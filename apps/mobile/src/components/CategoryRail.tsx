@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, memo } from 'react';
 import { ScrollView, Pressable, Text, StyleSheet, View } from 'react-native';
 import type { Theme } from '../theme/tokens';
 
@@ -32,7 +32,7 @@ interface Props {
   labelLang: 'ne' | 'en';
 }
 
-export function CategoryRail({ categories, active, onSelect, theme, labelLang }: Props) {
+function CategoryRailInner({ categories, active, onSelect, theme, labelLang }: Props) {
   const scroller = useRef<ScrollView>(null);
   /** Measured positions, so scrolling to a label does not depend on guessing
    *  its width — Devanagari and Latin differ considerably. */
@@ -95,6 +95,10 @@ export function CategoryRail({ categories, active, onSelect, theme, labelLang }:
     </View>
   );
 }
+
+/** The rail re-renders only when the active category or theme changes, not on
+ *  every feed state update in the screen above it. */
+export const CategoryRail = memo(CategoryRailInner);
 
 const styles = StyleSheet.create({
   wrap: { borderBottomWidth: StyleSheet.hairlineWidth },

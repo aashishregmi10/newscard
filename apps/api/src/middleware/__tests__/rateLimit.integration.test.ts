@@ -14,10 +14,12 @@ import { requestId, errorHandler } from '../index.js';
  * behaviour deterministic.
  */
 
-const URI =
-  process.env.MONGO_TEST_URI ??
-  process.env.MONGO_URI ??
-  'mongodb://localhost:27017/newscard_test';
+/**
+ * Never falls back to MONGO_URI. These suites DELETE collections, and a chain
+ * that reaches the development database turns `npm test` into "why is my feed
+ * empty" — a data loss that presents as a code bug.
+ */
+const URI = process.env.MONGO_TEST_URI ?? 'mongodb://localhost:27017/newscard_test';
 
 function appWithLimit(limit: number, windowMs = 60_000) {
   const app = express();

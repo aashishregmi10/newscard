@@ -5,6 +5,7 @@ import {
   useMemo,
   useState,
   useCallback,
+  useRef,
   type ReactNode,
 } from 'react';
 import { Platform } from 'react-native';
@@ -67,9 +68,15 @@ interface Ctx {
   prefs: NotifPrefs;
   /** OS-level permission, which is separate from our own preferences. */
   permission: 'granted' | 'denied' | 'undetermined';
-  /** True once the reader has read enough for the prompt to be fair to ask. */
+  /**
+   * True once the reader has read enough for the prompt to be fair to ask.
+   *
+   * Deliberately a boolean rather than the running count: the count changes on
+   * every card, and every consumer of this context re-renders when the context
+   * value changes — which meant each scrolled card re-rendered every mounted
+   * category feed. This flips once, and only once.
+   */
   promptEligible: boolean;
-  cardsRead: number;
   noteCardRead: () => void;
   requestPermission: () => Promise<boolean>;
   setPrefs: (patch: Partial<NotifPrefs>) => void;
@@ -102,7 +109,14 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
   const [token, setToken] = useState<string | null>(null);
   const [prefs, setPrefsState] = useState<NotifPrefs>(DEFAULT_PREFS);
   const [permission, setPermission] = useState<Ctx['permission']>('undetermined');
-  const [cardsRead, setCardsRead] = useState(0);
+  /** A ref, not state: counting a card must not re-render the feed. */
+  const cardsRead = useRef(0);
+  const [readEnough, setReadEnough] = useState(false);
+
+  const noteCardRead = useCallback(() => {
+    cardsRead.current += 1;
+    if (cardsRead.current >= CARDS_BEFORE_PROMPT) setReadEnough(true);
+  }, []);
   const [promptDismissed, setPromptDismissed] = useState(false);
 
   /** Register (or refresh) with the API. Idempotent on deviceId. */
@@ -218,16 +232,14 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
       registered: token !== null,
       prefs,
       permission,
-      cardsRead,
       promptDismissed,
-      promptEligible:
-        permission === 'undetermined' && !promptDismissed && cardsRead >= CARDS_BEFORE_PROMPT,
-      noteCardRead: () => setCardsRead((n) => n + 1),
+      promptEligible: permission === 'undetermined' && !promptDismissed && readEnough,
+      noteCardRead,
       requestPermission,
       setPrefs,
       dismissPrompt,
     }),
-    [ready, deviceId, token, prefs, permission, cardsRead, promptDismissed, requestPermission, setPrefs, dismissPrompt],
+    [ready, deviceId, token, prefs, permission, readEnough, promptDismissed, noteCardRead, requestPermission, setPrefs, dismissPrompt],
   );
 
   return <DeviceCtx.Provider value={value}>{children}</DeviceCtx.Provider>;

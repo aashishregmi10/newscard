@@ -15,8 +15,12 @@ import { publishArticle, retractArticle } from '../publish.service.js';
  * Uses its own database name so it can never touch dev data.
  */
 
-const URI =
-  process.env.MONGO_TEST_URI ?? 'mongodb://localhost:27017/newscard_test';
+/**
+ * Never falls back to MONGO_URI. These suites DELETE collections, and a chain
+ * that reaches the development database turns `npm test` into "why is my feed
+ * empty" — a data loss that presents as a code bug.
+ */
+const URI = process.env.MONGO_TEST_URI ?? 'mongodb://localhost:27017/newscard_test';
 
 /**
  * Publishing works with or without transactions, so these run against ANY

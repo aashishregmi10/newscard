@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, memo } from 'react';
 import { View, Image, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import {
   blurHashAverageColor,
@@ -35,7 +35,7 @@ interface Props {
  *  than no number at all — the point is that the reader can decide. */
 const APPROX_KB: Record<string, number> = { sm: 25, md: 70, lg: 140 };
 
-export function CardImage({ image, theme, height, dataSaver, rendition = 'md' }: Props) {
+function CardImageInner({ image, theme, height, dataSaver, rendition = 'md' }: Props) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [manuallyRequested, setManuallyRequested] = useState(false);
@@ -96,6 +96,9 @@ export function CardImage({ image, theme, height, dataSaver, rendition = 'md' }:
     </View>
   );
 }
+
+/** Images are the most expensive part of a card to re-mount. */
+export const CardImage = memo(CardImageInner);
 
 const styles = StyleSheet.create({
   wrap: { width: '100%', overflow: 'hidden' },

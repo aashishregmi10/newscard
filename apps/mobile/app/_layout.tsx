@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -8,6 +10,7 @@ import { FiltersProvider } from '../src/state/FiltersContext';
 import { DeviceProvider } from '../src/state/DeviceContext';
 import { useNotificationRouting } from '../src/hooks/useNotificationRouting';
 import { useRetractionPurge } from '../src/hooks/useRetractionPurge';
+import { loadAdBudget, flushAdEvents } from '../src/lib/adTracker';
 
 function Root() {
   const { isDark, theme } = useSettings();
@@ -15,6 +18,21 @@ function Root() {
   useNotificationRouting();
   // Drops withdrawn stories from the cache on every foreground (Ch. 9.7).
   useRetractionPurge();
+
+  // Warm the day's ad allowance so the first feed request does not wait on a
+  // storage read. useFeed awaits it too — that is what makes the cap correct;
+  // this only makes it fast.
+  useEffect(() => {
+    void loadAdBudget();
+    const sub = AppState.addEventListener('change', (s) => {
+      // Backgrounding is the last reliable moment to report. An impression the
+      // reader was mid-way through would otherwise be lost when the OS reclaims
+      // the process.
+      if (s !== 'active') void flushAdEvents();
+    });
+    return () => sub.remove();
+  }, []);
+
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />

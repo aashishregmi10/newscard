@@ -3,6 +3,8 @@ import { z } from 'zod';
 import { AppError, FEED_PAGE_SIZE } from '@newscard/shared';
 import { LanguageEnum } from '@newscard/schemas';
 import { getFeed } from '../services/feed.service.js';
+import { injectAds } from '../services/ads.service.js';
+import { DEFAULT_AD_DENSITY } from '@newscard/shared';
 import { asyncRoute } from '../middleware/index.js';
 import { loadEnv } from '../config/index.js';
 
@@ -20,6 +22,11 @@ const QuerySchema = z.object({
   category: z.string().default('top'),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().positive().default(FEED_PAGE_SIZE),
+  /** Content cards the reader has already passed. Ad placement is a function
+   *  of ABSOLUTE position, so this keeps spacing consistent across pages. */
+  seen: z.coerce.number().int().nonnegative().default(0),
+  /** Ads already shown to this device today, for the daily cap. */
+  adsToday: z.coerce.number().int().nonnegative().default(0),
 });
 
 export const feedRoutes = Router();
@@ -46,9 +53,21 @@ feedRoutes.get(
       cursorSecret: env.CURSOR_SECRET,
     });
 
-    // A minute of staleness is imperceptible for news at this cadence and
-    // removes most origin load (Ch. 6.5.4).
-    res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
-    res.json(result);
+    // Ads are interleaved AFTER the content page is built, so editorial order
+    // and source diversity survive untouched.
+    const { entries, adCount } = await injectAds(result.items, {
+      languages: lang,
+      categorySlug: category,
+      pageOffset: parsed.data.seen,
+      density: DEFAULT_AD_DENSITY,
+      adsShownToday: parsed.data.adsToday,
+    });
+
+    // Personalised by ad allowance, so this response is NOT shared cache-safe.
+    res.setHeader(
+      'Cache-Control',
+      adCount > 0 ? 'private, max-age=30' : 'public, max-age=60, stale-while-revalidate=300',
+    );
+    res.json({ ...result, items: entries, adCount });
   }),
 );

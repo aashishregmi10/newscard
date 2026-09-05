@@ -30,15 +30,28 @@ export interface CategoryPagerHandle {
 
 interface Props {
   initialPage: number;
+  /** Fired when the pager SETTLES on a page. */
   onPageChange: (index: number) => void;
+  /**
+   * Fired as soon as the swipe passes the halfway point, before it settles.
+   *
+   * The rail highlight follows this rather than onPageChange so the label moves
+   * with the reader's thumb instead of a beat after it. Waiting for the settle
+   * is the difference between a pager that feels attached to the finger and one
+   * that feels like it is catching up.
+   */
+  onPageApproaching?: (index: number) => void;
   children: ReactNode;
 }
 
 export const CategoryPager = forwardRef<CategoryPagerHandle, Props>(function CategoryPager(
-  { initialPage, onPageChange, children },
+  { initialPage, onPageChange, onPageApproaching, children },
   ref,
 ) {
   const pager = useRef<PagerView>(null);
+  /** Last index reported as approaching, so a frame-rate scroll event produces
+   *  at most one state update per swipe. */
+  const approaching = useRef(initialPage);
 
   useImperativeHandle(ref, () => ({
     setPage: (index: number) => pager.current?.setPage(index),
@@ -51,6 +64,17 @@ export const CategoryPager = forwardRef<CategoryPagerHandle, Props>(function Cat
       initialPage={initialPage}
       offscreenPageLimit={1}
       onPageSelected={(e) => onPageChange(e.nativeEvent.position)}
+      onPageScroll={(e) => {
+        if (!onPageApproaching) return;
+        const { position, offset } = e.nativeEvent;
+        const next = Math.round(position + offset);
+        if (next === approaching.current) return;
+        approaching.current = next;
+        onPageApproaching(next);
+      }}
+      // No rubber-band at the ends. On the first and last category the bounce
+      // reads as "something is there" when nothing is.
+      overdrag={false}
     >
       {children}
     </PagerView>

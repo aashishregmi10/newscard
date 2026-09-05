@@ -4,6 +4,7 @@ import { AppError, gone } from '@newscard/shared';
 import { feedRoutes } from './feed.routes.js';
 import { deviceRoutes } from './devices.routes.js';
 import { validateRoutes } from './validate.routes.js';
+import { adRoutes } from './ads.routes.js';
 import { getArticleBySlug } from '../services/feed.service.js';
 import { toArticleCard } from '../dto/articleCard.dto.js';
 import { asyncRoute } from '../middleware/index.js';
@@ -13,6 +14,7 @@ export const v1 = Router();
 v1.use(feedRoutes);
 v1.use(deviceRoutes);
 v1.use(validateRoutes);
+v1.use(adRoutes);
 
 /** GET /v1/articles/:slug — deep-link resolution. Spec Ch. 6.6. */
 v1.get(

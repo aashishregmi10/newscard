@@ -39,6 +39,27 @@ export default function FeedScreen() {
 
   const [categories, setCategories] = useState<CategoryOption[]>(FALLBACK_CATEGORIES);
   const [index, setIndex] = useState(0);
+  /**
+   * The category the rail highlights.
+   *
+   * Separate from `index` on purpose. This one moves as soon as the swipe
+   * crosses halfway, so the highlight tracks the thumb; `index` moves when the
+   * pager settles, and is what decides which feed is counting reads and
+   * measuring ads. Tying both to the settle made the rail feel a beat late.
+   */
+  const [railIndex, setRailIndex] = useState(0);
+  /**
+   * Which pages have ever been visited.
+   *
+   * PagerView keeps all its children in the React tree, so without this every
+   * category mounts a feed on launch: seven simultaneous requests before the
+   * reader has seen anything, and seven lists to reconcile on every swipe.
+   *
+   * Pages mount on first arrival and then STAY mounted — unmounting would throw
+   * away the reader's scroll position in a category they are moving between,
+   * which is the thing that makes a pager feel disposable.
+   */
+  const [visited, setVisited] = useState<ReadonlySet<number>>(() => new Set([0]));
   const [menuCard, setMenuCard] = useState<Card | null>(null);
   const pager = useRef<CategoryPagerHandle>(null);
 
@@ -54,13 +75,52 @@ export default function FeedScreen() {
   const selectByTap = useCallback(
     (slug: string) => {
       const next = categories.findIndex((c) => c.slug === slug);
-      if (next >= 0 && next !== index) pager.current?.setPage(next);
+      if (next < 0) return;
+      // Highlight immediately; the pager animates and its own callbacks follow.
+      // Waiting for the animation to finish before moving the highlight is what
+      // makes a tap feel unacknowledged.
+      setRailIndex(next);
+      pager.current?.setPage(next);
     },
-    [categories, index],
+    // Deliberately NOT dependent on `index`: a callback that changes on every
+    // page change defeats the rail's memoisation.
+    [categories],
   );
 
   const labelLang = languages.includes('ne') ? 'ne' : 'en';
-  const activeSlug = categories[index]?.slug ?? 'top';
+  const activeSlug = categories[railIndex]?.slug ?? 'top';
+
+  /**
+   * Called when the pager settles on a new page.
+   *
+   * The neighbours are marked visited at the same time so the NEXT swipe finds
+   * its page already mounted and shows cards immediately rather than a
+   * skeleton — the pager's own `offscreenPageLimit` keeps the native views
+   * alive, and this keeps the React side in step with it.
+   */
+  const onPageChange = useCallback((i: number) => {
+    setRailIndex(i);
+    setIndex((prev) => {
+      // A selection tick on arrival gives the horizontal swipe a physical
+      // answer, the same way the vertical card snap does.
+      if (i !== prev) void Haptics.selectionAsync();
+      return i;
+    });
+    setVisited((prev) => {
+      if (prev.has(i) && prev.has(i - 1) && prev.has(i + 1)) return prev;
+      const next = new Set(prev);
+      next.add(i);
+      next.add(i - 1);
+      next.add(i + 1);
+      return next;
+    });
+  }, []);
+
+  // Mounting the first neighbour on arrival, not during the swipe, keeps the
+  // gesture itself free of any mount work.
+  useEffect(() => {
+    setVisited((prev) => (prev.has(1) ? prev : new Set([...prev, 1])));
+  }, []);
 
   return (
     <View style={[styles.root, { backgroundColor: theme.surface, paddingTop: insets.top }]}>
@@ -75,28 +135,31 @@ export default function FeedScreen() {
       <CategoryPager
         ref={pager}
         initialPage={0}
-        onPageChange={(i) => {
-          // A selection tick on arrival gives the horizontal swipe a physical
-          // answer, the same way the vertical card snap does.
-          if (i !== index) void Haptics.selectionAsync();
-          setIndex(i);
-        }}
+        onPageChange={onPageChange}
+        onPageApproaching={setRailIndex}
       >
         {categories.map((c, i) => (
           // `key` must be the slug: PagerView keeps children mounted, and a
           // positional key would recycle one category's list into another.
           <View key={c.slug} style={styles.page} collapsable={false}>
-            <CategoryFeed
-              category={c.slug}
-              languages={languages}
-              theme={theme}
-              textScale={textScale}
-              dataSaver={dataSaver}
-              height={pageHeight}
-              labelLang={labelLang}
-              active={i === index}
-              onMenu={setMenuCard}
-            />
+            {visited.has(i) ? (
+              <CategoryFeed
+                category={c.slug}
+                languages={languages}
+                theme={theme}
+                textScale={textScale}
+                dataSaver={dataSaver}
+                height={pageHeight}
+                labelLang={labelLang}
+                active={i === index}
+                onMenu={setMenuCard}
+              />
+            ) : (
+              // An unvisited page is a plain surface, not a skeleton: a skeleton
+              // implies something is loading, and nothing is — the reader has
+              // not asked for this category yet.
+              <View style={[styles.page, { backgroundColor: theme.surface }]} />
+            )}
           </View>
         ))}
       </CategoryPager>

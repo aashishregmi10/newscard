@@ -10,6 +10,9 @@ import { publicReadLimit } from './middleware/rateLimit.js';
 /** repo root, from apps/api/src */
 const MEDIA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'media');
 
+/** apps/api/public — the advertiser report page. Static, no build step. */
+const PUBLIC_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
+
 /**
  * Middleware order is load-bearing:
  *
@@ -57,6 +60,18 @@ export function createApp(): Express {
       },
     }),
   );
+
+  /**
+   * The advertiser report page.
+   *
+   * Static files only, so helmet's default CSP (`script-src 'self'`) is
+   * satisfied without loosening anything — which is also why the page carries
+   * no inline script and no CDN dependency.
+   *
+   * noindex is set in the page itself; nothing here is secret without a token,
+   * but a campaign report has no business in a search index.
+   */
+  app.use('/report', express.static(join(PUBLIC_DIR, 'report'), { index: 'index.html' }));
 
   // Applied to the whole read surface. Deliberately generous: carrier-grade NAT
   // means one apparent IP can be a whole mobile cell (Ch. 6.10).

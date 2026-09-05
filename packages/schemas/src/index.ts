@@ -8,4 +8,5 @@ export * from './staff.js';
 export * from './notification.js';
 export * from './readEvent.js';
 export * from './config.js';
+export * from './ad.js';
 export * from './mongoValidator.js';

@@ -1,8 +1,7 @@
 import { Tabs } from 'expo-router';
-import { View, Text, StyleSheet, type ColorValue } from 'react-native';
+import { View, StyleSheet, type ColorValue } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSettings } from '../../src/state/SettingsContext';
-import { useBookmarks } from '../../src/state/BookmarksContext';
 
 /**
  * Bottom navigation.  Spec Ch. 7.9.
@@ -37,19 +36,25 @@ import { useBookmarks } from '../../src/state/BookmarksContext';
  */
 type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
 
+/**
+ * No count badge on Saved.
+ *
+ * A number on a tab is a nag: it asks to be cleared, and there is nothing here
+ * to clear — a saved story is something the reader chose to keep, not an unread
+ * item demanding attention. The icon already changes shape when the tab is
+ * active, which is all the state this needs.
+ */
 function TabIcon({
   name,
   nameFocused,
   focused,
   color,
-  badge,
 }: {
   name: IconName;
   nameFocused: IconName;
   focused: boolean;
   /** react-navigation hands back a ColorValue, not a plain string. */
   color: ColorValue;
-  badge?: number;
 }) {
   return (
     <View style={styles.iconWrap}>
@@ -58,18 +63,12 @@ function TabIcon({
         size={23}
         color={color as string}
       />
-      {badge ? (
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
-        </View>
-      ) : null}
     </View>
   );
 }
 
 export default function TabsLayout() {
   const { theme } = useSettings();
-  const { items } = useBookmarks();
 
   return (
     <Tabs
@@ -111,7 +110,6 @@ export default function TabsLayout() {
               nameFocused="bookmark"
               focused={focused}
               color={color}
-              badge={items.length}
             />
           ),
         }}
@@ -131,17 +129,4 @@ export default function TabsLayout() {
 
 const styles = StyleSheet.create({
   iconWrap: { width: 34, alignItems: 'center', justifyContent: 'center' },
-  badge: {
-    position: 'absolute',
-    top: -4,
-    right: -2,
-    minWidth: 16,
-    height: 16,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-    backgroundColor: '#C0392B',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: { color: '#fff', fontSize: 10, fontWeight: '700' },
 });

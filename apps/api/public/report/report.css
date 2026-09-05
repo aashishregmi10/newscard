@@ -1,0 +1,312 @@
+/*
+ * Campaign report styling.
+ *
+ * Plain, printable, and readable on a phone — a local advertiser is as likely
+ * to open this on a handset as on a desktop, and quite likely to print it for
+ * someone who approves the spend. No web fonts and no frameworks: the page has
+ * to load quickly on the same connections the app is designed for.
+ */
+
+:root {
+  --ink: #14171a;
+  --ink-2: #5b6570;
+  --line: #e3e7eb;
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --accent: #1f5fd6;
+  --good: #1c7a4a;
+  --warn: #9a6b12;
+  --radius: 10px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans", Arial,
+    sans-serif;
+}
+
+.wrap {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.top {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  padding: 14px 0;
+  margin-bottom: 28px;
+}
+.top .wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.brand {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.brandsub {
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+
+h1 {
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+h2 {
+  font-size: 15px;
+  margin: 0 0 14px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+h3 {
+  font-size: 15px;
+  margin: 0 0 8px;
+}
+p {
+  margin: 0 0 12px;
+}
+.muted {
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 22px;
+  margin-bottom: 18px;
+}
+
+/* ---------------------------------------------------------------- sign-in */
+
+.auth {
+  max-width: 460px;
+}
+.auth label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin: 14px 0 5px;
+}
+.auth input[type='text'],
+.auth input[type='password'],
+.auth input:not([type]) {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font: inherit;
+  font-size: 14px;
+}
+.auth input:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 400;
+  font-size: 13.5px;
+  margin: 16px 0 4px;
+}
+.remember input {
+  width: auto;
+}
+button {
+  margin-top: 16px;
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.linkish {
+  width: auto;
+  background: none;
+  color: var(--accent);
+  font-weight: 600;
+  padding: 0;
+  margin: 0;
+  border-radius: 0;
+}
+.error {
+  color: #a5271f;
+  font-size: 13.5px;
+  margin-top: 12px;
+}
+
+/* ----------------------------------------------------------------- report */
+
+.head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pill {
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+.pill.live {
+  color: var(--good);
+  border-color: #bfe0cd;
+  background: #f0f9f4;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.metric {
+  background: var(--surface);
+  padding: 16px 18px;
+}
+.metric .value {
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.metric .label {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  margin-top: 2px;
+}
+.metric .note {
+  font-size: 11.5px;
+  color: var(--ink-2);
+  margin-top: 6px;
+}
+
+.bar {
+  height: 8px;
+  background: var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+  margin: 10px 0 6px;
+}
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+th,
+td {
+  text-align: left;
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--line);
+}
+th {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+}
+td.num,
+th.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.chart {
+  width: 100%;
+  height: 160px;
+  display: block;
+  overflow-x: auto;
+}
+.chart rect {
+  fill: var(--accent);
+}
+.chart rect.viewable {
+  fill: #8fb2ec;
+}
+.chart text {
+  font-size: 10px;
+  fill: var(--ink-2);
+}
+
+.legend {
+  display: flex;
+  gap: 16px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  margin-top: 8px;
+}
+.legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  margin-right: 6px;
+}
+
+.explain dt {
+  font-weight: 600;
+  margin-top: 12px;
+}
+.explain dd {
+  margin: 3px 0 0;
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+
+.foot {
+  color: var(--ink-2);
+  font-size: 12.5px;
+  padding-bottom: 40px;
+}
+
+@media print {
+  .top,
+  .auth,
+  button {
+    display: none;
+  }
+  body {
+    background: #fff;
+  }
+  .card,
+  .grid {
+    break-inside: avoid;
+  }
+}

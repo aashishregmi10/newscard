@@ -72,8 +72,27 @@ export interface Card {
   image: CardImage | null;
 }
 
+export interface AdCard {
+  kind: 'ad';
+  id: string;
+  campaignId: string;
+  language: 'ne' | 'en';
+  advertiser: string;
+  headline: string;
+  body: string;
+  callToAction: { ne: string; en: string };
+  landingUrl: string;
+  image: { blurHash: string | null; urls: { sm: string | null; md: string | null; lg: string | null } } | null;
+}
+
+/** A feed entry is either editorial or an ad. Discriminated on `kind` so the
+ *  two can never be confused at a call site. */
+export type FeedEntry = (Card & { kind?: 'article' }) | AdCard;
+
+export const isAd = (e: FeedEntry): e is AdCard => (e as AdCard).kind === 'ad';
+
 export interface FeedPage {
-  items: Card[];
+  items: FeedEntry[];
   nextCursor: string | null;
   hasMore: boolean;
 }
@@ -94,11 +113,19 @@ export async function fetchFeed(opts: {
   category?: string;
   cursor?: string | null;
   limit?: number;
+  /** Content cards already loaded in this category. Ad spacing is a function
+   *  of ABSOLUTE position, so without this every page would restart the count
+   *  and the reader would meet an ad every few cards at each page boundary. */
+  seen?: number;
+  /** Ads this device has already been shown today, for the daily cap. */
+  adsToday?: number;
 }): Promise<FeedPage> {
   const params = new URLSearchParams({
     lang: opts.languages.join(','),
     category: opts.category ?? 'top',
     limit: String(opts.limit ?? 20),
+    seen: String(opts.seen ?? 0),
+    adsToday: String(opts.adsToday ?? 0),
   });
   if (opts.cursor) params.set('cursor', opts.cursor);
 
@@ -137,7 +164,7 @@ export async function fetchFeed(opts: {
     throw new FeedError('bad-response', 'That did not look like our server.');
   }
   const bad = page.items.find(
-    (i) => typeof i?.id !== 'string' || typeof i?.headline !== 'string',
+    (i) => typeof i?.id !== 'string' || typeof (i as { headline?: unknown }).headline !== 'string',
   );
   if (bad) throw new FeedError('bad-response', 'That did not look like our server.');
 
@@ -204,4 +231,32 @@ export function blurHashAverageColor(hash: string | null | undefined): string | 
   const g = (dc >> 8) & 255;
   const b = dc & 255;
   return `rgb(${r}, ${g}, ${b})`;
+}
+
+/* ------------------------------------------------------ ad measurement */
+
+export interface AdEventInput {
+  campaignId: string;
+  type: 'impression' | 'click';
+  dwellMs: number;
+  categorySlug: string;
+  occurredAt: string;
+}
+
+/**
+ * Post a batch of ad events.
+ *
+ * Deliberately returns void and swallows nothing louder than a rejection: the
+ * caller treats measurement as best-effort. An advertiser losing one impression
+ * to a dropped connection is a rounding error; a reader losing the story they
+ * were reading because a measurement call failed is not.
+ */
+export async function postAdEvents(deviceId: string, events: AdEventInput[]): Promise<void> {
+  if (events.length === 0) return;
+  const res = await fetch(`${API_BASE}/v1/ads/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deviceId, events: events.slice(0, 50) }),
+  });
+  if (!res.ok) throw new FeedError('server', `Ad events returned ${res.status}.`);
 }

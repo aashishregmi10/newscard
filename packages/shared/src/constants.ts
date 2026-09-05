@@ -30,6 +30,17 @@ export const ARTICLE_CACHE_MAX_CARDS = 400;
 
 /** Spec Ch. 3.8.1 / 3.6.1 */
 export const READ_EVENT_TTL_DAYS = 90;
+
+/**
+ * How long raw ad events are kept.
+ *
+ * Longer than read events because an advertiser can reasonably ask for a report
+ * on a campaign that ran last season, and a year plus a margin covers a full
+ * annual cycle of comparisons. The campaign's own running totals are
+ * denormalised and never expire, so expiry costs detail, not the record of what
+ * was delivered.
+ */
+export const AD_EVENT_TTL_DAYS = 400;
 export const DEVICE_IDLE_DELETE_DAYS = 180;
 
 export const IMAGE_RENDITIONS = ['sm', 'md', 'lg'] as const;

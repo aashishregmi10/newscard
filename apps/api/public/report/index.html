@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Campaign report — NEWSCARD</title>
+    <link rel="stylesheet" href="./report.css" />
+  </head>
+  <body>
+    <header class="top">
+      <div class="wrap">
+        <span class="brand">NEWSCARD</span>
+        <span class="brandsub">Campaign report</span>
+      </div>
+    </header>
+
+    <main class="wrap">
+      <!-- Sign-in. The token is deliberately entered rather than carried in the
+           link: a token in a URL ends up in browser history, in referrer
+           headers, and in any proxy log the link passes through. -->
+      <form id="auth" class="card auth">
+        <h1>Open your report</h1>
+        <p class="muted">
+          Use the campaign ID and report token we sent you. The token is not stored
+          on our servers in a readable form and never appears in the address bar.
+        </p>
+
+        <label for="campaign">Campaign ID</label>
+        <input id="campaign" name="campaign" autocomplete="off" spellcheck="false"
+               placeholder="24-character ID" required />
+
+        <label for="token">Report token</label>
+        <input id="token" name="token" type="password" autocomplete="off"
+               spellcheck="false" placeholder="rp_…" required />
+
+        <label class="remember">
+          <input id="remember" type="checkbox" checked />
+          <span>Keep me signed in until I close this tab</span>
+        </label>
+
+        <button type="submit" id="open">Open report</button>
+        <p id="autherr" class="error" hidden></p>
+      </form>
+
+      <section id="report" hidden></section>
+    </main>
+
+    <footer class="wrap foot">
+      <p>
+        Every figure here is an aggregate. We do not build profiles of readers, we
+        do not use advertising identifiers, and no number on this page describes an
+        individual person.
+      </p>
+    </footer>
+
+    <script src="./report.js"></script>
+  </body>
+</html>

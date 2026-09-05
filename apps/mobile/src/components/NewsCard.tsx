@@ -1,7 +1,7 @@
 import { View, Text, StyleSheet, Pressable, Linking, Share } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useRef } from 'react';
+import { useRef, memo } from 'react';
 import { Animated } from 'react-native';
 import type { Card } from '../api/client';
 import { CardImage } from './CardImage';
@@ -29,7 +29,7 @@ interface Props {
   onMenu?: (card: Card) => void;
 }
 
-export function NewsCard({ card, theme, height, textScale, dataSaver, onMenu }: Props) {
+function NewsCardInner({ card, theme, height, textScale, dataSaver, onMenu }: Props) {
   const bookmarks = useBookmarks();
   const saved = bookmarks.has(card.id);
 
@@ -184,6 +184,13 @@ export function NewsCard({ card, theme, height, textScale, dataSaver, onMenu }: 
     </View>
   );
 }
+
+/**
+ * Cards are the most numerous component in the app and their props are stable
+ * for the life of a card. Memoising them means a parent re-render — a category
+ * swipe, a settings change — does not rebuild every visible card's subtree.
+ */
+export const NewsCard = memo(NewsCardInner);
 
 const styles = StyleSheet.create({
   card: { justifyContent: 'flex-start' },

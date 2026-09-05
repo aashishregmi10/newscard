@@ -91,6 +91,18 @@ export function generateFor(slug: string, categorySlug: string, cdnBase: string)
 /** Regenerate every image the seed will reference. */
 export function generateAll(cdnBase: string): { count: number; bytes: number } {
   let bytes = 0;
+  // Ad creatives, keyed the same way the ad seed derives them.
+  const AD_KEYS = [
+    'ad-namuna-bank-Savings account — Dashain',
+    'ad-sample-telecom-Data pack launch',
+    'ad-namuna-shikshya-Exam preparation intake',
+    'ad-sample-trek-Autumn season',
+  ];
+  for (const slug of AD_KEYS) {
+    const img = generateFor(slug, 'business', cdnBase);
+    bytes += Object.values(img.bytes).reduce((x, y) => x + y, 0);
+  }
+
   for (const { slug, category } of SEED_SLUGS) {
     const img = generateFor(slug, category, cdnBase);
     bytes += Object.values(img.bytes).reduce((x, y) => x + y, 0);

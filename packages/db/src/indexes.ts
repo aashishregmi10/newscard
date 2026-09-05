@@ -1,5 +1,5 @@
 import type { Db, IndexDescription } from 'mongodb';
-import { READ_EVENT_TTL_DAYS } from '@newscard/shared';
+import { READ_EVENT_TTL_DAYS, AD_EVENT_TTL_DAYS } from '@newscard/shared';
 
 /**
  * Every index in the system.  Spec Ch. 3.15.
@@ -146,6 +146,39 @@ const NOTIFICATIONS: IndexSpec[] = [
   { key: { articleId: 1 }, name: 'notif_by_article', sparse: true, serves: 'Collapse-key lookup' },
 ];
 
+const CAMPAIGNS: IndexSpec[] = [
+  {
+    key: { status: 1, language: 1, startsAt: 1, endsAt: 1 },
+    name: 'campaign_eligibility',
+    serves: 'Ad selection — the live/in-flight/language filter on every feed request carrying an ad',
+  },
+  {
+    key: { advertiserId: 1 },
+    name: 'campaign_by_advertiser',
+    serves: 'Advertiser reporting across all of their campaigns',
+  },
+];
+
+const AD_EVENTS: IndexSpec[] = [
+  {
+    key: { campaignId: 1, type: 1, occurredAt: -1 },
+    name: 'ad_events_by_campaign',
+    serves:
+      'Daily pacing (servedToday) and every report aggregation. Without it, pacing scans the ' +
+      'whole event collection on each ad served — the one query on the serving hot path',
+  },
+  {
+    key: { occurredAt: 1 },
+    name: 'ad_events_ttl',
+    expireAfterSeconds: AD_EVENT_TTL_DAYS * 24 * 60 * 60,
+    serves: 'Automatic expiry of raw events; campaign totals are denormalised and survive',
+  },
+];
+
+const ADVERTISERS: IndexSpec[] = [
+  { key: { name: 1 }, name: 'advertiser_name_unique', unique: true, serves: 'Seed and CMS lookup' },
+];
+
 export const ALL_INDEXES = {
   articles: ARTICLES,
   sources: SOURCES,
@@ -155,6 +188,9 @@ export const ALL_INDEXES = {
   bookmarks: BOOKMARKS,
   staff: STAFF,
   notifications: NOTIFICATIONS,
+  advertisers: ADVERTISERS,
+  campaigns: CAMPAIGNS,
+  adEvents: AD_EVENTS,
 } as const;
 
 export interface SyncResult {

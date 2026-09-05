@@ -17,6 +17,7 @@ import { countGraphemes, countWords } from '@newscard/shared';
 import { hash as argonHash } from '@node-rs/argon2';
 import { STORIES, SOURCES } from './seedStories.js';
 import { generateFor } from './gen-images.js';
+import { seedAds } from './seedAds.js';
 
 /** Development-only credentials, printed at the end so they are never a secret
  *  hidden in a file, and never reused anywhere real. */
@@ -187,12 +188,25 @@ async function main(): Promise<void> {
     } as never);
   }
 
+  const ads = await seedAds(db, CDN_BASE);
+  console.log(`  ${ads.advertisers} advertisers, ${ads.campaigns} campaigns (all fictional)`);
+
   const ne = STORIES.filter((s) => s.language === 'ne').length;
   console.log(`  ${STORIES.length} articles (${ne} Nepali, ${STORIES.length - ne} English)`);
   console.log(`  ${withImage} with images, ${STORIES.length - withImage} without (deliberate)`);
   console.log(`  ${clusterIds.size} cluster(s) — one story carried by 3 outlets`);
   console.log('\nseed complete');
   console.log(`\nCMS login (development only):\n  ${DEV_EMAIL}\n  ${DEV_PASSWORD}`);
+
+  // Printed rather than stored: the campaign holds only a sha256 of this, so
+  // there is nowhere to look it up afterwards. Re-seed to issue a new one.
+  console.log('\nAdvertiser reports (development only) — each token is shown once:');
+  for (const s of ads.seeded) {
+    console.log(`  ${s.advertiser}`);
+    console.log(
+      `    curl -H "Authorization: Bearer ${s.reportToken}" http://localhost:3000/v1/ads/campaigns/${s.id}/report`,
+    );
+  }
 }
 
 main()

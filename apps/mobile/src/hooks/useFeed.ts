@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchFeed, FeedError, type Card } from '../api/client';
+import { fetchFeed, FeedError, isAd, type Card, type FeedEntry } from '../api/client';
 import { putCards, getCards, evict } from '../db/cache';
+import { adsShownToday, loadAdBudget } from '../lib/adTracker';
 
 /**
  * Feed loading with an offline cache.  Spec Ch. 9.
@@ -19,7 +20,7 @@ import { putCards, getCards, evict } from '../db/cache';
 export type FeedStatus = 'loading' | 'ready' | 'empty';
 
 export interface FeedState {
-  cards: Card[] | null;
+  cards: FeedEntry[] | null;
   status: FeedStatus;
   /** Set when the last network attempt failed. Cards may still be present. */
   error: { kind: string; message: string } | null;
@@ -40,6 +41,9 @@ export function useFeed(languages: Array<'ne' | 'en'>, category: string) {
   const cursor = useRef<string | null>(null);
   const hasMore = useRef(true);
   const loadingMore = useRef(false);
+  /** Content cards delivered so far. Ads are spaced on ABSOLUTE position, so
+   *  the server needs the running total, not the offset within one page. */
+  const contentSeen = useRef(0);
   /** Guards against a slow response for a category the reader has left. */
   const requestId = useRef(0);
 
@@ -77,7 +81,19 @@ export function useFeed(languages: Array<'ne' | 'en'>, category: string) {
       }
 
       try {
-        const page = await fetchFeed({ languages, category, limit: 20 });
+        // Must resolve BEFORE the request. Reporting zero ads shown would reset
+        // the daily cap on every cold start — the whole cap, defeated by an app
+        // restart. It is a single AsyncStorage read and idempotent after the
+        // first call.
+        await loadAdBudget();
+
+        const page = await fetchFeed({
+          languages,
+          category,
+          limit: 20,
+          seen: 0,
+          adsToday: adsShownToday(),
+        });
         if (requestId.current !== myRequest) return;
 
         cursor.current = page.nextCursor;
@@ -91,7 +107,13 @@ export function useFeed(languages: Array<'ne' | 'en'>, category: string) {
           refreshing: false,
         });
 
-        void putCards(page.items, category).then(() => evict()).catch(() => undefined);
+        contentSeen.current = page.items.filter((i) => !isAd(i)).length;
+
+        // Only editorial is cached. An ad has a flight window and a budget;
+        // serving one from a stale cache would bill nobody and mislead the
+        // reader after the campaign has ended.
+        const articlesOnly = page.items.filter((i): i is Card => !isAd(i));
+        void putCards(articlesOnly, category).then(() => evict()).catch(() => undefined);
       } catch (e) {
         if (requestId.current !== myRequest) return;
         const fe = e instanceof FeedError ? e : null;
@@ -125,11 +147,14 @@ export function useFeed(languages: Array<'ne' | 'en'>, category: string) {
         category,
         cursor: cursor.current,
         limit: 20,
+        seen: contentSeen.current,
+        adsToday: adsShownToday(),
       });
       setState((s) => ({ ...s, cards: [...(s.cards ?? []), ...page.items] }));
+      contentSeen.current += page.items.filter((i) => !isAd(i)).length;
       cursor.current = page.nextCursor;
       hasMore.current = page.hasMore;
-      void putCards(page.items, category).catch(() => undefined);
+      void putCards(page.items.filter((i): i is Card => !isAd(i)), category).catch(() => undefined);
     } catch {
       // Silent. The reader still has everything above; a toast would interrupt
       // reading to report something they never asked for.
