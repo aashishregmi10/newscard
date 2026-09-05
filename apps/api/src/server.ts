@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { connect, close, warnIfNoTransactions } from '@newscard/db';
 import { loadEnv } from './config/index.js';
 import { createApp } from './app.js';
+import { ensureRateLimitIndexes } from './middleware/rateLimit.js';
 
 async function main(): Promise<void> {
   const env = loadEnv();
@@ -10,6 +11,7 @@ async function main(): Promise<void> {
   // The read API never opens a transaction, so a standalone MongoDB is fine
   // here — warn and carry on. The CMS asserts instead, because it publishes.
   await warnIfNoTransactions();
+  await ensureRateLimitIndexes();
 
   const app = createApp();
   const server = app.listen(env.API_PORT, () => {

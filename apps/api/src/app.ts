@@ -5,6 +5,7 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { requestId, sanitizeMongo, errorHandler, notFoundHandler } from './middleware/index.js';
 import { v1 } from './routes/index.js';
+import { publicReadLimit } from './middleware/rateLimit.js';
 
 /** repo root, from apps/api/src */
 const MEDIA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'media');
@@ -57,7 +58,9 @@ export function createApp(): Express {
     }),
   );
 
-  app.use('/v1', v1);
+  // Applied to the whole read surface. Deliberately generous: carrier-grade NAT
+  // means one apparent IP can be a whole mobile cell (Ch. 6.10).
+  app.use('/v1', publicReadLimit, v1);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
