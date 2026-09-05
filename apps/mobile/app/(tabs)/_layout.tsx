@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, Text, StyleSheet, type ColorValue } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSettings } from '../../src/state/SettingsContext';
 import { useBookmarks } from '../../src/state/BookmarksContext';
 
@@ -26,16 +27,25 @@ import { useBookmarks } from '../../src/state/BookmarksContext';
  * A tab bar with five dead ends is worse than three that work.
  */
 
-/** Simple glyph icons: no icon-font dependency, which keeps the bundle inside
- *  the size budget (Ch. 12.6). Each is paired with a label, so meaning never
- *  rests on the glyph alone. */
+/**
+ * Material icons from @expo/vector-icons, which ships with Expo — no extra
+ * download and no webfont request at runtime.
+ *
+ * The filled/outlined pair carries the selected state as SHAPE, not only as
+ * colour, so the active tab is still obvious to someone who cannot distinguish
+ * the accent from the muted grey (Ch. 11.7).
+ */
+type IconName = React.ComponentProps<typeof MaterialCommunityIcons>['name'];
+
 function TabIcon({
-  glyph,
+  name,
+  nameFocused,
   focused,
   color,
   badge,
 }: {
-  glyph: string;
+  name: IconName;
+  nameFocused: IconName;
   focused: boolean;
   /** react-navigation hands back a ColorValue, not a plain string. */
   color: ColorValue;
@@ -43,7 +53,11 @@ function TabIcon({
 }) {
   return (
     <View style={styles.iconWrap}>
-      <Text style={{ fontSize: 19, color, opacity: focused ? 1 : 0.75 }}>{glyph}</Text>
+      <MaterialCommunityIcons
+        name={focused ? nameFocused : name}
+        size={23}
+        color={color as string}
+      />
       {badge ? (
         <View style={styles.badge}>
           <Text style={styles.badgeText}>{badge > 99 ? '99+' : badge}</Text>
@@ -78,7 +92,12 @@ export default function TabsLayout() {
         options={{
           title: 'Feed',
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon glyph="▤" focused={focused} color={color} />
+            <TabIcon
+              name="card-text-outline"
+              nameFocused="card-text"
+              focused={focused}
+              color={color}
+            />
           ),
         }}
       />
@@ -87,7 +106,13 @@ export default function TabsLayout() {
         options={{
           title: 'Saved',
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon glyph="♡" focused={focused} color={color} badge={items.length} />
+            <TabIcon
+              name="bookmark-outline"
+              nameFocused="bookmark"
+              focused={focused}
+              color={color}
+              badge={items.length}
+            />
           ),
         }}
       />
@@ -96,7 +121,7 @@ export default function TabsLayout() {
         options={{
           title: 'Settings',
           tabBarIcon: ({ focused, color }) => (
-            <TabIcon glyph="⚙" focused={focused} color={color} />
+            <TabIcon name="cog-outline" nameFocused="cog" focused={focused} color={color} />
           ),
         }}
       />

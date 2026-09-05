@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import { ScrollView, Pressable, Text, StyleSheet, View } from 'react-native';
 import type { Theme } from '../theme/tokens';
 
@@ -26,9 +27,24 @@ interface Props {
 }
 
 export function CategoryRail({ categories, active, onSelect, theme, labelLang }: Props) {
+  const scroller = useRef<ScrollView>(null);
+  /** Measured chip positions, so scrolling to one does not depend on guessing
+   *  its width from the label length — Devanagari and Latin differ a lot. */
+  const layouts = useRef<Record<string, { x: number; width: number }>>({});
+
+  // Keep the active chip visible as the reader SWIPES between categories, not
+  // only when they tap. Without this the rail highlights a chip that may be off
+  // screen, and the rail reads as disconnected from the gesture.
+  useEffect(() => {
+    const l = layouts.current[active];
+    if (!l) return;
+    scroller.current?.scrollTo({ x: Math.max(0, l.x - 64), animated: true });
+  }, [active]);
+
   return (
     <View style={[styles.wrap, { borderBottomColor: theme.divider }]}>
       <ScrollView
+        ref={scroller}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.content}
@@ -38,6 +54,10 @@ export function CategoryRail({ categories, active, onSelect, theme, labelLang }:
           return (
             <Pressable
               key={c.slug}
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                layouts.current[c.slug] = { x, width };
+              }}
               onPress={() => onSelect(c.slug)}
               style={[
                 styles.chip,

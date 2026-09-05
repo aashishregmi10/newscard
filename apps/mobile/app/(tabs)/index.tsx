@@ -1,31 +1,26 @@
-import { useState, useEffect, useRef } from 'react';
-import {
-  View,
-  Text,
-  FlatList,
-  StyleSheet,
-  useWindowDimensions,
-  Pressable,
-  RefreshControl,
-} from 'react-native';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { View, StyleSheet, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { NewsCard } from '../../src/components/NewsCard';
-import { CardSkeleton } from '../../src/components/CardSkeleton';
+import * as Haptics from 'expo-haptics';
 import { CategoryRail, type CategoryOption } from '../../src/components/CategoryRail';
+import { CategoryPager, type CategoryPagerHandle } from '../../src/components/CategoryPager';
+import { CategoryFeed } from '../../src/components/CategoryFeed';
 import { CardMenu } from '../../src/components/CardMenu';
+import { NotifPrompt } from '../../src/components/NotifPrompt';
 import { fetchCategories, type Card } from '../../src/api/client';
-import { useFeed } from '../../src/hooks/useFeed';
 import { useSettings } from '../../src/state/SettingsContext';
 import { useFilters } from '../../src/state/FiltersContext';
-import { useDevice } from '../../src/state/DeviceContext';
-import { NotifPrompt } from '../../src/components/NotifPrompt';
 
 /**
- * The feed.  Spec Ch. 7.1.
+ * The feed screen.  Spec Ch. 7.1, 7.9.
  *
- * Full-screen and vertically PAGED. Not free-scrolling: a free list lets the
- * reader park between two cards, halving the reading area, which reads as
- * broken. Paging guarantees whatever is on screen is one complete story.
+ * Two axes, which is what makes it feel like a phone app rather than a list:
+ *
+ *   vertical   — one swipe, one story (paged, Reels-style)
+ *   horizontal — one swipe, one category: नेपाल → राजनीति → अर्थतन्त्र
+ *
+ * The rail stays tappable for jumping several categories at once; the swipe is
+ * for moving one step, which is the common case.
  */
 
 const FALLBACK_CATEGORIES: CategoryOption[] = [
@@ -34,31 +29,18 @@ const FALLBACK_CATEGORIES: CategoryOption[] = [
 
 export default function FeedScreen() {
   const { theme, textScale, dataSaver, languages } = useSettings();
+  const filters = useFilters();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
   const railH = 52;
   const tabBarH = 58;
-  const [listH, setListH] = useState(Math.round(height - insets.top - railH - tabBarH));
+  const pageHeight = Math.round(height - insets.top - railH - tabBarH);
 
   const [categories, setCategories] = useState<CategoryOption[]>(FALLBACK_CATEGORIES);
-  const [category, setCategory] = useState('top');
-  const listRef = useRef<FlatList<Card>>(null);
-
-  const filters = useFilters();
-  const device = useDevice();
+  const [index, setIndex] = useState(0);
   const [menuCard, setMenuCard] = useState<Card | null>(null);
-  /** Cards already counted, so re-visiting one does not inflate the total that
-   *  gates the permission prompt. */
-  const counted = useRef<Set<string>>(new Set());
-
-  const { cards: rawCards, status, error, fromCache, refreshing, reload, refresh, loadMore } =
-    useFeed(languages, category);
-
-  // Applied client-side and immediately. "Not interested" must visibly change
-  // the feed — a control that does nothing teaches the reader we ignore them
-  // (Ch. 7.8).
-  const cards = rawCards?.filter((c) => !filters.isMuted(c.category.slug, c.source.name)) ?? null;
+  const pager = useRef<CategoryPagerHandle>(null);
 
   useEffect(() => {
     // Non-fatal: the feed still works on `top` if this never resolves.
@@ -67,127 +49,57 @@ export default function FeedScreen() {
       .catch(() => undefined);
   }, []);
 
-  const selectCategory = (slug: string) => {
-    if (slug === category) return;
-    setCategory(slug);
-    listRef.current?.scrollToOffset({ offset: 0, animated: false });
-  };
+  /** Rail tap → jump the pager. The pager's own callback then updates `index`,
+   *  so tap and swipe converge on one source of truth. */
+  const selectByTap = useCallback(
+    (slug: string) => {
+      const next = categories.findIndex((c) => c.slug === slug);
+      if (next >= 0 && next !== index) pager.current?.setPage(next);
+    },
+    [categories, index],
+  );
 
   const labelLang = languages.includes('ne') ? 'ne' : 'en';
-
-  /** Shown only when there is something on screen to qualify. A banner over an
-   *  empty view would just be a worse empty state. */
-  const bannerText =
-    cards && cards.length > 0
-      ? error?.kind === 'offline'
-        ? labelLang === 'ne'
-          ? 'तपाईं अफलाइन हुनुहुन्छ। सुरक्षित समाचार देखाइँदै।'
-          : 'You are offline. Showing saved stories.'
-        : error
-          ? error.message
-          : fromCache
-            ? labelLang === 'ne'
-              ? 'सुरक्षित प्रतिलिपि देखाइँदै…'
-              : 'Showing saved copy…'
-            : null
-      : null;
+  const activeSlug = categories[index]?.slug ?? 'top';
 
   return (
     <View style={[styles.root, { backgroundColor: theme.surface, paddingTop: insets.top }]}>
       <CategoryRail
         categories={categories}
-        active={category}
-        onSelect={selectCategory}
+        active={activeSlug}
+        onSelect={selectByTap}
         theme={theme}
         labelLang={labelLang}
       />
 
-      {bannerText && (
-        <View style={[styles.banner, { backgroundColor: theme.surfaceRaised }]}>
-          <Text style={{ color: theme.textSecondary, fontSize: 12.5 }}>{bannerText}</Text>
-        </View>
-      )}
-
-      {status === 'loading' && !cards ? (
-        <CardSkeleton theme={theme} height={listH} />
-      ) : !cards || cards.length === 0 ? (
-        <View style={styles.empty}>
-          <Text style={[styles.emptyTitle, { color: theme.textPrimary }]}>
-            {error
-              ? labelLang === 'ne'
-                ? 'समाचार ल्याउन सकिएन'
-                : 'Could not load stories'
-              : labelLang === 'ne'
-                ? 'यहाँ केही छैन'
-                : 'Nothing here yet'}
-          </Text>
-          <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
-            {error?.message ??
-              (labelLang === 'ne'
-                ? 'यो श्रेणीमा अहिले कुनै समाचार छैन।'
-                : 'This category has no stories right now.')}
-          </Text>
-          <Pressable style={[styles.retry, { borderColor: theme.divider }]} onPress={reload}>
-            <Text style={{ color: theme.accent, fontWeight: '600' }}>
-              {labelLang === 'ne' ? 'पुनः प्रयास' : 'Try again'}
-            </Text>
-          </Pressable>
-        </View>
-      ) : (
-        /* One swipe = one card, like Reels. `disableIntervalMomentum` is what
-         * enforces it: pagingEnabled and snapToInterval only decide where a
-         * scroll RESTS, so without it a fling keeps momentum and travels
-         * several cards. The interval is measured by onLayout rather than
-         * computed, because a one-pixel error accumulates into visible
-         * misalignment after a dozen swipes. */
-        <FlatList
-          ref={listRef}
-          data={cards}
-          keyExtractor={(c) => c.id}
-          renderItem={({ item }) => (
-            <NewsCard
-              card={item}
+      <CategoryPager
+        ref={pager}
+        initialPage={0}
+        onPageChange={(i) => {
+          // A selection tick on arrival gives the horizontal swipe a physical
+          // answer, the same way the vertical card snap does.
+          if (i !== index) void Haptics.selectionAsync();
+          setIndex(i);
+        }}
+      >
+        {categories.map((c, i) => (
+          // `key` must be the slug: PagerView keeps children mounted, and a
+          // positional key would recycle one category's list into another.
+          <View key={c.slug} style={styles.page} collapsable={false}>
+            <CategoryFeed
+              category={c.slug}
+              languages={languages}
               theme={theme}
-              height={listH}
               textScale={textScale}
               dataSaver={dataSaver}
+              height={pageHeight}
+              labelLang={labelLang}
+              active={i === index}
               onMenu={setMenuCard}
             />
-          )}
-          onLayout={(e) => {
-            const h = Math.round(e.nativeEvent.layout.height);
-            if (h > 0 && h !== listH) setListH(h);
-          }}
-          showsVerticalScrollIndicator={false}
-          snapToInterval={listH}
-          snapToAlignment="start"
-          disableIntervalMomentum
-          decelerationRate="fast"
-          getItemLayout={(_, index) => ({ length: listH, offset: listH * index, index })}
-          // A card counts as read only once it has settled and been on screen
-          // for a moment — flicking past ten cards must not look like reading
-          // ten (Ch. 7.4).
-          viewabilityConfig={{ itemVisiblePercentThreshold: 90, minimumViewTime: 800 }}
-          onViewableItemsChanged={({ viewableItems }) => {
-            for (const v of viewableItems) {
-              const id = (v.item as Card | undefined)?.id;
-              if (id && !counted.current.has(id)) {
-                counted.current.add(id);
-                device.noteCardRead();
-              }
-            }
-          }}
-          onEndReached={() => void loadMore()}
-          onEndReachedThreshold={0.5}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={refresh}
-              tintColor={theme.textSecondary}
-            />
-          }
-        />
-      )}
+          </View>
+        ))}
+      </CategoryPager>
 
       <CardMenu
         visible={menuCard !== null}
@@ -199,7 +111,6 @@ export default function FeedScreen() {
         onHideSource={(c) => filters.muteSource(c.source.name)}
       />
 
-      {/* Only appears after five cards — see CARDS_BEFORE_PROMPT. */}
       <NotifPrompt theme={theme} lang={labelLang} />
     </View>
   );
@@ -207,9 +118,5 @@ export default function FeedScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  banner: { paddingHorizontal: 16, paddingVertical: 7 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyTitle: { fontSize: 17, fontWeight: '600', marginBottom: 6 },
-  emptyBody: { fontSize: 14, textAlign: 'center', marginBottom: 18 },
-  retry: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22, borderWidth: 1 },
+  page: { flex: 1 },
 });

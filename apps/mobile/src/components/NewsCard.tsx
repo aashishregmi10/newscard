@@ -1,4 +1,8 @@
 import { View, Text, StyleSheet, Pressable, Linking, Share } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import * as Haptics from 'expo-haptics';
+import { useRef } from 'react';
+import { Animated } from 'react-native';
 import type { Card } from '../api/client';
 import { CardImage } from './CardImage';
 import { relativeTime } from '../lib/relativeTime';
@@ -28,6 +32,19 @@ interface Props {
 export function NewsCard({ card, theme, height, textScale, dataSaver, onMenu }: Props) {
   const bookmarks = useBookmarks();
   const saved = bookmarks.has(card.id);
+
+  // Saving is otherwise invisible — nothing leaves the device and there is no
+  // spinner — so the icon itself has to confirm it. Native driver, so this
+  // costs no JS frames on the reference device (Ch. 12.4).
+  const pop = useRef(new Animated.Value(1)).current;
+  const toggleSave = () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    bookmarks.toggle(card);
+    Animated.sequence([
+      Animated.timing(pop, { toValue: 1.25, duration: 90, useNativeDriver: true }),
+      Animated.spring(pop, { toValue: 1, friction: 4, useNativeDriver: true }),
+    ]).start();
+  };
   const lh = LINE_HEIGHT[card.language];
   const summarySize = TYPE.summary.size * textScale;
   const headlineSize = TYPE.headline.size * textScale;
@@ -57,7 +74,7 @@ export function NewsCard({ card, theme, height, textScale, dataSaver, onMenu }: 
           accessibilityRole="button"
           accessibilityLabel="More options"
         >
-          <Text style={[styles.overflowIcon, { color: theme.stripText }]}>⋯</Text>
+          <MaterialCommunityIcons name="dots-horizontal" size={20} color="#fff" />
         </Pressable>
       )}
 
@@ -76,14 +93,18 @@ export function NewsCard({ card, theme, height, textScale, dataSaver, onMenu }: 
           {/* Optimistic and instant — nothing leaves the device, so there is
               nothing to fail and no spinner to show (Ch. 9.4). */}
           <Pressable
-            onPress={() => bookmarks.toggle(card)}
+            onPress={toggleSave}
             hitSlop={12}
             accessibilityRole="button"
             accessibilityLabel={saved ? 'Remove from saved' : 'Save story'}
           >
-            <Text style={[styles.actionIcon, { color: saved ? theme.accent : theme.textSecondary }]}>
-              {saved ? '♥' : '♡'}
-            </Text>
+            <Animated.View style={{ transform: [{ scale: pop }] }}>
+              <MaterialCommunityIcons
+                name={saved ? 'bookmark' : 'bookmark-outline'}
+                size={21}
+                color={saved ? theme.accent : theme.textSecondary}
+              />
+            </Animated.View>
           </Pressable>
           <Pressable
             onPress={() => {
@@ -97,7 +118,7 @@ export function NewsCard({ card, theme, height, textScale, dataSaver, onMenu }: 
             accessibilityRole="button"
             accessibilityLabel="Share story"
           >
-            <Text style={[styles.actionIcon, { color: theme.textSecondary }]}>↗</Text>
+            <MaterialCommunityIcons name="share-variant-outline" size={20} color={theme.textSecondary} />
           </Pressable>
         </View>
       </View>
@@ -153,9 +174,12 @@ export function NewsCard({ card, theme, height, textScale, dataSaver, onMenu }: 
             {card.pullQuote}
           </Text>
         ) : null}
-        <Text style={[styles.stripCta, { color: theme.stripText }]}>
-          {card.language === 'ne' ? 'पूरा समाचार पढ्न ट्याप गर्नुहोस्' : 'Tap to read the full story'}
-        </Text>
+        <View style={styles.stripRow}>
+          <Text style={[styles.stripCta, { color: theme.stripText }]}>
+            {card.language === 'ne' ? 'पूरा समाचार पढ्नुहोस्' : 'Read the full story'}
+          </Text>
+          <MaterialCommunityIcons name="chevron-right" size={20} color={theme.stripText} />
+        </View>
       </Pressable>
     </View>
   );
@@ -193,5 +217,6 @@ const styles = StyleSheet.create({
   attribution: { marginTop: 'auto', marginBottom: 12 },
   strip: { paddingHorizontal: 18, paddingVertical: 12, minHeight: 64, justifyContent: 'center' },
   pullQuote: { fontSize: 15, fontWeight: '600', marginBottom: 3 },
-  stripCta: { fontSize: 13, opacity: 0.75 },
+  stripCta: { fontSize: 13, opacity: 0.8 },
+  stripRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });
