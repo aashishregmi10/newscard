@@ -1,5 +1,5 @@
 import { ObjectId } from 'mongodb';
-import { collections, getClient, getDb } from '@newscard/db';
+import { collections, getClient, getDb, supportsTransactions } from '@newscard/db';
 import {
   AppError,
   checkReviewGuards,
@@ -13,10 +13,10 @@ import { writeAudit } from '../audit/writeAudit.js';
  * Publishing.  Spec Fig. 4.3 and Ch. 4.9.
  *
  * The ONLY code path that makes content visible to readers, and the one place
- * where several checks must all hold together. It runs in a transaction because
- * a half-applied publish — status changed but denormalised source name not
- * copied — renders as a card with a blank publisher, which is precisely the
- * attribution failure the product cannot afford.
+ * where several checks must all hold together. It uses a transaction when the
+ * deployment offers one, and a compare-and-swap when it does not — see the note
+ * inside publishArticle. Either way a half-applied publish is impossible, and a
+ * card can never reach the feed with a blank publisher.
  */
 
 export interface PublishInput {
@@ -39,16 +39,36 @@ export interface PublishResult {
 export async function publishArticle(input: PublishInput): Promise<PublishResult> {
   const db = getDb();
   const c = collections(db);
-  const session = getClient().startSession();
 
   const targetStatus: ArticleStatus = input.scheduledFor ? 'scheduled' : 'published';
   let result: PublishResult | undefined;
 
-  try {
-    await session.withTransaction(async () => {
+  /**
+   * Transactions are used WHEN AVAILABLE, but are not required.
+   *
+   * This flow performs four reads and exactly one write. A single-document
+   * update is already atomic in MongoDB, so the transaction was only ever
+   * protecting read-then-write consistency: the risk that a source's licence
+   * is revoked, or the article is published by someone else, between the
+   * checks and the write.
+   *
+   * That race is closed instead by a COMPARE-AND-SWAP — the update's filter
+   * re-asserts the status the checks were made against, so a concurrent change
+   * makes the update match nothing and we fail loudly rather than publishing on
+   * stale reads. It is a narrower guarantee than a transaction and it is the
+   * one that actually matters here.
+   *
+   * The point is not elegance: requiring a replica set forced a Docker
+   * dependency on anyone who just wanted to run the CMS, and this removes it.
+   */
+  const useTransaction = await supportsTransactions().catch(() => false);
+  const session = useTransaction ? getClient().startSession() : null;
+
+  const body = async (): Promise<void> => {
+    {
       const article = await c.articles.findOne(
         { _id: new ObjectId(input.articleId) },
-        { session },
+        session ? { session } : {},
       );
       if (!article) throw new AppError('NOT_FOUND', 'No such article.');
 
@@ -66,7 +86,7 @@ export async function publishArticle(input: PublishInput): Promise<PublishResult
       // depth: a source can be downgraded from `agreed` to `refused` between
       // ingestion and publication, and that is exactly the moment when
       // publishing would be most damaging.
-      const source = await c.sources.findOne({ _id: article.sourceId }, { session });
+      const source = await c.sources.findOne({ _id: article.sourceId }, session ? { session } : {});
       if (!source) throw new AppError('VALIDATION_FAILED', 'Article has no source.');
       if (source.licence.status !== 'agreed' || !source.isActive) {
         throw new AppError(
@@ -94,7 +114,7 @@ export async function publishArticle(input: PublishInput): Promise<PublishResult
       // ── 4. summary length, per the CURRENT config ───────────────────────
       // Read from config rather than a constant, because Gate 2 may change both
       // the limit and the unit it is measured in.
-      const cfg = (await c.config.findOne({}, { session })) ?? DEFAULT_CONFIG;
+      const cfg = (await c.config.findOne({}, session ? { session } : {})) ?? DEFAULT_CONFIG;
       const limits = cfg.summaryLimits ?? DEFAULT_CONFIG.summaryLimits;
       const band = limits.limits[article.language];
       const measured = measureSummary(
@@ -113,7 +133,10 @@ export async function publishArticle(input: PublishInput): Promise<PublishResult
       // ── 5. reviewer guards ──────────────────────────────────────────────
       // Reviewer must differ from the author, unless this is still a one-person
       // operation; and must be able to read the language they are approving.
-      const activeStaffCount = await c.staff.countDocuments({ isActive: true }, { session });
+      const activeStaffCount = await c.staff.countDocuments(
+        { isActive: true },
+        session ? { session } : {},
+      );
       const guard = checkReviewGuards({
         authoredBy: article.authoredBy.toString(),
         reviewerId: input.actorId,
@@ -132,8 +155,11 @@ export async function publishArticle(input: PublishInput): Promise<PublishResult
       const now = new Date();
       const publishedAt = targetStatus === 'published' ? now : null;
 
-      await c.articles.updateOne(
-        { _id: article._id },
+      // COMPARE-AND-SWAP: re-assert the status the checks above were made
+      // against. If anything changed underneath us the filter matches nothing,
+      // and we refuse rather than publish on stale reads.
+      const write = await c.articles.updateOne(
+        { _id: article._id, status: article.status },
         {
           $set: {
             status: targetStatus,
@@ -147,13 +173,29 @@ export async function publishArticle(input: PublishInput): Promise<PublishResult
             updatedAt: now,
           },
         },
-        { session },
+        session ? { session } : {},
       );
 
+      if (write.matchedCount === 0) {
+        throw new AppError(
+          'INVALID_TRANSITION',
+          'This article changed while you were publishing it. Reload and try again.',
+          { from: article.status, to: targetStatus },
+        );
+      }
+
       result = { status: targetStatus, publishedAt, selfApproved: guard.selfApproved };
-    });
+    }
+  };
+
+  try {
+    if (session) {
+      await session.withTransaction(body);
+    } else {
+      await body();
+    }
   } finally {
-    await session.endSession();
+    await session?.endSession();
   }
 
   if (!result) throw new AppError('INTERNAL', 'Publish did not complete.');

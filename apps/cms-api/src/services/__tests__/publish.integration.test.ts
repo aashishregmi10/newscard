@@ -1,5 +1,4 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
-import { MongoClient } from 'mongodb';
 import { ObjectId } from 'mongodb';
 import { connect, close, collections, getDb, applyValidators } from '@newscard/db';
 import { DEFAULT_CONFIG, MVP_CATEGORIES } from '@newscard/schemas';
@@ -17,36 +16,15 @@ import { publishArticle, retractArticle } from '../publish.service.js';
  */
 
 const URI =
-  process.env.MONGO_TEST_URI ??
-  'mongodb://localhost:27018/newscard_test?replicaSet=rs0&directConnection=true';
+  process.env.MONGO_TEST_URI ?? 'mongodb://localhost:27017/newscard_test';
 
 /**
- * Publishing runs in a transaction, which needs a replica set. When one is not
- * reachable these tests SKIP with a clear reason rather than failing: a red
- * suite should mean the code is wrong, not that Docker is not running. CI runs
- * with the stack up, so nothing is quietly lost.
+ * Publishing works with or without transactions, so these run against ANY
+ * reachable MongoDB — no replica set and therefore no Docker required. The
+ * compare-and-swap path is the one most developers will actually exercise.
  */
-async function replicaSetAvailable(): Promise<boolean> {
-  const c = new MongoClient(URI, { serverSelectionTimeoutMS: 1500 });
-  try {
-    await c.connect();
-    const info = (await c.db('admin').command({ hello: 1 })) as { setName?: string };
-    return typeof info.setName === 'string';
-  } catch {
-    return false;
-  } finally {
-    await c.close().catch(() => undefined);
-  }
-}
-
-const hasReplicaSet = await replicaSetAvailable();
-if (!hasReplicaSet) {
-  console.warn(
-    `\n[skipped] publish integration tests — no replica set at ${URI.split('?')[0]}.` +
-      '\n          Start it with: npm run db:up\n',
-  );
-}
-const describeIfRs = hasReplicaSet ? describe : describe.skip;
+const describeIfRs = describe;
+const hasReplicaSet = true;
 
 let catId: ObjectId;
 let licensedSourceId: ObjectId;

@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { connect, close, assertReplicaSet } from '@newscard/db';
+import { connect, close, warnIfNoTransactions } from '@newscard/db';
 import {
   requestId,
   attachSession,
@@ -61,7 +61,9 @@ async function main(): Promise<void> {
   if (!uri) throw new Error('MONGO_URI is not set. Copy .env.example to .env first.');
 
   await connect({ uri });
-  await assertReplicaSet();
+  // Publishing no longer requires transactions, so a standalone MongoDB is
+  // supported. Warn, because a replica set is still the safer deployment.
+  await warnIfNoTransactions();
   await ensureSessionIndexes();
 
   const server = createCmsApp().listen(PORT, () => {
