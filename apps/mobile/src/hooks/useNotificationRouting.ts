@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { router } from 'expo-router';
 import * as Notifications from 'expo-notifications';
+import { safeNotify, safeNotifySync } from '../lib/pushSupport';
 
 /**
  * Notification tap → the right card.  Spec Ch. 10.7, test N-09.
@@ -55,31 +56,40 @@ export function useNotificationRouting(): void {
   useEffect(() => {
     let alive = true;
 
+    // Every call below is guarded. Expo Go on Android has no remote push
+    // (SDK 53+), and an unguarded throw here happens inside a provider — which
+    // takes the whole app down with the "something went wrong" screen. Reading
+    // the news must never depend on notifications working.
+
     // Cold start: the tap that launched the app.
-    void Notifications.getLastNotificationResponseAsync()
-      .then((response) => {
+    void safeNotify(() => Notifications.getLastNotificationResponseAsync(), null).then(
+      (response) => {
         if (!alive || !response) return;
         const target = targetFrom(
           response.notification.request.content.data as NotificationData | undefined,
         );
         if (target) go(target);
-      })
-      .catch(() => undefined);
+      },
+    );
 
     // Warm: tapped while the app was already running or backgrounded.
-    const sub = Notifications.addNotificationResponseReceivedListener((response) => {
-      const target = targetFrom(
-        response.notification.request.content.data as NotificationData | undefined,
-      );
-      if (target) {
-        handled.current = null; // a fresh tap should always navigate
-        go(target);
-      }
-    });
+    const sub = safeNotifySync(
+      () =>
+        Notifications.addNotificationResponseReceivedListener((response) => {
+          const target = targetFrom(
+            response.notification.request.content.data as NotificationData | undefined,
+          );
+          if (target) {
+            handled.current = null; // a fresh tap should always navigate
+            go(target);
+          }
+        }),
+      null,
+    );
 
     return () => {
       alive = false;
-      sub.remove();
+      sub?.remove();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -14,6 +14,7 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { API_BASE } from '../api/client';
 import { useSettings } from './SettingsContext';
+import { safeNotify, remotePushSupported, pushUnavailableReason } from '../lib/pushSupport';
 
 /**
  * Device identity and notification preferences.  Spec Ch. 6.7, 10.2, 15.2.
@@ -138,7 +139,7 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
       const [savedToken, promptState, perms] = await Promise.all([
         AsyncStorage.getItem(DEVICE_TOKEN_KEY),
         AsyncStorage.getItem(PROMPT_STATE_KEY),
-        Notifications.getPermissionsAsync().catch(() => null),
+        safeNotify(() => Notifications.getPermissionsAsync(), null),
       ]);
 
       if (savedToken) setToken(savedToken);
@@ -154,24 +155,29 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
-    try {
-      const res = await Notifications.requestPermissionsAsync();
-      const granted = res.granted;
-      setPermission(granted ? 'granted' : res.canAskAgain ? 'undetermined' : 'denied');
-      if (!granted || !deviceId) return granted;
+    const res = await safeNotify(() => Notifications.requestPermissionsAsync(), null);
+    if (!res) return false;
 
-      // Expo's push service relays to FCM and APNs, so no Firebase project is
-      // needed in development. A standalone Android build will need FCM
-      // credentials attached to the Expo project.
-      const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
-      const pushToken = await Notifications.getExpoPushTokenAsync(
-        projectId ? { projectId } : undefined,
-      );
-      await register(deviceId, pushToken.data);
-      return true;
-    } catch {
-      return false;
+    const granted = res.granted;
+    setPermission(granted ? 'granted' : res.canAskAgain ? 'undetermined' : 'denied');
+    if (!granted || !deviceId) return granted;
+
+    // Expo Go on Android cannot receive remote push (SDK 53+). The permission
+    // and the preferences are still real and still stored — only the token
+    // fetch is skipped, so nothing here throws and the settings screen behaves
+    // identically. A development build picks the token up automatically.
+    if (!remotePushSupported) {
+      console.info('[push]', pushUnavailableReason);
+      return granted;
     }
+
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
+    const pushToken = await safeNotify(
+      () => Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined),
+      null,
+    );
+    if (pushToken) await register(deviceId, pushToken.data);
+    return granted;
   }, [deviceId, register]);
 
   const setPrefs = useCallback(
