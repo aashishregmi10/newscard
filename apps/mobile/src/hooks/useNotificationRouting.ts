@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import { router } from 'expo-router';
-import * as Notifications from 'expo-notifications';
 import { safeNotify, safeNotifySync } from '../lib/pushSupport';
 
 /**
@@ -62,7 +61,7 @@ export function useNotificationRouting(): void {
     // the news must never depend on notifications working.
 
     // Cold start: the tap that launched the app.
-    void safeNotify(() => Notifications.getLastNotificationResponseAsync(), null).then(
+    void safeNotify((n) => n.getLastNotificationResponseAsync(), null).then(
       (response) => {
         if (!alive || !response) return;
         const target = targetFrom(
@@ -74,8 +73,8 @@ export function useNotificationRouting(): void {
 
     // Warm: tapped while the app was already running or backgrounded.
     const sub = safeNotifySync(
-      () =>
-        Notifications.addNotificationResponseReceivedListener((response) => {
+      (n) =>
+        n.addNotificationResponseReceivedListener((response) => {
           const target = targetFrom(
             response.notification.request.content.data as NotificationData | undefined,
           );

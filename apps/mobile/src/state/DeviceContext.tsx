@@ -9,12 +9,13 @@ import {
 } from 'react';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { API_BASE } from '../api/client';
 import { useSettings } from './SettingsContext';
 import { safeNotify, remotePushSupported, pushUnavailableReason } from '../lib/pushSupport';
+// NOTE: expo-notifications is never imported at module scope — it throws on
+// import in Expo Go on Android. pushSupport requires it lazily.
 
 /**
  * Device identity and notification preferences.  Spec Ch. 6.7, 10.2, 15.2.
@@ -142,7 +143,7 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
       const [savedToken, promptState, perms] = await Promise.all([
         AsyncStorage.getItem(DEVICE_TOKEN_KEY).catch(() => null),
         AsyncStorage.getItem(PROMPT_STATE_KEY).catch(() => null),
-        safeNotify(() => Notifications.getPermissionsAsync(), null),
+        safeNotify((n) => n.getPermissionsAsync(), null),
       ]);
 
       if (savedToken) setToken(savedToken);
@@ -158,7 +159,7 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
-    const res = await safeNotify(() => Notifications.requestPermissionsAsync(), null);
+    const res = await safeNotify((n) => n.requestPermissionsAsync(), null);
     if (!res) return false;
 
     const granted = res.granted;
@@ -176,7 +177,7 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
 
     const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
     const pushToken = await safeNotify(
-      () => Notifications.getExpoPushTokenAsync(projectId ? { projectId } : undefined),
+      (n) => n.getExpoPushTokenAsync(projectId ? { projectId } : undefined),
       null,
     );
     if (pushToken) await register(deviceId, pushToken.data);
