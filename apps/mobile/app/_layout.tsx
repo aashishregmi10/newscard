@@ -3,6 +3,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { SettingsProvider, useSettings } from '../src/state/SettingsContext';
 import { BookmarksProvider } from '../src/state/BookmarksContext';
+import { FiltersProvider } from '../src/state/FiltersContext';
 
 function Root() {
   const { isDark, theme } = useSettings();
@@ -25,7 +26,9 @@ export default function RootLayout() {
     <SafeAreaProvider>
       <SettingsProvider>
         <BookmarksProvider>
-          <Root />
+          <FiltersProvider>
+            <Root />
+          </FiltersProvider>
         </BookmarksProvider>
       </SettingsProvider>
     </SafeAreaProvider>

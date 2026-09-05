@@ -12,9 +12,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NewsCard } from '../../src/components/NewsCard';
 import { CardSkeleton } from '../../src/components/CardSkeleton';
 import { CategoryRail, type CategoryOption } from '../../src/components/CategoryRail';
+import { CardMenu } from '../../src/components/CardMenu';
 import { fetchCategories, type Card } from '../../src/api/client';
 import { useFeed } from '../../src/hooks/useFeed';
 import { useSettings } from '../../src/state/SettingsContext';
+import { useFilters } from '../../src/state/FiltersContext';
 
 /**
  * The feed.  Spec Ch. 7.1.
@@ -41,10 +43,16 @@ export default function FeedScreen() {
   const [category, setCategory] = useState('top');
   const listRef = useRef<FlatList<Card>>(null);
 
-  const { cards, status, error, fromCache, refreshing, reload, refresh, loadMore } = useFeed(
-    languages,
-    category,
-  );
+  const filters = useFilters();
+  const [menuCard, setMenuCard] = useState<Card | null>(null);
+
+  const { cards: rawCards, status, error, fromCache, refreshing, reload, refresh, loadMore } =
+    useFeed(languages, category);
+
+  // Applied client-side and immediately. "Not interested" must visibly change
+  // the feed — a control that does nothing teaches the reader we ignore them
+  // (Ch. 7.8).
+  const cards = rawCards?.filter((c) => !filters.isMuted(c.category.slug, c.source.name)) ?? null;
 
   useEffect(() => {
     // Non-fatal: the feed still works on `top` if this never resolves.
@@ -137,6 +145,7 @@ export default function FeedScreen() {
               height={listH}
               textScale={textScale}
               dataSaver={dataSaver}
+              onMenu={setMenuCard}
             />
           )}
           onLayout={(e) => {
@@ -160,6 +169,16 @@ export default function FeedScreen() {
           }
         />
       )}
+
+      <CardMenu
+        visible={menuCard !== null}
+        card={menuCard}
+        theme={theme}
+        lang={labelLang}
+        onClose={() => setMenuCard(null)}
+        onNotInterested={(c) => filters.muteCategory(c.category.slug)}
+        onHideSource={(c) => filters.muteSource(c.source.name)}
+      />
     </View>
   );
 }

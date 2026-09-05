@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { MongoClient } from 'mongodb';
 import { ObjectId } from 'mongodb';
 import { connect, close, collections, getDb, applyValidators } from '@newscard/db';
 import { DEFAULT_CONFIG, MVP_CATEGORIES } from '@newscard/schemas';
@@ -18,6 +19,34 @@ import { publishArticle, retractArticle } from '../publish.service.js';
 const URI =
   process.env.MONGO_TEST_URI ??
   'mongodb://localhost:27018/newscard_test?replicaSet=rs0&directConnection=true';
+
+/**
+ * Publishing runs in a transaction, which needs a replica set. When one is not
+ * reachable these tests SKIP with a clear reason rather than failing: a red
+ * suite should mean the code is wrong, not that Docker is not running. CI runs
+ * with the stack up, so nothing is quietly lost.
+ */
+async function replicaSetAvailable(): Promise<boolean> {
+  const c = new MongoClient(URI, { serverSelectionTimeoutMS: 1500 });
+  try {
+    await c.connect();
+    const info = (await c.db('admin').command({ hello: 1 })) as { setName?: string };
+    return typeof info.setName === 'string';
+  } catch {
+    return false;
+  } finally {
+    await c.close().catch(() => undefined);
+  }
+}
+
+const hasReplicaSet = await replicaSetAvailable();
+if (!hasReplicaSet) {
+  console.warn(
+    `\n[skipped] publish integration tests — no replica set at ${URI.split('?')[0]}.` +
+      '\n          Start it with: npm run db:up\n',
+  );
+}
+const describeIfRs = hasReplicaSet ? describe : describe.skip;
 
 let catId: ObjectId;
 let licensedSourceId: ObjectId;
@@ -79,6 +108,9 @@ const asEditorB = (articleId: ObjectId) => ({
 });
 
 beforeAll(async () => {
+  // describe.skip does not stop the hooks running, so this must bail too or it
+  // fails with a connection error for the very reason we chose to skip.
+  if (!hasReplicaSet) return;
   await connect({ uri: URI });
   await applyValidators(getDb());
 
@@ -148,14 +180,16 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
+  if (!hasReplicaSet) return;
   await close();
 });
 
 beforeEach(async () => {
+  if (!hasReplicaSet) return;
   await collections(getDb()).articles.deleteMany({});
 });
 
-describe('publish — the happy path', () => {
+describeIfRs('publish — the happy path', () => {
   it('publishes an approved article and denormalises the source', async () => {
     const id = await makeArticle();
     const res = await publishArticle(asEditorB(id));
@@ -189,7 +223,7 @@ describe('publish — the happy path', () => {
   });
 });
 
-describe('publish — the five preconditions', () => {
+describeIfRs('publish — the five preconditions', () => {
   it('1. rejects an illegal state transition', async () => {
     const id = await makeArticle({ status: 'draft' });
     await expect(publishArticle(asEditorB(id))).rejects.toMatchObject({
@@ -336,7 +370,7 @@ describe('publish — the five preconditions', () => {
   });
 });
 
-describe('publish — atomicity', () => {
+describeIfRs('publish — atomicity', () => {
   it('leaves the article untouched when a precondition fails', async () => {
     const id = await makeArticle({ sourceId: unlicensedSourceId });
     await expect(publishArticle(asEditorB(id))).rejects.toThrow();
@@ -350,7 +384,7 @@ describe('publish — atomicity', () => {
   });
 });
 
-describe('retraction', () => {
+describeIfRs('retraction', () => {
   it('retracts a published article without deleting it', async () => {
     const id = await makeArticle();
     await publishArticle(asEditorB(id));

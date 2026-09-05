@@ -2,6 +2,7 @@ import { View, Text, ScrollView, StyleSheet, Switch, Pressable, Linking, Alert }
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings, type ThemeMode } from '../../src/state/SettingsContext';
 import { useBookmarks } from '../../src/state/BookmarksContext';
+import { useFilters } from '../../src/state/FiltersContext';
 import { TEXT_SCALE, type TextSizeSetting } from '../../src/theme/tokens';
 import type { Theme } from '../../src/theme/tokens';
 
@@ -102,6 +103,7 @@ function Segmented<T extends string>({
 export default function SettingsScreen() {
   const s = useSettings();
   const { items, clear } = useBookmarks();
+  const filters = useFilters();
   const insets = useSafeAreaInsets();
   const t = s.theme;
   const ne = s.languages.includes('ne');
@@ -232,6 +234,47 @@ export default function SettingsScreen() {
             }
           />
         </Section>
+
+        {/* Every "not interested" tap is reversible here. A filter the reader
+            cannot find and undo is a trap, not a preference (Ch. 7.8). */}
+        {(filters.mutedCategories.length > 0 || filters.mutedSources.length > 0) && (
+          <>
+            <Section title={ne ? 'लुकाइएका' : 'HIDDEN'} theme={t}>
+              {filters.mutedCategories.map((slug, i, arr) => (
+                <Row
+                  key={`c-${slug}`}
+                  label={slug}
+                  hint={ne ? 'विषय लुकाइएको' : 'Topic hidden'}
+                  theme={t}
+                  last={i === arr.length - 1 && filters.mutedSources.length === 0}
+                  right={
+                    <Pressable onPress={() => filters.unmuteCategory(slug)} hitSlop={8}>
+                      <Text style={{ color: t.accent, fontWeight: '600' }}>
+                        {ne ? 'देखाउने' : 'Unhide'}
+                      </Text>
+                    </Pressable>
+                  }
+                />
+              ))}
+              {filters.mutedSources.map((name, i, arr) => (
+                <Row
+                  key={`s-${name}`}
+                  label={name}
+                  hint={ne ? 'स्रोत लुकाइएको' : 'Source hidden'}
+                  theme={t}
+                  last={i === arr.length - 1}
+                  right={
+                    <Pressable onPress={() => filters.unmuteSource(name)} hitSlop={8}>
+                      <Text style={{ color: t.accent, fontWeight: '600' }}>
+                        {ne ? 'देखाउने' : 'Unhide'}
+                      </Text>
+                    </Pressable>
+                  }
+                />
+              ))}
+            </Section>
+          </>
+        )}
 
         <Section title={ne ? 'बारेमा' : 'ABOUT'} theme={t}>
           <Row

@@ -21,9 +21,11 @@ interface Props {
   textScale: number;
   dataSaver: boolean;
   isDark?: boolean;
+  /** Opens the overflow menu (Ch. 7.8). */
+  onMenu?: (card: Card) => void;
 }
 
-export function NewsCard({ card, theme, height, textScale, dataSaver }: Props) {
+export function NewsCard({ card, theme, height, textScale, dataSaver, onMenu }: Props) {
   const bookmarks = useBookmarks();
   const saved = bookmarks.has(card.id);
   const lh = LINE_HEIGHT[card.language];
@@ -47,6 +49,18 @@ export function NewsCard({ card, theme, height, textScale, dataSaver }: Props) {
 
   return (
     <View style={[styles.card, { height, backgroundColor: theme.surface }]}>
+      {onMenu && (
+        <Pressable
+          style={styles.overflow}
+          hitSlop={12}
+          onPress={() => onMenu(card)}
+          accessibilityRole="button"
+          accessibilityLabel="More options"
+        >
+          <Text style={[styles.overflowIcon, { color: theme.stripText }]}>⋯</Text>
+        </Pressable>
+      )}
+
       <CardImage
         image={card.image}
         theme={theme}
@@ -149,6 +163,19 @@ export function NewsCard({ card, theme, height, textScale, dataSaver }: Props) {
 
 const styles = StyleSheet.create({
   card: { justifyContent: 'flex-start' },
+  overflow: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.35)',
+  },
+  overflowIcon: { fontSize: 19, lineHeight: 21, fontWeight: '700' },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',

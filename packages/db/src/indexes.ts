@@ -96,8 +96,13 @@ const DEVICES: IndexSpec[] = [
     key: { fcmToken: 1 },
     name: 'fcm_token_unique',
     unique: true,
-    sparse: true,
-    serves: 'Token rotation and dedupe',
+    // PARTIAL, not sparse. A sparse index skips documents where the field is
+    // MISSING, but still indexes an explicit null — and we store null for every
+    // device that has not granted notification permission yet. With `sparse`
+    // the second such device fails with a duplicate-key error on null, which
+    // presents as "registration silently does nothing".
+    partialFilterExpression: { fcmToken: { $type: 'string' } },
+    serves: 'Token rotation and dedupe, ignoring devices with no token yet',
   },
   {
     key: { lastSeenAt: 1 },
@@ -158,6 +163,25 @@ export interface SyncResult {
   existing: string[];
 }
 
+/**
+ * Does the live index match what we declare?
+ *
+ * Compares the key and the options that change BEHAVIOUR. Cosmetic fields the
+ * server adds (`v`, `ns`) are ignored, and an absent option on either side is
+ * treated as its default rather than as a difference.
+ */
+function sameDefinition(live: Record<string, unknown>, spec: Record<string, unknown>): boolean {
+  if (JSON.stringify(live.key) !== JSON.stringify(spec.key)) return false;
+
+  const opts = ['unique', 'sparse', 'expireAfterSeconds', 'partialFilterExpression'] as const;
+  for (const o of opts) {
+    const a = live[o] ?? (o === 'unique' || o === 'sparse' ? false : undefined);
+    const b = spec[o] ?? (o === 'unique' || o === 'sparse' ? false : undefined);
+    if (JSON.stringify(a) !== JSON.stringify(b)) return false;
+  }
+  return true;
+}
+
 /** Idempotent. Safe to run on every deploy. */
 export async function syncIndexes(db: Db): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
@@ -168,26 +192,36 @@ export async function syncIndexes(db: Db): Promise<SyncResult[]> {
     // A collection with no documents and no validator does not exist yet, and
     // listing its indexes throws "ns does not exist" rather than returning [].
     // createIndex will create it, so an absent namespace just means "no indexes".
-    let existingNames = new Set<string>();
+    let live: Array<Record<string, unknown>> = [];
     try {
-      existingNames = new Set(
-        (await coll.indexes()).map((i) => i.name).filter((n): n is string => Boolean(n)),
-      );
+      live = (await coll.indexes()) as Array<Record<string, unknown>>;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       if (!/ns does not exist|NamespaceNotFound/i.test(msg)) throw e;
     }
+    const byName = new Map(live.map((i) => [String(i.name), i]));
 
     const created: string[] = [];
     const existing: string[] = [];
 
     for (const { serves: _serves, ...spec } of specs) {
-      if (spec.name && existingNames.has(spec.name)) {
-        existing.push(spec.name);
-        continue;
+      const name = spec.name;
+      const current = name ? byName.get(name) : undefined;
+
+      if (current) {
+        // An index whose OPTIONS changed must be dropped and rebuilt —
+        // createIndex is a no-op when the name already exists, so without this
+        // a corrected definition silently never takes effect and the old,
+        // broken index keeps enforcing the old rule.
+        if (sameDefinition(current, spec)) {
+          existing.push(name!);
+          continue;
+        }
+        await coll.dropIndex(name!);
       }
+
       await coll.createIndex(spec.key, spec);
-      created.push(spec.name ?? JSON.stringify(spec.key));
+      created.push(name ?? JSON.stringify(spec.key));
     }
 
     results.push({ collection, created, existing });

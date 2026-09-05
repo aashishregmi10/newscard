@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { collections, getDb } from '@newscard/db';
 import { AppError, gone } from '@newscard/shared';
 import { feedRoutes } from './feed.routes.js';
+import { deviceRoutes } from './devices.routes.js';
 import { getArticleBySlug } from '../services/feed.service.js';
 import { toArticleCard } from '../dto/articleCard.dto.js';
 import { asyncRoute } from '../middleware/index.js';
@@ -9,6 +10,7 @@ import { asyncRoute } from '../middleware/index.js';
 export const v1 = Router();
 
 v1.use(feedRoutes);
+v1.use(deviceRoutes);
 
 /** GET /v1/articles/:slug — deep-link resolution. Spec Ch. 6.6. */
 v1.get(
