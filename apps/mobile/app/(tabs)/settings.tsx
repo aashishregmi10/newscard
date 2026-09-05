@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings, type ThemeMode } from '../../src/state/SettingsContext';
 import { useBookmarks } from '../../src/state/BookmarksContext';
 import { useFilters } from '../../src/state/FiltersContext';
+import { useDevice } from '../../src/state/DeviceContext';
 import { TEXT_SCALE, type TextSizeSetting } from '../../src/theme/tokens';
 import type { Theme } from '../../src/theme/tokens';
 
@@ -104,6 +105,7 @@ export default function SettingsScreen() {
   const s = useSettings();
   const { items, clear } = useBookmarks();
   const filters = useFilters();
+  const device = useDevice();
   const insets = useSafeAreaInsets();
   const t = s.theme;
   const ne = s.languages.includes('ne');
@@ -167,6 +169,101 @@ export default function SettingsScreen() {
             }
           />
         </Section>
+
+        {/* The cap is user-lowerable but never raisable: three a day is a
+            product decision expressed in code, not a preference (Ch. 10.1). */}
+        <Section title={ne ? 'सूचना' : 'NOTIFICATIONS'} theme={t}>
+          <Row
+            label={ne ? 'सूचना' : 'Notifications'}
+            hint={
+              device.permission === 'denied'
+                ? ne
+                  ? 'फोनको सेटिङबाट अनुमति दिनुहोस्।'
+                  : 'Blocked — allow them in your phone settings.'
+                : undefined
+            }
+            theme={t}
+            right={
+              device.permission === 'undetermined' ? (
+                <Pressable onPress={() => void device.requestPermission()}>
+                  <Text style={{ color: t.accent, fontWeight: '600' }}>
+                    {ne ? 'सुरु गर्नुहोस्' : 'Turn on'}
+                  </Text>
+                </Pressable>
+              ) : (
+                <Switch
+                  value={device.prefs.enabled && device.permission === 'granted'}
+                  disabled={device.permission === 'denied'}
+                  onValueChange={(v) => device.setPrefs({ enabled: v })}
+                  trackColor={{ true: t.accent }}
+                />
+              )
+            }
+          />
+          <Row
+            label={ne ? 'ठूला समाचार' : 'Breaking news'}
+            theme={t}
+            right={
+              <Switch
+                value={device.prefs.channels.breaking}
+                disabled={!device.prefs.enabled}
+                onValueChange={(v) => device.setPrefs({ channels: { ...device.prefs.channels, breaking: v } })}
+                trackColor={{ true: t.accent }}
+              />
+            }
+          />
+          <Row
+            label={ne ? 'दैनिक सारांश' : 'Daily digest'}
+            hint={ne ? 'बिहान ७:३० बजे' : '7:30am'}
+            theme={t}
+            right={
+              <Switch
+                value={device.prefs.channels.digest}
+                disabled={!device.prefs.enabled}
+                onValueChange={(v) => device.setPrefs({ channels: { ...device.prefs.channels, digest: v } })}
+                trackColor={{ true: t.accent }}
+              />
+            }
+          />
+          <Row
+            label={ne ? 'मन पर्ने विषय' : 'Topics you follow'}
+            theme={t}
+            right={
+              <Switch
+                value={device.prefs.channels.categories}
+                disabled={!device.prefs.enabled}
+                onValueChange={(v) =>
+                  device.setPrefs({ channels: { ...device.prefs.channels, categories: v } })
+                }
+                trackColor={{ true: t.accent }}
+              />
+            }
+          />
+          <Row
+            label={ne ? 'दैनिक सीमा' : 'Daily limit'}
+            hint={ne ? 'बढीमा ३ — घटाउन सकिन्छ' : 'Maximum 3 — you can lower it'}
+            theme={t}
+            last
+            right={
+              <Segmented<string>
+                theme={t}
+                value={String(device.prefs.dailyCap)}
+                onChange={(v) => device.setPrefs({ dailyCap: Number(v) })}
+                options={[
+                  { key: '0', label: '0' },
+                  { key: '1', label: '1' },
+                  { key: '2', label: '2' },
+                  { key: '3', label: '3' },
+                ]}
+              />
+            }
+          />
+        </Section>
+        <Text style={[styles.note, { color: t.textSecondary }]}>
+          {ne
+            ? 'राति ९:३० देखि बिहान ६:३० सम्म कुनै सूचना पठाइँदैन।'
+            : 'Nothing is sent between 9:30pm and 6:30am.'}
+        </Text>
 
         <Section title={ne ? 'देखिने रूप' : 'APPEARANCE'} theme={t}>
           <Row

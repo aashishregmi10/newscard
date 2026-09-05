@@ -17,6 +17,8 @@ import { fetchCategories, type Card } from '../../src/api/client';
 import { useFeed } from '../../src/hooks/useFeed';
 import { useSettings } from '../../src/state/SettingsContext';
 import { useFilters } from '../../src/state/FiltersContext';
+import { useDevice } from '../../src/state/DeviceContext';
+import { NotifPrompt } from '../../src/components/NotifPrompt';
 
 /**
  * The feed.  Spec Ch. 7.1.
@@ -44,7 +46,11 @@ export default function FeedScreen() {
   const listRef = useRef<FlatList<Card>>(null);
 
   const filters = useFilters();
+  const device = useDevice();
   const [menuCard, setMenuCard] = useState<Card | null>(null);
+  /** Cards already counted, so re-visiting one does not inflate the total that
+   *  gates the permission prompt. */
+  const counted = useRef<Set<string>>(new Set());
 
   const { cards: rawCards, status, error, fromCache, refreshing, reload, refresh, loadMore } =
     useFeed(languages, category);
@@ -158,6 +164,19 @@ export default function FeedScreen() {
           disableIntervalMomentum
           decelerationRate="fast"
           getItemLayout={(_, index) => ({ length: listH, offset: listH * index, index })}
+          // A card counts as read only once it has settled and been on screen
+          // for a moment — flicking past ten cards must not look like reading
+          // ten (Ch. 7.4).
+          viewabilityConfig={{ itemVisiblePercentThreshold: 90, minimumViewTime: 800 }}
+          onViewableItemsChanged={({ viewableItems }) => {
+            for (const v of viewableItems) {
+              const id = (v.item as Card | undefined)?.id;
+              if (id && !counted.current.has(id)) {
+                counted.current.add(id);
+                device.noteCardRead();
+              }
+            }
+          }}
           onEndReached={() => void loadMore()}
           onEndReachedThreshold={0.5}
           refreshControl={
@@ -179,6 +198,9 @@ export default function FeedScreen() {
         onNotInterested={(c) => filters.muteCategory(c.category.slug)}
         onHideSource={(c) => filters.muteSource(c.source.name)}
       />
+
+      {/* Only appears after five cards — see CARDS_BEFORE_PROMPT. */}
+      <NotifPrompt theme={theme} lang={labelLang} />
     </View>
   );
 }

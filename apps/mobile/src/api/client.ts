@@ -148,6 +148,24 @@ export async function fetchFeed(opts: {
   };
 }
 
+/** The article was retracted — 410, not 404. The client must tell the reader
+ *  it was withdrawn rather than that it never existed (Ch. 3.3.3). */
+export class ArticleGoneError extends Error {
+  constructor() {
+    super('This story was withdrawn.');
+  }
+}
+
+/** Resolve a deep link. Spec Ch. 6.6. */
+export async function fetchArticle(slug: string): Promise<Card> {
+  const res = await fetch(`${API_BASE}/v1/articles/${encodeURIComponent(slug)}`);
+  if (res.status === 410) throw new ArticleGoneError();
+  if (!res.ok) throw new FeedError('server', `The server returned ${res.status}.`);
+  const body = (await res.json()) as { item?: Card };
+  if (!body.item?.id) throw new FeedError('bad-response', 'Unexpected response.');
+  return body.item;
+}
+
 export interface CategoryOption {
   slug: string;
   label: { ne: string; en: string };
