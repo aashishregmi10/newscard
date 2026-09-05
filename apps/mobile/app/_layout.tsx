@@ -7,11 +7,14 @@ import { BookmarksProvider } from '../src/state/BookmarksContext';
 import { FiltersProvider } from '../src/state/FiltersContext';
 import { DeviceProvider } from '../src/state/DeviceContext';
 import { useNotificationRouting } from '../src/hooks/useNotificationRouting';
+import { useRetractionPurge } from '../src/hooks/useRetractionPurge';
 
 function Root() {
   const { isDark, theme } = useSettings();
   // Routes a notification tap straight to its card, including from cold start.
   useNotificationRouting();
+  // Drops withdrawn stories from the cache on every foreground (Ch. 9.7).
+  useRetractionPurge();
   return (
     <>
       <StatusBar style={isDark ? 'light' : 'dark'} />

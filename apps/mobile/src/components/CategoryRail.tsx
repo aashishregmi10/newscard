@@ -6,10 +6,16 @@ import type { Theme } from '../theme/tokens';
  * Category rail.  Spec Ch. 7.9.
  *
  * In the MVP this rail IS the navigation model within the feed — there is no
- * search and no drawer. Selecting a category resets to the top of that feed.
+ * search and no drawer. Selecting a category resets to the top of that feed,
+ * and swiping horizontally moves one category at a time.
  *
- * The active chip is indicated by FILL as well as colour, so the state survives
- * colour-vision differences and monochrome rendering (Ch. 11.7).
+ * Plain text labels rather than filled pills: at seven categories a row of
+ * pills is a wall of boxes, and the boxes carry no information the label does
+ * not. The active category is the accent colour.
+ *
+ * Ch. 11.7 says state must never rest on colour alone, so the active label is
+ * ALSO heavier and carries a short underline. Someone who cannot separate the
+ * accent from the body colour still sees which one is selected.
  */
 
 export interface CategoryOption {
@@ -28,17 +34,17 @@ interface Props {
 
 export function CategoryRail({ categories, active, onSelect, theme, labelLang }: Props) {
   const scroller = useRef<ScrollView>(null);
-  /** Measured chip positions, so scrolling to one does not depend on guessing
-   *  its width from the label length — Devanagari and Latin differ a lot. */
+  /** Measured positions, so scrolling to a label does not depend on guessing
+   *  its width — Devanagari and Latin differ considerably. */
   const layouts = useRef<Record<string, { x: number; width: number }>>({});
 
-  // Keep the active chip visible as the reader SWIPES between categories, not
-  // only when they tap. Without this the rail highlights a chip that may be off
-  // screen, and the rail reads as disconnected from the gesture.
+  // Keep the active label visible as the reader SWIPES, not only when they tap.
+  // Without this the rail highlights a label that may be off screen, and reads
+  // as disconnected from the gesture.
   useEffect(() => {
     const l = layouts.current[active];
     if (!l) return;
-    scroller.current?.scrollTo({ x: Math.max(0, l.x - 64), animated: true });
+    scroller.current?.scrollTo({ x: Math.max(0, l.x - 72), animated: true });
   }, [active]);
 
   return (
@@ -59,24 +65,29 @@ export function CategoryRail({ categories, active, onSelect, theme, labelLang }:
                 layouts.current[c.slug] = { x, width };
               }}
               onPress={() => onSelect(c.slug)}
-              style={[
-                styles.chip,
-                {
-                  backgroundColor: on ? theme.accent : 'transparent',
-                  borderColor: on ? theme.accent : theme.divider,
-                },
-              ]}
+              style={styles.item}
               accessibilityRole="tab"
               accessibilityState={{ selected: on }}
             >
               <Text
                 style={[
-                  styles.chipText,
-                  { color: on ? '#fff' : theme.textSecondary, fontWeight: on ? '700' : '600' },
+                  styles.label,
+                  {
+                    color: on ? theme.accent : theme.textSecondary,
+                    fontWeight: on ? '700' : '500',
+                  },
                 ]}
+                numberOfLines={1}
               >
                 {c.label[labelLang]}
               </Text>
+              {/* Second, non-colour signal for the selected state. */}
+              <View
+                style={[
+                  styles.underline,
+                  { backgroundColor: on ? theme.accent : 'transparent' },
+                ]}
+              />
             </Pressable>
           );
         })}
@@ -87,14 +98,8 @@ export function CategoryRail({ categories, active, onSelect, theme, labelLang }:
 
 const styles = StyleSheet.create({
   wrap: { borderBottomWidth: StyleSheet.hairlineWidth },
-  content: { paddingHorizontal: 12, paddingVertical: 9, gap: 7 },
-  chip: {
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 18,
-    borderWidth: 1,
-    minHeight: 34,
-    justifyContent: 'center',
-  },
-  chipText: { fontSize: 13 },
+  content: { paddingHorizontal: 14, gap: 20, alignItems: 'flex-end' },
+  item: { paddingTop: 13, alignItems: 'center', minHeight: 44, justifyContent: 'flex-end' },
+  label: { fontSize: 15, letterSpacing: 0.1 },
+  underline: { height: 2.5, borderRadius: 2, alignSelf: 'stretch', marginTop: 8 },
 });
