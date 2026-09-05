@@ -79,7 +79,10 @@ interface Ctx {
 const DeviceCtx = createContext<Ctx | null>(null);
 
 async function uuid(): Promise<string> {
-  const existing = await AsyncStorage.getItem(DEVICE_ID_KEY);
+  // Storage can fail (a full or locked device). Falling back to an in-memory id
+  // keeps the app usable; the only cost is that this install looks new to the
+  // server next launch, which is far better than failing to boot.
+  const existing = await AsyncStorage.getItem(DEVICE_ID_KEY).catch(() => null);
   if (existing) return existing;
   // expo-crypto is not a dependency; this is a v4-shaped random id, which is
   // all we need — it identifies an install, not a person or a handset.
@@ -87,7 +90,7 @@ async function uuid(): Promise<string> {
   const id = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) =>
     c === 'x' ? hex() : ((Math.floor(Math.random() * 4) + 8) % 16).toString(16),
   );
-  await AsyncStorage.setItem(DEVICE_ID_KEY, id);
+  await AsyncStorage.setItem(DEVICE_ID_KEY, id).catch(() => undefined);
   return id;
 }
 
@@ -120,7 +123,7 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
         if (!res.ok) return;
         const body = (await res.json()) as { deviceToken: string; notif: NotifPrefs };
         setToken(body.deviceToken);
-        await AsyncStorage.setItem(DEVICE_TOKEN_KEY, body.deviceToken);
+        await AsyncStorage.setItem(DEVICE_TOKEN_KEY, body.deviceToken).catch(() => undefined);
         // Trust the server's copy: it is authoritative and already clamped.
         if (body.notif) setPrefsState(body.notif);
       } catch {
@@ -137,8 +140,8 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
       setDeviceId(id);
 
       const [savedToken, promptState, perms] = await Promise.all([
-        AsyncStorage.getItem(DEVICE_TOKEN_KEY),
-        AsyncStorage.getItem(PROMPT_STATE_KEY),
+        AsyncStorage.getItem(DEVICE_TOKEN_KEY).catch(() => null),
+        AsyncStorage.getItem(PROMPT_STATE_KEY).catch(() => null),
         safeNotify(() => Notifications.getPermissionsAsync(), null),
       ]);
 

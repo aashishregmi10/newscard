@@ -13,6 +13,9 @@ import type { Card } from '../api/client';
  *
  * SQLite rather than a key-value store because eviction needs an ordered range
  * query, not a full scan of every key (Ch. 9.2).
+ *
+ * EVERY function here is failure-tolerant. The cache is an optimisation; if it
+ * cannot open, the app must still fetch and display news.
  */
 
 const DB_NAME = 'newscard.db';
@@ -21,30 +24,38 @@ const DB_NAME = 'newscard.db';
 export const RETENTION_DAYS = 7;
 export const MAX_CARDS = 400;
 
+const SCHEMA = `
+  PRAGMA journal_mode = WAL;
+  CREATE TABLE IF NOT EXISTS articles (
+    id            TEXT PRIMARY KEY NOT NULL,
+    slug          TEXT NOT NULL,
+    language      TEXT NOT NULL,
+    category_slug TEXT NOT NULL,
+    published_at  INTEGER NOT NULL,
+    cached_at     INTEGER NOT NULL,
+    payload       TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_articles_feed
+    ON articles (category_slug, published_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_articles_cached
+    ON articles (cached_at);
+`;
+
 let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
 
-async function open(): Promise<SQLite.SQLiteDatabase> {
+function open(): Promise<SQLite.SQLiteDatabase> {
   if (!dbPromise) {
     dbPromise = (async () => {
       const db = await SQLite.openDatabaseAsync(DB_NAME);
-      await db.execAsync(`
-        PRAGMA journal_mode = WAL;
-        CREATE TABLE IF NOT EXISTS articles (
-          id            TEXT PRIMARY KEY NOT NULL,
-          slug          TEXT NOT NULL,
-          language      TEXT NOT NULL,
-          category_slug TEXT NOT NULL,
-          published_at  INTEGER NOT NULL,
-          cached_at     INTEGER NOT NULL,
-          payload       TEXT NOT NULL
-        );
-        CREATE INDEX IF NOT EXISTS idx_articles_feed
-          ON articles (category_slug, published_at DESC);
-        CREATE INDEX IF NOT EXISTS idx_articles_cached
-          ON articles (cached_at);
-      `);
+      await db.execAsync(SCHEMA);
       return db;
-    })();
+    })().catch((e: unknown) => {
+      // Do NOT keep a rejected promise cached. Every later call would reject
+      // forever, so a single transient failure at boot would disable the cache
+      // for the entire session. Clearing it lets the next call retry.
+      dbPromise = null;
+      throw e;
+    });
   }
   return dbPromise;
 }
@@ -84,12 +95,12 @@ export async function getCards(
   limit = 40,
 ): Promise<Card[]> {
   const db = await open();
-  const langPlaceholders = languages.map(() => '?').join(',');
+  const placeholders = languages.map(() => '?').join(',');
 
   const rows = await db.getAllAsync<{ payload: string }>(
     `SELECT payload FROM articles
       WHERE category_slug = ?
-        AND language IN (${langPlaceholders})
+        AND language IN (${placeholders})
       ORDER BY published_at DESC
       LIMIT ?`,
     categorySlug,
@@ -102,7 +113,7 @@ export async function getCards(
       try {
         return JSON.parse(r.payload) as Card;
       } catch {
-        // A single corrupt row must not blank the whole feed.
+        // One corrupt row must not blank the whole feed.
         return null;
       }
     })
@@ -112,7 +123,7 @@ export async function getCards(
 /**
  * Evict by age, then by count.  Ch. 9.3.
  *
- * Bookmarked stories are held in a separate store and are never evicted — a
+ * Bookmarked stories live in a separate store and are never evicted — a
  * bookmark is a promise, and re-fetching it needs a network the reader may not
  * have.
  */
@@ -121,7 +132,6 @@ export async function evict(): Promise<number> {
   const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
   const byAge = await db.runAsync('DELETE FROM articles WHERE cached_at < ?', cutoff);
-
   const byCount = await db.runAsync(
     `DELETE FROM articles WHERE id IN (
        SELECT id FROM articles ORDER BY published_at DESC LIMIT -1 OFFSET ?
@@ -137,10 +147,7 @@ export async function evict(): Promise<number> {
 export async function purge(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
   const db = await open();
-  await db.runAsync(
-    `DELETE FROM articles WHERE id IN (${ids.map(() => '?').join(',')})`,
-    ...ids,
-  );
+  await db.runAsync(`DELETE FROM articles WHERE id IN (${ids.map(() => '?').join(',')})`, ...ids);
 }
 
 export async function stats(): Promise<{ count: number; oldest: number | null }> {
