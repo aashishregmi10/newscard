@@ -1,0 +1,29 @@
+{
+  "name": "@newscard/api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc -b",
+    "start": "node dist/server.js",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@newscard/db": "*",
+    "@newscard/schemas": "*",
+    "@newscard/shared": "*",
+    "compression": "^1.7.5",
+    "dotenv": "^17.4.2",
+    "express": "^4.21.2",
+    "helmet": "^8.0.0",
+    "mongodb": "^6.12.0",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/compression": "^1.7.5",
+    "@types/express": "^5.0.0",
+    "supertest": "^7.0.0",
+    "@types/supertest": "^6.0.2"
+  }
+}

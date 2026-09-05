@@ -1,0 +1,68 @@
+name: newscard-dev
+
+services:
+  # MongoDB as a SINGLE-NODE REPLICA SET.
+  #
+  # This is not optional. The publish flow (spec Fig. 4.3) uses a transaction,
+  # and MongoDB transactions require a replica set. A standalone mongod fails at
+  # runtime with "Transaction numbers are only allowed on a replica set member",
+  # which reads like an application bug and is not.
+  #
+  # The healthcheck below initiates rs0 on first boot, so this is automatic
+  # rather than a README step someone skips.
+  mongo:
+    image: mongo:7
+    container_name: newscard-mongo
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    ports:
+      # Published on 27018, NOT 27017.
+      #
+      # A locally-installed MongoDB service commonly already holds 27017. When it
+      # does, this container's port simply does not bind and every connection
+      # silently goes to that standalone instead — which has no replica set, so
+      # transactions fail later with a confusing error. Using a distinct port
+      # keeps the project's database completely separate from any system one.
+      - "27018:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: >
+        mongosh --quiet --eval "
+          try { rs.status().ok }
+          catch (e) { rs.initiate({_id:'rs0',members:[{_id:0,host:'localhost:27017'}]}).ok }
+        "
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 5s
+
+  # S3-compatible object store for image renditions (spec Ch. 4.8).
+  minio:
+    image: minio/minio:latest
+    container_name: newscard-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Catches OTP email in development so no real mail is ever sent from a dev box.
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: newscard-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
+volumes:
+  mongo-data:
+  minio-data:

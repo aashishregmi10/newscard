@@ -1,0 +1,37 @@
+{
+  "name": "newscard",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bilingual short-form news application for the Nepali market",
+  "workspaces": [
+    "packages/*",
+    "apps/api",
+    "apps/cms-api",
+    "apps/worker"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "typecheck": "tsc -b --pretty",
+    "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:up": "docker compose -f infra/docker-compose.dev.yml up -d",
+    "db:down": "docker compose -f infra/docker-compose.dev.yml down",
+    "db:init": "tsx scripts/init-db.ts",
+    "db:seed": "tsx scripts/gen-images.ts && tsx scripts/seed.ts",
+    "dev:api": "tsx watch apps/api/src/server.ts",
+    "check:forbidden": "tsx scripts/check-forbidden-deps.ts",
+    "media:gen": "tsx scripts/gen-images.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "dotenv": "^17.4.2"
+  }
+}

@@ -1,0 +1,44 @@
+# dependencies
+node_modules/
+.pnpm-store/
+
+# build output
+dist/
+build/
+*.tsbuildinfo
+
+# environment — NEVER commit
+.env
+.env.*
+!.env.example
+
+# expo / react native
+.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+android/
+ios/
+
+# test + coverage
+coverage/
+.vitest/
+
+# logs
+*.log
+npm-debug.log*
+
+# local data
+/data/
+/tmp/
+
+# editor / os
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+/media/
