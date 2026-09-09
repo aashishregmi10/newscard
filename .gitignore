@@ -42,3 +42,5 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 /media/
+media/i/
+media/commons-cache.json

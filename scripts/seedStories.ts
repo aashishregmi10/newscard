@@ -10,6 +10,8 @@
  * grapheme-counting bugs survive all the way to a real device.
  */
 
+import { DEMO_STORIES } from './seedStoriesDemo.js';
+
 export interface SeedStory {
   slug: string;
   language: 'ne' | 'en';
@@ -25,9 +27,15 @@ export interface SeedStory {
   originatingAgency?: string;
   /** A minority of stories have no image — the card must handle that (Ch. 7.2.1). */
   noImage?: boolean;
+  /**
+   * What to search Wikimedia Commons for when fetching a real photograph.
+   * Concrete and photographable: "Kathmandu street market" finds something,
+   * "economic policy" does not.
+   */
+  imageQuery?: string;
 }
 
-export const STORIES: SeedStory[] = [
+const FIXTURES: SeedStory[] = [
   // ── one wire story carried by three outlets ─────────────────────────────
   {
     slug: 'relief-fund-first-tranche-ne-khabar', language: 'ne', category: 'nepal',
@@ -157,6 +165,14 @@ export const STORIES: SeedStory[] = [
     pullQuote: 'परम्परागत सामग्री र सीप प्रयोग हुने', author: 'र. श्रेष्ठ', minutesAgo: 3300,
   },
 ];
+
+/**
+ * The fixtures above exercise specific behaviours — a clustered wire story, a
+ * card with no image, a same-millisecond publish. The demonstration corpus is
+ * volume: enough stories that every section has a full feed when the app is
+ * shown to someone. Both are synthetic under the same rules.
+ */
+export const STORIES: SeedStory[] = [...FIXTURES, ...DEMO_STORIES];
 
 /** Consumed by the image generator so both stay in step. */
 export const SEED_SLUGS = STORIES.map((s) => ({ slug: s.slug, category: s.category }));

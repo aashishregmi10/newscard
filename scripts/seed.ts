@@ -17,6 +17,7 @@ import { countGraphemes, countWords } from '@newscard/shared';
 import { hash as argonHash } from '@node-rs/argon2';
 import { STORIES, SOURCES } from './seedStories.js';
 import { generateFor } from './gen-images.js';
+import { fetchAll } from './fetch-demo-images.js';
 import { seedAds } from './seedAds.js';
 
 /** Development-only credentials, printed at the end so they are never a secret
@@ -31,13 +32,16 @@ if (!uri) {
 }
 
 /**
- * Image URLs must be reachable FROM THE PHONE, not just from this machine.
- * localhost on a handset means the handset. Set CDN_BASE_URL to the LAN address
- * (e.g. http://192.168.1.20:3000/media) before seeding if you are testing on a
- * real device, or images will silently fail to load there while looking fine in
- * a desktop browser.
+ * Image URLs are stored RELATIVE ("/media/..."), and the client resolves them
+ * against whichever host it reached Expo on.
+ *
+ * The alternative — baking in an absolute address at seed time — breaks twice:
+ * "localhost" on a handset means the handset, and a hardcoded LAN address stops
+ * working the next time the router hands out a different lease. Both fail as
+ * images that silently do not load on the phone while looking correct in a
+ * desktop browser.
  */
-const CDN_BASE = process.env.CDN_BASE_URL ?? 'http://localhost:3000/media';
+const CDN_BASE = process.env.CDN_BASE_URL ?? '/media';
 
 const NOW = Date.now();
 const minsAgo = (m: number) => new Date(NOW - m * 60_000);
@@ -114,8 +118,20 @@ async function main(): Promise<void> {
     updatedAt: new Date(),
   } as never);
 
+  /**
+   * Real photographs from Wikimedia Commons, each carrying its own licence and
+   * photographer. Cached on disk, so this only touches the network for stories
+   * that do not have a picture yet.
+   *
+   * A story with no usable result falls back to the generated gradient rather
+   * than to nothing: the point of the fallback is that the card layout is
+   * exercised either way.
+   */
+  const photos = await fetchAll(CDN_BASE);
+
   const clusterIds = new Map<string, ObjectId>();
   let withImage = 0;
+  let withPhoto = 0;
 
   for (const story of STORIES) {
     const catId = categoryIds.get(story.category);
@@ -135,18 +151,38 @@ async function main(): Promise<void> {
     // the image region cleanly rather than leaving a gap (Ch. 7.2.1).
     let image: Record<string, unknown> | null = null;
     if (!story.noImage) {
-      const g = generateFor(story.slug, story.category, CDN_BASE);
-      image = {
-        sourceUrl: null,
-        credit: `${src.displayName} (synthetic placeholder)`,
-        // `own` is accurate: we generated these. Nothing here is claimed as a
-        // licensed news photograph.
-        licence: 'own',
-        blurHash: g.blurHash,
-        width: g.width,
-        height: g.height,
-        urls: g.urls,
-      };
+      const photo = photos[story.slug];
+      if (photo) {
+        image = {
+          sourceUrl: photo.sourceUrl,
+          // The photographer and the exact licence, both shown on the card.
+          // Crediting a real photographer correctly is the whole reason these
+          // are usable at all.
+          credit: `${photo.credit} (${photo.licence})`,
+          // Maps to the schema's enum. The precise licence string lives in the
+          // credit, because "CC BY-SA 3.0" is what a takedown request would
+          // actually be checked against.
+          licence: 'cc_by',
+          blurHash: photo.blurHash,
+          width: photo.width,
+          height: photo.height,
+          urls: photo.urls,
+        };
+        withPhoto++;
+      } else {
+        const g = generateFor(story.slug, story.category, CDN_BASE);
+        image = {
+          sourceUrl: null,
+          credit: `${src.displayName} (synthetic placeholder)`,
+          // `own` is accurate: we generated these. Nothing here is claimed as a
+          // licensed news photograph.
+          licence: 'own',
+          blurHash: g.blurHash,
+          width: g.width,
+          height: g.height,
+          urls: g.urls,
+        };
+      }
       withImage++;
     }
 
@@ -193,7 +229,8 @@ async function main(): Promise<void> {
 
   const ne = STORIES.filter((s) => s.language === 'ne').length;
   console.log(`  ${STORIES.length} articles (${ne} Nepali, ${STORIES.length - ne} English)`);
-  console.log(`  ${withImage} with images, ${STORIES.length - withImage} without (deliberate)`);
+  console.log(`  ${withImage} with images — ${withPhoto} real photographs (CC-licensed, credited), ${withImage - withPhoto} generated`);
+  console.log(`  ${STORIES.length - withImage} without an image (deliberate)`);
   console.log(`  ${clusterIds.size} cluster(s) — one story carried by 3 outlets`);
   console.log('\nseed complete');
   console.log(`\nCMS login (development only):\n  ${DEV_EMAIL}\n  ${DEV_PASSWORD}`);

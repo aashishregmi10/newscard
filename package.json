@@ -27,10 +27,12 @@
     "mobile": "node scripts/mobile.mjs",
     "mobile:doctor": "node scripts/mobile.mjs --doctor",
     "check:forbidden": "tsx scripts/check-forbidden-deps.ts",
-    "media:gen": "tsx scripts/gen-images.ts"
+    "media:gen": "tsx scripts/gen-images.ts",
+    "media:fetch": "tsx scripts/fetch-demo-images.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "sharp": "^0.35.4",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vitest": "^2.1.8"
