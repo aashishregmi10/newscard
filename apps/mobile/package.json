@@ -5,14 +5,14 @@
   "dependencies": {
     "@expo/vector-icons": "^15.1.1",
     "@react-native-async-storage/async-storage": "2.2.0",
-    "expo": "~57.0.20",
+    "expo": "~57.0.21",
     "expo-clipboard": "^57.0.1",
     "expo-constants": "~57.0.17",
     "expo-device": "^57.0.1",
     "expo-haptics": "^57.0.2",
     "expo-linking": "~57.0.9",
     "expo-notifications": "^57.0.17",
-    "expo-router": "~57.0.19",
+    "expo-router": "~57.0.20",
     "expo-sqlite": "^57.0.2",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
@@ -30,10 +30,12 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "prestart": "node ../../scripts/mobile.mjs --doctor",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web"
+    "web": "expo start --web",
+    "doctor": "node ../../scripts/mobile.mjs --doctor"
   },
   "private": true
 }
