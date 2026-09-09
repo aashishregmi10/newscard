@@ -2,6 +2,7 @@ import { Tabs } from 'expo-router';
 import { View, StyleSheet, type ColorValue } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSettings } from '../../src/state/SettingsContext';
+import { emitFeedTabPress } from '../../src/lib/feedTabSignal';
 
 /**
  * Bottom navigation.  Spec Ch. 7.9.
@@ -88,6 +89,17 @@ export default function TabsLayout() {
     >
       <Tabs.Screen
         name="index"
+        /**
+         * Pressing Feed while Feed is already open returns to the top, and
+         * pressing it again refreshes — the behaviour every other app on the
+         * reader's phone has. When the Feed tab is NOT focused this is ordinary
+         * navigation, so nothing is emitted and nothing is intercepted.
+         */
+        listeners={({ navigation }) => ({
+          tabPress: () => {
+            if (navigation.isFocused()) emitFeedTabPress();
+          },
+        })}
         options={{
           title: 'Feed',
           tabBarIcon: ({ focused, color }) => (

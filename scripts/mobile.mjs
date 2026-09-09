@@ -40,6 +40,7 @@ import { existsSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import net from 'node:net';
+import http from 'node:http';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MOBILE = join(ROOT, 'apps', 'mobile');
@@ -92,6 +93,7 @@ function portInUse(port) {
     const server = net.createServer();
     server.once('error', () => resolve(true));
     server.once('listening', () => server.close(() => resolve(false)));
+    server.unref();
     server.listen(port, '127.0.0.1');
   });
 }
@@ -250,6 +252,57 @@ function checkNativeVersions() {
   );
 }
 
+/**
+ * The app is offline-first, so a missing API does not crash it — it quietly
+ * falls back to the cache and shows "Could not reach the server". That is
+ * correct behaviour and it is also indistinguishable, from the phone, from a
+ * bug. Checking here turns a confusing screen into one line of output.
+ */
+function getHealth() {
+  return new Promise((resolve) => {
+    const req = http.get(
+      { host: '127.0.0.1', port: 3000, path: '/v1/health', agent: false, timeout: 1500 },
+      (res) => {
+        let body = '';
+        res.setEncoding('utf8');
+        res.on('data', (d) => (body += d));
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(body));
+          } catch {
+            resolve(null);
+          }
+        });
+      },
+    );
+    req.on('timeout', () => req.destroy());
+    req.on('error', () => resolve(null));
+  });
+}
+
+async function checkApi() {
+  const body = await getHealth();
+  if (body) {
+    if (body.db === false) {
+      console.log(
+        `  ${c.yellow('note')}  the API is running but has no database connection.
+` +
+          `        ${c.dim('Check MONGO_URI in .env, and that MongoDB is running.')}`,
+      );
+      return;
+    }
+    return ok('read API is up on port 3000');
+  }
+
+  console.log(
+    `  ${c.yellow('note')}  the read API is NOT running on port 3000.
+` +
+      `        ${c.dim('The app will show "Could not reach the server" and fall back to cached stories.')}
+` +
+      `        ${c.dim('Start it in a second terminal:  npm run dev:api')}`,
+  );
+}
+
 /** A Metro left running from a previous session holds the port and confuses the app. */
 async function checkPort() {
   if (await portInUse(8081)) {
@@ -273,6 +326,7 @@ checkNoLegacyEntry();
 checkInstall();
 checkReactPairing();
 checkNativeVersions();
+await checkApi();
 await checkPort();
 
 console.log('');

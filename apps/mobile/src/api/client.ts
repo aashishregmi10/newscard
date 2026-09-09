@@ -139,7 +139,11 @@ export async function fetchFeed(opts: {
     const aborted = (e as { name?: string })?.name === 'AbortError';
     throw new FeedError(
       aborted ? 'timeout' : 'offline',
-      aborted ? 'The server took too long to respond.' : 'No connection.',
+      aborted
+        ? 'The server took too long to respond.'
+        : // Covers both "no network" and "server unreachable". fetch cannot
+          // tell them apart, so the message must be true of both.
+          'Could not reach the server.',
     );
   } finally {
     clearTimeout(timer);

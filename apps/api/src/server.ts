@@ -1,4 +1,17 @@
-import 'dotenv/config';
+import { config as loadDotenv } from 'dotenv';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+/**
+ * The single .env lives at the repository ROOT, and it is resolved from this
+ * file rather than from process.cwd().
+ *
+ * `import 'dotenv/config'` reads .env relative to wherever the process happened
+ * to start, so the server booted fine from the repository root and failed with
+ * "MONGO_URI is not set" when started from its own directory — the same command
+ * working or not depending on which folder the terminal was in.
+ */
+loadDotenv({ path: join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.env') });
 import { connect, close, warnIfNoTransactions } from '@newscard/db';
 import { loadEnv } from './config/index.js';
 import { createApp } from './app.js';

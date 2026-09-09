@@ -8,8 +8,11 @@ import {
   RefreshControl,
   Platform,
   type ListRenderItemInfo,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type ViewToken,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { NewsCard } from './NewsCard';
 import { CardSkeleton } from './CardSkeleton';
 import { SponsoredCard } from './SponsoredCard';
@@ -24,6 +27,7 @@ import {
   flushAdEvents,
   setAdDeviceId,
 } from '../lib/adTracker';
+import { onFeedTabPress } from '../lib/feedTabSignal';
 import type { Theme } from '../theme/tokens';
 
 /**
@@ -90,6 +94,11 @@ function CategoryFeedInner({
   const noteCardReadRef = useRef(device.noteCardRead);
   noteCardReadRef.current = device.noteCardRead;
 
+  const listRef = useRef<FlatList<FeedEntry>>(null);
+  /** Whether the list is resting at the top. Updated only when scrolling stops,
+   *  so it costs nothing during the scroll itself. */
+  const atTop = useRef(true);
+
   const { cards: raw, status, error, fromCache, refreshing, reload, refresh, loadMore } = useFeed(
     languages,
     category,
@@ -135,6 +144,41 @@ function CategoryFeedInner({
    * categories doing that at once, mid-animation, is exactly the stutter a
    * reader feels as "the tabs are laggy".
    */
+
+  const refreshRef = useRef(refresh);
+  refreshRef.current = refresh;
+
+  /**
+   * Feed tab pressed while already on the Feed.
+   *
+   * Scrolled down  -> return to the top.
+   * Already at top -> refresh.
+   *
+   * Refresh rather than a full reload: the cards stay on screen under the
+   * spinner instead of collapsing to a skeleton and back, which is the
+   * difference between the feed feeling responsive and feeling like it
+   * restarted. Every mounted category hears this; only the visible one acts.
+   */
+  useEffect(
+    () =>
+      onFeedTabPress(() => {
+        if (!activeRef.current) return;
+        void Haptics.selectionAsync();
+
+        if (!atTop.current) {
+          listRef.current?.scrollToOffset({ offset: 0, animated: true });
+          atTop.current = true;
+          return;
+        }
+        void refreshRef.current();
+      }),
+    [],
+  );
+
+  /** Cheap because it fires only when a scroll comes to rest, never per frame. */
+  const onScrollSettled = useCallback((e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    atTop.current = e.nativeEvent.contentOffset.y <= 8;
+  }, []);
 
   const keyExtractor = useCallback((e: FeedEntry) => e.id, []);
 
@@ -223,9 +267,13 @@ function CategoryFeedInner({
   const banner =
     cards && cards.length > 0
       ? error?.kind === 'offline'
-        ? labelLang === 'ne'
-          ? 'तपाईं अफलाइन हुनुहुन्छ। सुरक्षित समाचार देखाइँदै।'
-          : 'You are offline. Showing saved stories.'
+        ? // Deliberately not "you are offline": the same failure happens when
+          // the reader has full signal and the server is unreachable, and
+          // telling someone with four bars that they are offline reads as a
+          // broken app rather than a broken connection.
+          labelLang === 'ne'
+          ? 'सर्भरसँग जोड्न सकिएन। सुरक्षित समाचार देखाइँदै।'
+          : 'Could not reach the server. Showing saved stories.'
         : error
           ? error.message
           : fromCache
@@ -278,6 +326,7 @@ function CategoryFeedInner({
        * pagingEnabled and snapToInterval only decide where a scroll RESTS, so
        * without it a fling keeps its momentum and travels several cards. */}
       <FlatList
+        ref={listRef}
         data={cards}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
@@ -289,6 +338,8 @@ function CategoryFeedInner({
         getItemLayout={getItemLayout}
         viewabilityConfig={VIEWABILITY}
         onViewableItemsChanged={onViewableItemsChanged}
+        onMomentumScrollEnd={onScrollSettled}
+        onScrollEndDrag={onScrollSettled}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.5}
         refreshControl={refreshControl}
