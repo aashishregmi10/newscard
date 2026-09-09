@@ -43,10 +43,21 @@ export const articleValidator: MongoValidator = {
         enum: ['draft', 'in_review', 'approved', 'scheduled', 'published', 'spiked', 'retracted'],
       },
       language: { enum: ['ne', 'en'] },
-      headline: { bsonType: 'string', minLength: 10, maxLength: 90 },
-      // Safety rail, NOT the editorial limit. The real limit is in
-      // config.summaryLimits because Gate 2 may change it.
-      summary: { bsonType: 'string', minLength: 40, maxLength: 1200 },
+      // Upper bounds only, and deliberately so.
+      //
+      // This validator governs every article at every stage, including a draft
+      // an editor has just created and not yet typed into. A minimum length here
+      // made an empty draft unstorable and the newsroom unable to create a story
+      // at all — the insert failed with "Document failed validation" and nothing
+      // said which rule.
+      //
+      // Minimum length is a PUBLISH rule and lives with the other publish
+      // preconditions in publish.service.ts, which is also where the summary's
+      // real limit has to live: it comes from config.summaryLimits, which Gate 2
+      // may change, and a constant baked in here could never follow it.
+      headline: { bsonType: 'string', maxLength: 90 },
+      // Safety rail against a runaway write, NOT the editorial limit.
+      summary: { bsonType: 'string', maxLength: 1200 },
       publisherUrl: { bsonType: 'string', pattern: '^https://' },
       draftSource: { enum: ['human', 'llm_assisted'] },
       image: {

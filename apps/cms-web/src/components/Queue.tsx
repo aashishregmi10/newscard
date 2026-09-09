@@ -43,9 +43,10 @@ function relative(iso: string): string {
 
 interface Props {
   onOpen: (id: string) => void;
+  onNew: () => void;
 }
 
-export function Queue({ onOpen }: Props) {
+export function Queue({ onOpen, onNew }: Props) {
   const [items, setItems] = useState<QueueItem[] | null>(null);
   const [limits, setLimits] = useState<Limits | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -76,10 +77,11 @@ export function Queue({ onOpen }: Props) {
       if (e.key === 'j') setCursor((c) => Math.min(items.length - 1, c + 1));
       else if (e.key === 'k') setCursor((c) => Math.max(0, c - 1));
       else if (e.key === 'Enter') onOpen(items[cursor]!.id);
+      else if (e.key === 'n') onNew();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [items, cursor, onOpen]);
+  }, [items, cursor, onOpen, onNew]);
 
   if (error) {
     return (
@@ -106,10 +108,22 @@ export function Queue({ onOpen }: Props) {
 
   if (items.length === 0) {
     return (
-      <div className="empty">
-        <h2>Nothing waiting</h2>
-        <p>Every story has been dealt with. New items appear here as they arrive.</p>
-      </div>
+      <>
+        <div className="page-head">
+          <h1>Queue</h1>
+          <div className="topbar-spacer" />
+          <button className="btn btn-primary btn-sm" onClick={onNew}>
+            New story
+          </button>
+        </div>
+        <div className="empty">
+          <h2>Nothing waiting</h2>
+          <p>Every story has been dealt with. Start the next one when you are ready.</p>
+          <button className="btn btn-primary" onClick={onNew}>
+            New story
+          </button>
+        </div>
+      </>
     );
   }
 
@@ -124,8 +138,11 @@ export function Queue({ onOpen }: Props) {
         <div className="topbar-spacer" />
         <span className="count">
           <span className="kbd">j</span> <span className="kbd">k</span> move ·{' '}
-          <span className="kbd">↵</span> open
+          <span className="kbd">↵</span> open · <span className="kbd">n</span> new
         </span>
+        <button className="btn btn-primary btn-sm" onClick={onNew}>
+          New story
+        </button>
       </div>
 
       <div className="queue">

@@ -8,6 +8,7 @@ import { requireRole, requireAuth } from '../auth/requireRole.js';
 import { asyncRoute } from '../middleware/index.js';
 import { transitionArticle } from '../services/transition.service.js';
 import { publishArticle, retractArticle } from '../services/publish.service.js';
+import { writeAudit } from '../audit/writeAudit.js';
 
 export const articleRoutes = Router();
 
@@ -231,5 +232,159 @@ articleRoutes.post(
     });
 
     res.json({ ok: true });
+  }),
+);
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Creating a story.
+ *
+ * This is the route the whole product turns on and it was missing: the queue
+ * could list, the composer could edit, the workflow could publish — and there
+ * was no way to bring an article into existence. Manual entry is the launch
+ * content strategy (ingestion is a later phase), so without this nobody could
+ * put a single story into the app.
+ *
+ * A new article starts almost empty on purpose. The composer autosaves through
+ * PATCH, so requiring a finished headline and summary up front would mean the
+ * editor writes into a form that cannot be saved until it is complete. What IS
+ * required is the three things that decide where the story belongs and cannot
+ * be inferred later: language, section and publisher.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const CreateSchema = z.object({
+  language: z.enum(['ne', 'en']),
+  categorySlug: z.string().min(1).max(40),
+  sourceSlug: z.string().min(1).max(60),
+  headline: z.string().max(90).optional(),
+});
+
+/**
+ * A slug that is unique, readable, and never derived from a headline the editor
+ * has not written yet. Devanagari is transliterated away rather than
+ * percent-encoded, because the slug ends up in a shareable URL.
+ */
+function draftSlug(language: string, categorySlug: string): string {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const rand = Math.random().toString(36).slice(2, 8);
+  return `${categorySlug}-${language}-${stamp}-${rand}`;
+}
+
+articleRoutes.post(
+  '/cms/articles',
+  requireRole('article.write'),
+  asyncRoute(async (req, res) => {
+    const parsed = CreateSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError('VALIDATION_FAILED', 'Language, section and publisher are required.', {
+        issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+      });
+    }
+
+    const c = collections(getDb());
+    const { language, categorySlug, sourceSlug } = parsed.data;
+
+    const category = await c.categories.findOne({ slug: categorySlug });
+    if (!category) throw new AppError('BAD_REQUEST', `No such section: ${categorySlug}.`);
+
+    const source = await c.sources.findOne({ slug: sourceSlug });
+    if (!source) throw new AppError('BAD_REQUEST', `No such publisher: ${sourceSlug}.`);
+
+    // The licence gate, checked at creation as well as at publication. Starting
+    // a story against a publisher we have no agreement with wastes the editor's
+    // time — the publish precondition would refuse it at the end.
+    if (source.licence?.status !== 'agreed') {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        `${source.displayName} has no agreed licence, so stories cannot be written against it.`,
+        { licenceStatus: source.licence?.status ?? null },
+      );
+    }
+
+    const now = new Date();
+    const _id = new ObjectId();
+
+    await c.articles.insertOne({
+      _id,
+      slug: draftSlug(language, categorySlug),
+      status: 'draft',
+      language,
+      categoryId: category._id,
+      sourceId: source._id,
+      publishedAt: null,
+      headline: parsed.data.headline ?? '',
+      summary: '',
+      summaryWordCount: 0,
+      summaryCharCount: 0,
+      pullQuote: null,
+      publisherUrl: source.homepageUrl,
+      publisherAuthor: null,
+      publisherPublishedAt: null,
+      tags: [],
+      clusterId: null,
+      originatingAgency: null,
+      image: null,
+      // Denormalised at creation so the queue and the feed never need a join.
+      sourceName: source.displayName,
+      sourceLogoUrl: source.logoUrl ?? null,
+      categorySlug: category.slug,
+      categoryLabel: category.label,
+      authoredBy: new ObjectId(req.staff!.staffId),
+      reviewedBy: null,
+      selfApproved: false,
+      // Written by a person. Recorded from day one so that when a machine draft
+      // arrives later there is a human baseline to measure it against (Ch. 4.7).
+      draftSource: 'human',
+      revisionCount: 0,
+      possibleDuplicate: false,
+      possibleLanguageMismatch: false,
+      createdAt: now,
+      updatedAt: now,
+    } as never);
+
+    await writeAudit({
+      action: 'article.create',
+      entityType: 'article',
+      entityId: _id.toString(),
+      actorId: req.staff!.staffId,
+      actorEmail: req.staff!.email,
+      before: null,
+      after: { language, categorySlug, sourceSlug, status: 'draft' },
+      ip: req.ip ?? null,
+    });
+
+    res.status(201).json({ id: _id.toString() });
+  }),
+);
+
+/**
+ * GET /cms/options — the sections and publishers a new story can be filed
+ * against.
+ *
+ * Publishers with no agreed licence are returned but marked, rather than hidden.
+ * An editor who cannot find a publisher they expect needs to know it is a
+ * licensing question, not a bug.
+ */
+articleRoutes.get(
+  '/cms/options',
+  requireRole('queue.read'),
+  asyncRoute(async (_req, res) => {
+    const c = collections(getDb());
+    const [categories, sources] = await Promise.all([
+      c.categories.find({ isActive: true }).sort({ order: 1 }).toArray(),
+      c.sources.find({ isActive: true }).sort({ priority: 1 }).toArray(),
+    ]);
+
+    res.json({
+      categories: categories
+        // `top` is virtual — it is the mixed feed, and no article is filed there.
+        .filter((cat) => cat.slug !== 'top' && cat.slug !== 'all')
+        .map((cat) => ({ slug: cat.slug, label: cat.label })),
+      sources: sources.map((s) => ({
+        slug: s.slug,
+        displayName: s.displayName,
+        language: s.language,
+        licensed: s.licence?.status === 'agreed',
+      })),
+    });
   }),
 );

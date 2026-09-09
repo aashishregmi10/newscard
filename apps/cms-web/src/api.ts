@@ -106,8 +106,24 @@ export interface ClusterSibling {
   language: string;
 }
 
+export interface NewStoryOptions {
+  categories: Array<{ slug: string; label: { ne: string; en: string } }>;
+  sources: Array<{ slug: string; displayName: string; language: string; licensed: boolean }>;
+}
+
 export const api = {
   me: () => req<{ staff: Staff }>('/auth/me'),
+
+  /** Sections and publishers a new story can be filed against. */
+  options: () => req<NewStoryOptions>('/cms/options'),
+
+  /** Create a draft. Returns its id so the composer can open it immediately. */
+  create: (body: {
+    language: 'ne' | 'en';
+    categorySlug: string;
+    sourceSlug: string;
+    headline?: string;
+  }) => req<{ id: string }>('/cms/articles', { method: 'POST', body: JSON.stringify(body) }),
   login: (email: string, password: string) =>
     req<{ staff: unknown }>('/auth/login', {
       method: 'POST',

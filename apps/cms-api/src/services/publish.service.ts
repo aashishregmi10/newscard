@@ -4,6 +4,7 @@ import {
   AppError,
   checkReviewGuards,
   measureSummary,
+  countGraphemes,
   type LimitType,
 } from '@newscard/shared';
 import { canTransition, DEFAULT_CONFIG, type ArticleStatus } from '@newscard/schemas';
@@ -109,6 +110,17 @@ export async function publishArticle(input: PublishInput): Promise<PublishResult
         if (!article.image.credit) {
           throw new AppError('VALIDATION_FAILED', 'Image has no credit.');
         }
+      }
+
+      // ── 3b. headline present ────────────────────────────────────────────
+      // Checked here rather than in the stored schema, because a draft is
+      // allowed to be empty and a published article is not. Ten graphemes is
+      // deliberately low: it is a guard against publishing a blank or a
+      // placeholder, not an editorial standard.
+      if (countGraphemes(article.headline.trim()) < 10) {
+        throw new AppError('VALIDATION_FAILED', 'The headline is too short to publish.', {
+          headline: article.headline,
+        });
       }
 
       // ── 4. summary length, per the CURRENT config ───────────────────────

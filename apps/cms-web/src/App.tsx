@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, ApiError, type Staff } from './api';
 import { Queue } from './components/Queue';
 import { Composer } from './components/Composer';
+import { NewStory } from './components/NewStory';
 
 function Login({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState('');
@@ -82,6 +83,7 @@ function Booting() {
 export default function App() {
   const [staff, setStaff] = useState<Staff | null | 'loading'>('loading');
   const [openId, setOpenId] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
 
   const check = () =>
     api
@@ -111,6 +113,7 @@ export default function App() {
             await api.logout().catch(() => undefined);
             setStaff(null);
             setOpenId(null);
+            setCreating(false);
           }}
         >
           Sign out
@@ -121,8 +124,16 @@ export default function App() {
         <div className="wrap">
           {openId ? (
             <Composer id={openId} onBack={() => setOpenId(null)} />
+          ) : creating ? (
+            <NewStory
+              onCreated={(id) => {
+                setCreating(false);
+                setOpenId(id);
+              }}
+              onCancel={() => setCreating(false)}
+            />
           ) : (
-            <Queue onOpen={setOpenId} />
+            <Queue onOpen={setOpenId} onNew={() => setCreating(true)} />
           )}
         </div>
       </main>

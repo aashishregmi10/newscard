@@ -361,3 +361,83 @@ button, input, textarea, select { font: inherit; color: inherit; }
   color: var(--ink-faint);
   background: var(--bg);
 }
+
+/* ── New story form ───────────────────────────────────────────────────────
+ *
+ * Reuses the composer's field rhythm rather than introducing a second one, so
+ * the two screens read as the same tool. The form is narrow on purpose: three
+ * questions do not need the full width, and a short measure makes the fact that
+ * there ARE only three the first thing you notice.
+ */
+
+.form {
+  max-width: 520px;
+  padding: 24px 26px 26px;
+}
+
+.form .field { margin-bottom: 20px; }
+.form fieldset.field { border: 0; padding: 0; margin-inline: 0; }
+.form legend,
+.field-label {
+  display: block;
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 7px;
+  padding: 0;
+}
+
+.field-optional {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  color: var(--ink-faint);
+  margin-left: 6px;
+}
+
+.form select,
+.form input[type="text"],
+.form input:not([type]) {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  transition: border-color 120ms ease, background 120ms ease;
+}
+.form select:focus,
+.form input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.field-note { display: block; font-size: 12.5px; margin-top: 7px; }
+.field-warn { color: var(--warn); }
+
+/* Two options are a pair of buttons, not a dropdown: the choice is visible
+   without a click, and it is the field most often changed. */
+.segmented {
+  display: inline-flex;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+.seg {
+  padding: 9px 20px;
+  background: var(--bg);
+  border: 0;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 120ms ease, color 120ms ease;
+}
+.seg + .seg { border-left: 1px solid var(--line-strong); }
+.seg:hover:not(.seg-on) { background: var(--surface); }
+.seg-on { background: var(--accent); color: #fff; font-weight: 600; }
+
+.form .btn-primary { width: 100%; margin-top: 4px; }
+
+.empty .btn { margin-top: 18px; }

@@ -48,11 +48,25 @@ export const Article = z.object({
   spikeReason: SpikeReasonEnum.nullable().optional(),
 
   // --- content (Ch. 3.2.2) ---
-  headline: z.string().min(10).max(90),
+  /**
+   * Upper bounds only.
+   *
+   * This schema generates the MongoDB validator, which governs every article at
+   * every stage — including a draft the editor has just started and has not yet
+   * typed a word into. A minimum length here made an empty draft unstorable, so
+   * the newsroom could not create a story at all.
+   *
+   * Minimum length is a PUBLISH rule, not a storage rule, and it lives with the
+   * other publish preconditions in publish.service.ts. That is also where it
+   * belongs for a second reason: the summary's real limit comes from
+   * `config.summaryLimits`, which Gate 2 may change, and a constant baked into
+   * the database validator could not follow it.
+   */
+  headline: z.string().max(90),
   /** Plain text only. No markup, no HTML entities, no newlines. The 1200 cap is
    *  a runaway-write rail; the REAL editorial limit lives in `config.summaryLimits`
    *  because Gate 2 may change it (Ch. 3.2.3). */
-  summary: z.string().min(40).max(1200),
+  summary: z.string().max(1200),
   summaryWordCount: z.number().int().nonnegative(),
   /** Grapheme clusters, not code points. See @newscard/shared countGraphemes. */
   summaryCharCount: z.number().int().nonnegative(),

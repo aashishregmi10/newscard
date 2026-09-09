@@ -413,3 +413,27 @@ describeIfRs('retraction', () => {
     ).rejects.toMatchObject({ code: 'INVALID_TRANSITION' });
   });
 });
+
+/**
+ * Headline length moved out of the stored schema and into the publish gate.
+ *
+ * It had to move: the MongoDB validator governs a draft as well as a published
+ * article, and a minimum there made an empty draft unstorable — which is why the
+ * newsroom could not create a story at all. These assert the rule still holds
+ * where it now lives, so nobody puts it back.
+ */
+describe('headline is a publish precondition, not a storage rule', () => {
+  it('stores a draft with an empty headline and summary', async () => {
+    // This is the insert that used to fail with "Document failed validation",
+    // which is what made the newsroom unable to start a story.
+    const id = await makeArticle({ status: 'draft', headline: '', summary: '' });
+    const doc = await collections(getDb()).articles.findOne({ _id: id });
+    expect(doc!.headline).toBe('');
+    expect(doc!.summary).toBe('');
+  });
+
+  it('refuses to publish an article whose headline is too short', async () => {
+    const id = await makeArticle({ headline: 'बस' });
+    await expect(publishArticle(asEditorB(id))).rejects.toThrow(/headline is too short/i);
+  });
+});
