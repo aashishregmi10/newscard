@@ -15,7 +15,6 @@ import { useFonts } from 'expo-font';
  */
 export function useAppFonts(): { ready: boolean; failed: boolean } {
   const [loaded, error] = useFonts({
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     NotoSansDevanagari: require('../../assets/fonts/NotoSansDevanagari-Variable.ttf'),
   });
 

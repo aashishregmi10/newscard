@@ -90,6 +90,6 @@ export function useNotificationRouting(): void {
       alive = false;
       sub?.remove();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, []);
 }

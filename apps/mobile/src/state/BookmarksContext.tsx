@@ -61,7 +61,7 @@ export function BookmarksProvider({ children }: { children: ReactNode }) {
       remove: (id) => persist(items.filter((i) => i.id !== id)),
       clear: () => persist([]),
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [items, ready],
   );
 

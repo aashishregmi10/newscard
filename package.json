@@ -14,7 +14,7 @@
   },
   "scripts": {
     "typecheck": "tsc -b --pretty",
-    "lint": "eslint . --ext .ts,.tsx --max-warnings 0",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "db:up": "docker compose -f infra/docker-compose.dev.yml up -d",
@@ -31,10 +31,15 @@
     "media:fetch": "tsx scripts/fetch-demo-images.ts"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.5",
     "@types/node": "^22.10.2",
+    "eslint": "^9.39.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
     "sharp": "^0.35.4",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
+    "typescript-eslint": "^8.70.0",
     "vitest": "^2.1.8"
   },
   "dependencies": {

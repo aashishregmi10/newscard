@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Article, ArticleCardDto, ARTICLE_CARD_KEYS, canTransition } from '../article.js';
+import { Article, ARTICLE_CARD_KEYS, canTransition } from '../article.js';
 
 /**
  * Spec Ch. 6.3. These tests exist so that adding a field to the Article schema

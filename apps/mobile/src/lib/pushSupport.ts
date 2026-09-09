@@ -52,7 +52,6 @@ export function getNotifications(): Notifications | null {
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     cached = require('expo-notifications') as Notifications;
   } catch {
     cached = null;

@@ -12,10 +12,11 @@ import { useNotificationRouting } from '../src/hooks/useNotificationRouting';
 import { useRetractionPurge } from '../src/hooks/useRetractionPurge';
 import { loadAdBudget, flushAdEvents } from '../src/lib/adTracker';
 import { useAppFonts } from '../src/lib/fonts';
+import { FirstRun } from '../src/components/FirstRun';
 import { installGlobalErrorHandlers, flushEvents } from '../src/lib/telemetry';
 
 function Root() {
-  const { isDark, theme } = useSettings();
+  const { isDark, theme, ready, languageChosen, chooseLanguages } = useSettings();
   // The card layout is tuned to one Devanagari metric. Painting with the system
   // face first and swapping when the bundled one arrives reflows every card in
   // view, so the first paint waits — see src/lib/fonts.ts for the bound on it.
@@ -50,8 +51,20 @@ function Root() {
   // A blank surface in the theme's own colour, not a spinner: this resolves in
   // well under the time a spinner would take to become meaningful, and a flash
   // of spinner reads as slower than a flash of nothing.
-  if (!fontsReady) {
+  if (!fontsReady || !ready) {
     return <View style={{ flex: 1, backgroundColor: theme.surface }} />;
+  }
+
+  // One screen, one decision. Shown only until it is answered, and answerable
+  // in a single tap — see src/components/FirstRun.tsx for why this is not an
+  // onboarding carousel.
+  if (!languageChosen) {
+    return (
+      <>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <FirstRun theme={theme} onChoose={chooseLanguages} />
+      </>
+    );
   }
 
   return (

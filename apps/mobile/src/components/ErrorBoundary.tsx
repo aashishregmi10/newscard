@@ -37,6 +37,10 @@ export class ErrorBoundary extends Component<Props, State> {
     this.setState({ info });
     // Also goes to the Metro terminal, so it is visible without the phone.
     console.error('[ErrorBoundary]', error?.message, '\n', info?.componentStack);
+    // And to us. Until this line existed a crash on a reader's handset was
+    // shown to them and to nobody else — which on fragmented Android means
+    // faults we cannot reproduce and hear about weeks later, if at all.
+    reportError(error, 'ErrorBoundary', true);
   }
 
   private reset = (): void => {

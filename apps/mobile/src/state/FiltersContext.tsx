@@ -79,7 +79,7 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
         write({ ...filters, mutedSources: filters.mutedSources.filter((s) => s !== name) }),
       clearAll: () => write(EMPTY),
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [filters, ready],
   );
 

@@ -11,14 +11,26 @@
  * file in the codebase and it is deliberately boring.
  */
 
-/** Devanagari block, plus the extended and vedic ranges we may encounter. */
-const DEVANAGARI_RE = /[ऀ-ॿ꣠-ꣿ᳐-᳿]/u;
+/**
+ * Devanagari block, plus the extended and vedic ranges we may encounter.
+ *
+ * Written as escapes rather than literals: two of these ranges begin with a
+ * combining mark and the zero-width set below is invisible in an editor, so as
+ * source characters they were indistinguishable from a typo.
+ *
+ * The disable below is a correction, not a suppression. U+0900 IS a combining
+ * mark and it IS the first codepoint of the Devanagari block, so the range is
+ * right. The rule guards against a range beginning on a combining mark by
+ * accident; here that is precisely what is wanted.
+ */
+/* eslint-disable-next-line no-misleading-character-class */
+const DEVANAGARI_RE = /[\u0900-\u097F\uA8E0-\uA8FF\u1CD0-\u1CFF]/u;
 
 /** Zero-width joiner / non-joiner. Present in real copy, invisible, breaks equality. */
-const ZERO_WIDTH_RE = /[​-‍﻿]/gu;
+const ZERO_WIDTH_RE = /[\u200B-\u200D\uFEFF]/gu;
 
 /** Devanagari danda and double danda — sentence punctuation, not word content. */
-const DANDA_RE = /[।॥]/gu;
+const DANDA_RE = /[\u0964\u0965]/gu;
 
 /**
  * Nepali stopwords. Deliberately short: an over-aggressive list removes the very

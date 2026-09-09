@@ -19,6 +19,14 @@ interface Settings {
   textSize: TextSizeSetting;
   dataSaver: boolean;
   themeMode: ThemeMode;
+  /**
+   * Whether the reader has ever chosen a language.
+   *
+   * Distinct from "languages is at its default", because ['ne','en'] is both a
+   * sensible default and a perfectly reasonable deliberate choice — the two
+   * cannot be told apart from the value alone.
+   */
+  languageChosen: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -26,6 +34,7 @@ const DEFAULTS: Settings = {
   textSize: 'default',
   dataSaver: false,
   themeMode: 'system',
+  languageChosen: false,
 };
 
 const KEY = 'newscard.settings.v1';
@@ -36,6 +45,7 @@ interface Ctx extends Settings {
   isDark: boolean;
   textScale: number;
   setLanguages: (l: Lang[]) => void;
+  chooseLanguages: (l: Lang[]) => void;
   toggleLanguage: (l: Lang) => void;
   setTextSize: (t: TextSizeSetting) => void;
   setDataSaver: (v: boolean) => void;
@@ -79,6 +89,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       theme: isDark ? dark : light,
       textScale: TEXT_SCALE[settings.textSize],
       setLanguages: (languages) => update({ languages }),
+      /** The first-run answer: records the choice and that one was made. */
+      chooseLanguages: (languages: Lang[]) => update({ languages, languageChosen: true }),
       toggleLanguage: (l) => {
         const has = settings.languages.includes(l);
         const next = has ? settings.languages.filter((x) => x !== l) : [...settings.languages, l];
@@ -90,7 +102,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setDataSaver: (dataSaver) => update({ dataSaver }),
       setThemeMode: (themeMode) => update({ themeMode }),
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     [settings, ready, isDark],
   );
 

@@ -1,0 +1,96 @@
+name: CI
+
+# The tests, the linter and the forbidden-dependency check all existed and none
+# of them ran automatically. 186 tests that nothing enforces are 186 tests that
+# will eventually break and stay broken — and the forbidden-dependency check is
+# the only thing stopping an advertising SDK being added by accident, which is a
+# guarantee the store privacy disclosure depends on.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# A second push to the same branch cancels the first. There is no value in
+# finishing a run against a commit that has already been superseded.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server:
+    name: Server, packages and scripts
+    runs-on: ubuntu-latest
+
+    # The integration suites need a real MongoDB. They run against a database
+    # named `newscard_test` and DELETE collections, which is why they must never
+    # be pointed at anything else — see MONGO_TEST_URI below.
+    services:
+      mongo:
+        image: mongo:7
+        ports: ['27017:27017']
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand(\"ping\").ok'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      MONGO_TEST_URI: mongodb://localhost:27017/newscard_test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Forbidden dependencies
+        # Fails if any advertising, attribution or session-replay package
+        # appears anywhere in the tree, including transitively.
+        run: npm run check:forbidden
+
+      - name: Test
+        run: npm test
+
+  mobile:
+    name: Mobile app
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # apps/mobile is deliberately not an npm workspace — it keeps its own
+      # node_modules so Metro cannot resolve two copies of React — so it needs
+      # its own install step.
+      - name: Install workspace
+        run: npm ci
+
+      - name: Install mobile
+        run: npm ci --prefix apps/mobile
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+        working-directory: apps/mobile
+
+      # Catches the class of failure that broke the app twice: a native module
+      # on a version the installed Expo SDK does not expect. `npm install` does
+      # not know about SDK compatibility and will happily create it.
+      - name: Native module versions match the SDK
+        run: npx expo install --check
+        working-directory: apps/mobile
