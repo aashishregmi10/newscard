@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { AppState, View } from 'react-native';
 import { Stack } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -11,9 +11,15 @@ import { DeviceProvider } from '../src/state/DeviceContext';
 import { useNotificationRouting } from '../src/hooks/useNotificationRouting';
 import { useRetractionPurge } from '../src/hooks/useRetractionPurge';
 import { loadAdBudget, flushAdEvents } from '../src/lib/adTracker';
+import { useAppFonts } from '../src/lib/fonts';
+import { installGlobalErrorHandlers, flushEvents } from '../src/lib/telemetry';
 
 function Root() {
   const { isDark, theme } = useSettings();
+  // The card layout is tuned to one Devanagari metric. Painting with the system
+  // face first and swapping when the bundled one arrives reflows every card in
+  // view, so the first paint waits — see src/lib/fonts.ts for the bound on it.
+  const { ready: fontsReady } = useAppFonts();
   // Routes a notification tap straight to its card, including from cold start.
   useNotificationRouting();
   // Drops withdrawn stories from the cache on every foreground (Ch. 9.7).
@@ -23,15 +29,30 @@ function Root() {
   // storage read. useFeed awaits it too — that is what makes the cap correct;
   // this only makes it fast.
   useEffect(() => {
+    // A React error boundary only sees errors thrown while rendering. A rejected
+    // promise in an effect, a callback that throws, a native module failing on a
+    // background thread — all bypass it, and between them they are most of what
+    // actually breaks in production.
+    installGlobalErrorHandlers();
     void loadAdBudget();
     const sub = AppState.addEventListener('change', (s) => {
       // Backgrounding is the last reliable moment to report. An impression the
       // reader was mid-way through would otherwise be lost when the OS reclaims
       // the process.
-      if (s !== 'active') void flushAdEvents();
+      if (s !== 'active') {
+        void flushAdEvents();
+        void flushEvents();
+      }
     });
     return () => sub.remove();
   }, []);
+
+  // A blank surface in the theme's own colour, not a spinner: this resolves in
+  // well under the time a spinner would take to become meaningful, and a flash
+  // of spinner reads as slower than a flash of nothing.
+  if (!fontsReady) {
+    return <View style={{ flex: 1, backgroundColor: theme.surface }} />;
+  }
 
   return (
     <>

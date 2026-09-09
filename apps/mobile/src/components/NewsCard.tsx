@@ -7,7 +7,8 @@ import type { Card } from '../api/client';
 import { CardImage } from './CardImage';
 import { relativeTime } from '../lib/relativeTime';
 import { useBookmarks } from '../state/BookmarksContext';
-import { LINE_HEIGHT, TYPE, type Theme } from '../theme/tokens';
+import { LINE_HEIGHT, TYPE, fontFor, type Theme } from '../theme/tokens';
+import { notePublisherOpen } from '../lib/telemetry';
 
 /**
  * One story card.  Spec Ch. 7.2.
@@ -46,6 +47,8 @@ function NewsCardInner({ card, theme, height, textScale, dataSaver, onMenu }: Pr
     ]).start();
   };
   const lh = LINE_HEIGHT[card.language];
+  // undefined for English, which means the platform's own sans.
+  const fontFamily = fontFor(card.language);
   const summarySize = TYPE.summary.size * textScale;
   const headlineSize = TYPE.headline.size * textScale;
 
@@ -61,6 +64,9 @@ function NewsCardInner({ card, theme, height, textScale, dataSaver, onMenu }: Pr
     .join('  ·  ');
 
   const openArticle = () => {
+    // Reported before the browser takes over: once the app is in the
+    // background a queued event may never be sent.
+    notePublisherOpen(card);
     void Linking.openURL(card.publisherUrl);
   };
 
@@ -131,6 +137,7 @@ function NewsCardInner({ card, theme, height, textScale, dataSaver, onMenu }: Pr
               color: theme.textPrimary,
               fontSize: headlineSize,
               lineHeight: headlineSize * TYPE.headline.lineHeight,
+              fontFamily,
             },
           ]}
           numberOfLines={TYPE.headline.maxLines}
@@ -147,6 +154,7 @@ function NewsCardInner({ card, theme, height, textScale, dataSaver, onMenu }: Pr
               color: theme.textPrimary,
               fontSize: summarySize,
               lineHeight: summarySize * lh,
+              fontFamily,
             },
           ]}
         >

@@ -41,6 +41,15 @@ export const READ_EVENT_TTL_DAYS = 90;
  * was delivered.
  */
 export const AD_EVENT_TTL_DAYS = 400;
+
+/**
+ * How long a client error report is kept.
+ *
+ * Long enough to tell whether a release fixed something — two months spans
+ * several releases — and short enough that the collection never becomes an
+ * archive nobody reads.
+ */
+export const CLIENT_ERROR_TTL_DAYS = 60;
 export const DEVICE_IDLE_DELETE_DAYS = 180;
 
 export const IMAGE_RENDITIONS = ['sm', 'md', 'lg'] as const;

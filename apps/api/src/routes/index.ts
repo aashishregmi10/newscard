@@ -5,6 +5,8 @@ import { feedRoutes } from './feed.routes.js';
 import { deviceRoutes } from './devices.routes.js';
 import { validateRoutes } from './validate.routes.js';
 import { adRoutes } from './ads.routes.js';
+import { clientErrorRoutes } from './clientErrors.routes.js';
+import { eventRoutes } from './events.routes.js';
 import { getArticleBySlug } from '../services/feed.service.js';
 import { toArticleCard } from '../dto/articleCard.dto.js';
 import { asyncRoute } from '../middleware/index.js';
@@ -15,6 +17,8 @@ v1.use(feedRoutes);
 v1.use(deviceRoutes);
 v1.use(validateRoutes);
 v1.use(adRoutes);
+v1.use(clientErrorRoutes);
+v1.use(eventRoutes);
 
 /** GET /v1/articles/:slug — deep-link resolution. Spec Ch. 6.6. */
 v1.get(

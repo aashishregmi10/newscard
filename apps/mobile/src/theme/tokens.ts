@@ -52,3 +52,34 @@ export const TYPE = {
 /** Ch. 11.6.1 — multiplies with the OS font scale, capped at a combined 1.8. */
 export const TEXT_SCALE = { small: 0.88, default: 1, large: 1.15, xlarge: 1.35 } as const;
 export type TextSizeSetting = keyof typeof TEXT_SCALE;
+
+/**
+ * The bundled Devanagari face.
+ *
+ * ── Why this is shipped rather than left to the system ──────────────────────
+ *
+ * Android OEMs do not agree on Devanagari. Samsung, Xiaomi and stock Android
+ * each supply a different face with different metrics, so the same card was
+ * laid out differently on every handset: conjuncts of different widths, a
+ * headline that fits on two lines here and wraps to three there, and vowel
+ * marks sitting at different heights against the 1.70 line height this app
+ * tunes. Latin varies far less, which is why only this one is bundled — 647 KB
+ * is a real cost in a data-conscious app, and it buys consistency in the script
+ * that actually differs.
+ *
+ * It is a variable font. Weight axes are honoured where the platform supports
+ * them and fall back to the regular instance where they do not, which is still
+ * a consistent shape on every device rather than an unknown one.
+ */
+export const FONT_DEVANAGARI = 'NotoSansDevanagari';
+
+/**
+ * The family for a given language, or undefined to mean "the system face".
+ *
+ * Returns undefined for English on purpose: the system sans is well matched to
+ * each platform and shipping a Latin face too would add weight for a difference
+ * almost nobody would see.
+ */
+export function fontFor(language: 'ne' | 'en'): string | undefined {
+  return language === 'ne' ? FONT_DEVANAGARI : undefined;
+}

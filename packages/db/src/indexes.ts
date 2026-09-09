@@ -1,5 +1,5 @@
 import type { Db, IndexDescription } from 'mongodb';
-import { READ_EVENT_TTL_DAYS, AD_EVENT_TTL_DAYS } from '@newscard/shared';
+import { READ_EVENT_TTL_DAYS, AD_EVENT_TTL_DAYS, CLIENT_ERROR_TTL_DAYS } from '@newscard/shared';
 
 /**
  * Every index in the system.  Spec Ch. 3.15.
@@ -179,6 +179,26 @@ const ADVERTISERS: IndexSpec[] = [
   { key: { name: 1 }, name: 'advertiser_name_unique', unique: true, serves: 'Seed and CMS lookup' },
 ];
 
+const CLIENT_ERRORS: IndexSpec[] = [
+  {
+    key: { fingerprint: 1 },
+    name: 'client_error_fingerprint',
+    unique: true,
+    serves: 'The upsert on every report — one row per distinct fault, not per occurrence',
+  },
+  {
+    key: { lastSeen: -1 },
+    name: 'client_error_recent',
+    serves: 'GET /v1/client-errors — what is broken this week',
+  },
+  {
+    key: { lastSeen: 1 },
+    name: 'client_error_ttl',
+    expireAfterSeconds: CLIENT_ERROR_TTL_DAYS * 24 * 60 * 60,
+    serves: 'Expiry — long enough to see whether a release fixed something',
+  },
+];
+
 export const ALL_INDEXES = {
   articles: ARTICLES,
   sources: SOURCES,
@@ -191,6 +211,7 @@ export const ALL_INDEXES = {
   advertisers: ADVERTISERS,
   campaigns: CAMPAIGNS,
   adEvents: AD_EVENTS,
+  clientErrors: CLIENT_ERRORS,
 } as const;
 
 export interface SyncResult {

@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { CardImage } from './CardImage';
 import type { AdCard } from '../api/client';
-import { LINE_HEIGHT, TYPE, type Theme } from '../theme/tokens';
+import { LINE_HEIGHT, TYPE, fontFor, type Theme } from '../theme/tokens';
 
 /**
  * A sponsored card.
@@ -42,6 +42,7 @@ const SPONSORED = { ne: 'प्रायोजित', en: 'Sponsored' } as cons
 
 function SponsoredCardInner({ ad, theme, height, textScale, dataSaver, lang, onClick }: Props) {
   const lh = LINE_HEIGHT[ad.language];
+  const fontFamily = fontFor(ad.language);
   const bodySize = TYPE.summary.size * textScale;
   const headlineSize = TYPE.headline.size * textScale;
 
@@ -85,6 +86,7 @@ function SponsoredCardInner({ ad, theme, height, textScale, dataSaver, lang, onC
               color: theme.textPrimary,
               fontSize: headlineSize,
               lineHeight: headlineSize * TYPE.headline.lineHeight,
+              fontFamily,
             },
           ]}
           numberOfLines={3}
@@ -95,7 +97,7 @@ function SponsoredCardInner({ ad, theme, height, textScale, dataSaver, lang, onC
         <Text
           style={[
             styles.text,
-            { color: theme.textSecondary, fontSize: bodySize, lineHeight: bodySize * lh },
+            { color: theme.textSecondary, fontSize: bodySize, lineHeight: bodySize * lh, fontFamily },
           ]}
         >
           {ad.body}

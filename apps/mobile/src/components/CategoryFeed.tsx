@@ -28,6 +28,7 @@ import {
   setAdDeviceId,
 } from '../lib/adTracker';
 import { onFeedTabPress } from '../lib/feedTabSignal';
+import { noteRead, flushEvents, setTelemetryDeviceId } from '../lib/telemetry';
 import type { Theme } from '../theme/tokens';
 
 /**
@@ -94,6 +95,10 @@ function CategoryFeedInner({
   const noteCardReadRef = useRef(device.noteCardRead);
   noteCardReadRef.current = device.noteCardRead;
 
+  /** When each visible article came on screen, so leaving it yields a dwell. */
+  const shownAt = useRef<Map<string, number>>(new Map());
+  const visibleArticles = useRef<Map<string, Card>>(new Map());
+
   const listRef = useRef<FlatList<FeedEntry>>(null);
   /** Whether the list is resting at the top. Updated only when scrolling stops,
    *  so it costs nothing during the scroll itself. */
@@ -116,6 +121,7 @@ function CategoryFeedInner({
 
   useEffect(() => {
     setAdDeviceId(device.deviceId);
+    setTelemetryDeviceId(device.deviceId);
   }, [device.deviceId]);
 
   // Leaving the category (or the screen) closes out anything still on screen.
@@ -125,6 +131,15 @@ function CategoryFeedInner({
     () => () => {
       visibleAds.current.clear();
       void flushAdEvents();
+      // Close out anything still on screen before the events are sent, or the
+      // last card a reader looked at is never counted.
+      for (const [id, card] of visibleArticles.current) {
+        const at = shownAt.current.get(id);
+        if (at) noteRead(card, Date.now() - at);
+      }
+      visibleArticles.current.clear();
+      shownAt.current.clear();
+      void flushEvents();
     },
     [],
   );
@@ -232,6 +247,7 @@ function CategoryFeedInner({
     if (!activeRef.current) return;
 
     const nowVisible = new Set<string>();
+    const nowVisibleArticles = new Set<string>();
     for (const v of viewableItems) {
       const item = v.item as FeedEntry | undefined;
       if (!item) continue;
@@ -245,6 +261,12 @@ function CategoryFeedInner({
         continue;
       }
 
+      nowVisibleArticles.add(item.id);
+      if (!shownAt.current.has(item.id)) {
+        shownAt.current.set(item.id, Date.now());
+        visibleArticles.current.set(item.id, item);
+      }
+
       if (!counted.current.has(item.id)) {
         counted.current.add(item.id);
         noteCardReadRef.current();
@@ -255,6 +277,15 @@ function CategoryFeedInner({
       if (!nowVisible.has(id)) noteAdHidden(id);
     }
     visibleAds.current = nowVisible;
+
+    // An article that has left the screen: its dwell is now known.
+    for (const [id, at] of shownAt.current) {
+      if (nowVisibleArticles.has(id)) continue;
+      const card = visibleArticles.current.get(id);
+      if (card) noteRead(card, Date.now() - at);
+      shownAt.current.delete(id);
+      visibleArticles.current.delete(id);
+    }
   }).current;
 
   const refreshControl = useMemo(

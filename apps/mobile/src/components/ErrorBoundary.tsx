@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { reportError } from '../lib/telemetry';
 import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
 import Constants from 'expo-constants';
 
