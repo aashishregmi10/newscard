@@ -29,6 +29,7 @@ export default tseslint.config(
       '**/media/**',
       'apps/mobile/assets/**',
       'apps/api/public/**',
+      'App.js', // the wrong-folder signpost; see the file for why
       '**/*.config.js',
       '**/*.config.mjs',
     ],

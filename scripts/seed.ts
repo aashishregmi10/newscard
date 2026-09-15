@@ -19,6 +19,7 @@ import { STORIES, SOURCES } from './seedStories.js';
 import { generateFor } from './gen-images.js';
 import { fetchAll } from './fetch-demo-images.js';
 import { seedAds } from './seedAds.js';
+import { seedVideos } from './seedVideos.js';
 
 /** Development-only credentials, printed at the end so they are never a secret
  *  hidden in a file, and never reused anywhere real. */
@@ -223,6 +224,16 @@ async function main(): Promise<void> {
       updatedAt: new Date(),
     } as never);
   }
+
+  const vids = await seedVideos(
+    db,
+    CDN_BASE,
+    categoryIds,
+    sourceIds,
+    new Map(MVP_CATEGORIES.map((c) => [c.slug, c.label])),
+    new Map(SOURCES.map((s) => [s.slug, s.displayName])),
+  );
+  console.log(`  ${vids.encoded} shorts (real CC-licensed footage, credited)${vids.skipped ? `, ${vids.skipped} skipped — no footage found` : ''}`);
 
   const ads = await seedAds(db, CDN_BASE);
   console.log(`  ${ads.advertisers} advertisers, ${ads.campaigns} campaigns (all fictional)`);

@@ -44,3 +44,6 @@ Thumbs.db
 /media/
 media/i/
 media/commons-cache.json
+media/v/
+media/video-cache.json
+media/.tmp/

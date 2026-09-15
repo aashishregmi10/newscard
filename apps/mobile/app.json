@@ -25,7 +25,9 @@
     "plugins": [
       "expo-router",
       "expo-status-bar",
-      "expo-font"
+      "expo-font",
+      "expo-video",
+      "expo-sqlite"
     ],
     "scheme": "newscard"
   }

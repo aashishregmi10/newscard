@@ -46,6 +46,17 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const MOBILE = join(ROOT, 'apps', 'mobile');
 const EXPO_CLI = join(MOBILE, 'node_modules', 'expo', 'bin', 'cli');
 
+/**
+ * Metro's port.
+ *
+ * 8082 rather than the 8081 default, because 8081 collides on this machine —
+ * and a collision does not fail cleanly: Expo offers another port, the QR code
+ * encodes the new one, and any device still holding the old address connects to
+ * whatever else is listening there. Pinning it means the address on the phone
+ * and the address in the terminal are always the same one.
+ */
+const PORT = process.env.EXPO_PORT ?? '8082';
+
 const args = process.argv.slice(2);
 const doctorOnly = args.includes('--doctor');
 const passThrough = args.filter((a) => a !== '--doctor');
@@ -88,13 +99,21 @@ function writeJson(path, value) {
   writeFileSync(path, JSON.stringify(value, null, 2) + '\n');
 }
 
+/**
+ * Binds the way Metro binds — all interfaces, not 127.0.0.1.
+ *
+ * The first version tested 127.0.0.1 only, and Metro listens on `::`. So a
+ * Metro already holding the port looked free, the check passed, and Expo then
+ * died with EADDRINUSE and a stack trace. A preflight that reports a port free
+ * and then fails on it is worse than no preflight.
+ */
 function portInUse(port) {
   return new Promise((resolve) => {
     const server = net.createServer();
     server.once('error', () => resolve(true));
     server.once('listening', () => server.close(() => resolve(false)));
     server.unref();
-    server.listen(port, '127.0.0.1');
+    server.listen(port);
   });
 }
 
@@ -180,7 +199,19 @@ function checkNoLegacyEntry() {
   const strays = [];
   for (const dir of [ROOT, MOBILE]) {
     for (const name of ['App.tsx', 'App.ts', 'App.jsx', 'App.js']) {
-      if (existsSync(join(dir, name))) strays.push(join(dir, name));
+      const path = join(dir, name);
+      if (!existsSync(path)) continue;
+      // The root App.js is a deliberate signpost, not an entry point: it exists
+      // so that starting Expo from the wrong folder shows an instruction rather
+      // than "Unable to resolve ../../App". It identifies itself.
+      if (dir === ROOT && name === 'App.js') {
+        try {
+          if (readFileSync(path, 'utf8').includes('THIS FILE IS A SIGNPOST')) continue;
+        } catch {
+          // Unreadable: treat it as a stray and let the check complain.
+        }
+      }
+      strays.push(path);
     }
   }
   if (strays.length > 0) {
@@ -305,14 +336,19 @@ async function checkApi() {
 
 /** A Metro left running from a previous session holds the port and confuses the app. */
 async function checkPort() {
-  if (await portInUse(8081)) {
-    console.log(
-      `  ${c.yellow('note')}  port 8081 is already in use.\n` +
-        `        ${c.dim('If this is an old Metro, Expo will offer to use another port — or stop it first.')}`,
+  if (await portInUse(Number(PORT))) {
+    // A hard failure, not a note. Starting anyway means Expo prints a QR code
+    // and then dies on EADDRINUSE, and anything that already scanned the code
+    // is pointed at whatever was holding the port.
+    return bad(
+      `port ${PORT} is already in use`,
+      'Most likely a Metro from an earlier run — if so the app is already being served,\n' +
+        '        so just scan the QR code that terminal is showing.\n' +
+        `        To take the port back, stop that process; or start elsewhere with:\n` +
+        '          npm run mobile -- --port 8083',
     );
-    return;
   }
-  ok('port 8081 is free');
+  ok(`port ${PORT} is free`);
 }
 
 /* ── run ────────────────────────────────────────────────────────────────── */
@@ -349,6 +385,10 @@ if (doctorOnly) {
  * did not work" and sends people back to searching.
  */
 const startArgs = ['start', ...passThrough];
+// Only if the caller did not ask for a different one.
+if (!passThrough.includes('--port') && !passThrough.some((a) => a.startsWith('--port='))) {
+  startArgs.push('--port', PORT);
+}
 if (fixed > 0 && !startArgs.includes('--clear')) {
   startArgs.push('--clear');
   console.log(c.dim('Repairs were made, so Metro starts with a cleared cache.\n'));

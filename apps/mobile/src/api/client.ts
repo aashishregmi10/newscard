@@ -264,3 +264,104 @@ export async function postAdEvents(deviceId: string, events: AdEventInput[]): Pr
   });
   if (!res.ok) throw new FeedError('server', `Ad events returned ${res.status}.`);
 }
+
+/* ------------------------------------------------------------------ videos */
+
+export interface VideoRendition {
+  quality: 'low' | 'medium' | 'high';
+  url: string;
+  width: number;
+  height: number;
+  bytes: number;
+}
+
+export interface VideoCard {
+  kind: 'video';
+  id: string;
+  slug: string;
+  language: 'ne' | 'en';
+  title: string;
+  caption: string;
+  durationSeconds: number;
+  posterUrl: string;
+  posterBlurHash: string | null;
+  renditions: VideoRendition[];
+  credit: string;
+  source: { name: string };
+  category: { slug: string; label: { ne: string; en: string } };
+  publishedAt: string;
+}
+
+export interface VideoPage {
+  items: VideoCard[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+export async function fetchVideos(opts: {
+  languages: Array<'ne' | 'en'>;
+  category?: string;
+  cursor?: string | null;
+  limit?: number;
+}): Promise<VideoPage> {
+  const params = new URLSearchParams({
+    lang: opts.languages.join(','),
+    category: opts.category ?? 'all',
+    limit: String(opts.limit ?? 10),
+  });
+  if (opts.cursor) params.set('cursor', opts.cursor);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/v1/videos?${params}`, { signal: controller.signal });
+  } catch (e) {
+    const aborted = (e as { name?: string })?.name === 'AbortError';
+    throw new FeedError(
+      aborted ? 'timeout' : 'offline',
+      aborted ? 'The server took too long to respond.' : 'Could not reach the server.',
+    );
+  } finally {
+    clearTimeout(timer);
+  }
+
+  if (!res.ok) throw new FeedError('server', `The server returned ${res.status}.`);
+
+  const body = (await res.json()) as Partial<VideoPage>;
+  if (!body || !Array.isArray(body.items)) {
+    throw new FeedError('bad-response', 'That did not look like our server.');
+  }
+
+  return {
+    items: body.items,
+    nextCursor: body.nextCursor ?? null,
+    hasMore: Boolean(body.hasMore),
+  };
+}
+
+/**
+ * Which rendition to play.
+ *
+ * Deliberately conservative. Only the client knows whether it is on Wi-Fi and
+ * whether the reader has Data Saver on, so the server returns every rendition
+ * and this decides — and when it cannot tell, it picks the cheaper one. Guessing
+ * high on a metered connection spends someone else's money.
+ */
+export function pickRendition(
+  renditions: VideoRendition[],
+  opts: { unmetered: boolean; dataSaver: boolean },
+): VideoRendition | undefined {
+  if (renditions.length === 0) return undefined;
+  const by = (q: VideoRendition['quality']) => renditions.find((r) => r.quality === q);
+  if (opts.dataSaver) return by('low') ?? renditions[0];
+  if (opts.unmetered) return by('high') ?? by('medium') ?? renditions[0];
+  return by('medium') ?? by('low') ?? renditions[0];
+}
+
+/** Bytes of the chosen rendition, for the "this will cost you X" label. */
+export function formatSize(bytes: number): string {
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}

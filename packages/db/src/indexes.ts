@@ -199,6 +199,20 @@ const CLIENT_ERRORS: IndexSpec[] = [
   },
 ];
 
+const VIDEOS: IndexSpec[] = [
+  {
+    key: { status: 1, language: 1, publishedAt: -1, _id: -1 },
+    name: 'videos_by_language',
+    serves: 'GET /v1/videos — the shorts feed, including the stable (publishedAt,_id) tiebreak',
+  },
+  {
+    key: { status: 1, categorySlug: 1, publishedAt: -1, _id: -1 },
+    name: 'videos_by_category',
+    serves: 'GET /v1/videos?category=<slug>',
+  },
+  { key: { slug: 1 }, name: 'video_slug_unique', unique: true, serves: 'Deep-link resolution' },
+];
+
 export const ALL_INDEXES = {
   articles: ARTICLES,
   sources: SOURCES,
@@ -212,6 +226,7 @@ export const ALL_INDEXES = {
   campaigns: CAMPAIGNS,
   adEvents: AD_EVENTS,
   clientErrors: CLIENT_ERRORS,
+  videos: VIDEOS,
 } as const;
 
 export interface SyncResult {

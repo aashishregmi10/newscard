@@ -7,6 +7,7 @@ import { ErrorBoundary } from '../src/components/ErrorBoundary';
 import { SettingsProvider, useSettings } from '../src/state/SettingsContext';
 import { BookmarksProvider } from '../src/state/BookmarksContext';
 import { FiltersProvider } from '../src/state/FiltersContext';
+import { NetworkProvider } from '../src/state/NetworkContext';
 import { DeviceProvider } from '../src/state/DeviceContext';
 import { useNotificationRouting } from '../src/hooks/useNotificationRouting';
 import { useRetractionPurge } from '../src/hooks/useRetractionPurge';
@@ -97,7 +98,9 @@ export default function RootLayout() {
           <DeviceProvider>
             <BookmarksProvider>
               <FiltersProvider>
-                <Root />
+                <NetworkProvider>
+                  <Root />
+                </NetworkProvider>
               </FiltersProvider>
             </BookmarksProvider>
           </DeviceProvider>

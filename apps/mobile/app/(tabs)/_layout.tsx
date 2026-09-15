@@ -113,6 +113,20 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="videos"
+        options={{
+          title: 'Shorts',
+          tabBarIcon: ({ focused, color }) => (
+            <TabIcon
+              name="play-circle-outline"
+              nameFocused="play-circle"
+              focused={focused}
+              color={color}
+            />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="saved"
         options={{
           title: 'Saved',

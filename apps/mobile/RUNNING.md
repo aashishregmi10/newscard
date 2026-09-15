@@ -79,6 +79,12 @@ what turns a one-off mistake into a recurring one.
 
 `npm run mobile` detects and reverses all four automatically, every time it runs.
 
+There is also an `App.js` at the repository root whose only job is to make this
+mistake legible. It is not part of the app — it throws immediately with an
+instruction, so starting Expo from the wrong folder shows "Expo was started from
+the wrong folder… run npm run mobile" on the phone instead of "Unable to resolve
+../../App".
+
 ---
 
 ## What the preflight checks
