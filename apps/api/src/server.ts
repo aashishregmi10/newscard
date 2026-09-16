@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
  * working or not depending on which folder the terminal was in.
  */
 loadDotenv({ path: join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.env') });
-import { connect, close, warnIfNoTransactions } from '@newscard/db';
+import { connect, close, warnIfNoTransactions } from '@saar/db';
 import { loadEnv } from './config/index.js';
 import { createApp } from './app.js';
 import { ensureRateLimitIndexes } from './middleware/rateLimit.js';

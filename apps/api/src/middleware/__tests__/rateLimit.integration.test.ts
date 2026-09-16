@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { connect, close, getDb } from '@newscard/db';
+import { connect, close, getDb } from '@saar/db';
 import { rateLimit, ensureRateLimitIndexes } from '../rateLimit.js';
 import { requestId, errorHandler } from '../index.js';
 

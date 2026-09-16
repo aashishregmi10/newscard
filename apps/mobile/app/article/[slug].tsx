@@ -10,7 +10,7 @@ import { useSettings } from '../../src/state/SettingsContext';
 /**
  * Deep-link target.  Spec Ch. 10.7, tested as N-09 in Ch. 16.10.
  *
- * `newscard://article/<slug>` — where a notification tap lands.
+ * `saar://article/<slug>` — where a notification tap lands.
  *
  * This is the single most important path in the notification feature. A slow
  * or broken deep link wastes the one moment the reader actively chose to come

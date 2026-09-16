@@ -7,7 +7,7 @@ export const Staff = z.object({
   name: z.string().min(1),
   role: StaffRoleEnum,
   /** A reviewer must not approve a summary in a language they cannot read
-   *  (Ch. 3.10). Enforced by checkReviewGuards in @newscard/shared. */
+   *  (Ch. 3.10). Enforced by checkReviewGuards in @saar/shared. */
   languages: z.array(LanguageEnum).min(1),
   /** Deactivation preserves the audit trail; deletion would orphan it. */
   isActive: z.boolean().default(true),

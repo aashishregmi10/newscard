@@ -1,5 +1,5 @@
 import type { Db, IndexDescription } from 'mongodb';
-import { READ_EVENT_TTL_DAYS, AD_EVENT_TTL_DAYS, CLIENT_ERROR_TTL_DAYS } from '@newscard/shared';
+import { READ_EVENT_TTL_DAYS, AD_EVENT_TTL_DAYS, CLIENT_ERROR_TTL_DAYS } from '@saar/shared';
 
 /**
  * Every index in the system.  Spec Ch. 3.15.

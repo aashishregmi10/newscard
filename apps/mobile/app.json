@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "NEWSCARD",
-    "slug": "newscard",
+    "name": "SAAR",
+    "slug": "saar",
     "version": "0.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -29,6 +29,6 @@
       "expo-video",
       "expo-sqlite"
     ],
-    "scheme": "newscard"
+    "scheme": "saar"
   }
 }

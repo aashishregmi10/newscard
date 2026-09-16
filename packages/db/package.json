@@ -1,5 +1,5 @@
 {
-  "name": "@newscard/db",
+  "name": "@saar/db",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,8 +13,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@newscard/schemas": "*",
-    "@newscard/shared": "*",
+    "@saar/schemas": "*",
+    "@saar/shared": "*",
     "mongodb": "^6.12.0"
   }
 }

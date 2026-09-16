@@ -1,5 +1,5 @@
 {
-  "name": "@newscard/api",
+  "name": "@saar/api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@newscard/db": "*",
-    "@newscard/schemas": "*",
-    "@newscard/shared": "*",
+    "@saar/db": "*",
+    "@saar/schemas": "*",
+    "@saar/shared": "*",
     "compression": "^1.7.5",
     "dotenv": "^17.4.2",
     "express": "^4.21.2",

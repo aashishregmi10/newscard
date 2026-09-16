@@ -1,3 +1,4 @@
+import dns from 'node:dns';
 import { MongoClient, type Db } from 'mongodb';
 
 /**
@@ -16,13 +17,64 @@ export interface ConnectOptions {
   dbName?: string;
 }
 
+/**
+ * Make `mongodb+srv://` work behind a resolver that refuses SRV queries.
+ *
+ * Atlas connection strings are SRV records: the driver has to do a DNS SRV
+ * lookup before it knows which hosts to dial. Plenty of real setups break
+ * that — a VPN client, an ad-blocking DNS proxy on 127.0.0.1, some corporate
+ * resolvers — and every one of them fails identically:
+ *
+ *   querySrv ECONNREFUSED _mongodb._tcp.<cluster>.mongodb.net
+ *
+ * which reads like the cluster is down rather than like a DNS problem, and is
+ * where an afternoon goes.
+ *
+ * So the lookup is attempted normally first, and only if it fails do we retry
+ * against public resolvers. Nothing is overridden when the system resolver
+ * works, which matters: a machine with split-horizon DNS or a private endpoint
+ * must keep using its own.
+ */
+async function ensureSrvResolvable(uri: string): Promise<void> {
+  if (!uri.startsWith('mongodb+srv://')) return;
+
+  const host = uri.split('@')[1]?.split(/[/?]/)[0];
+  if (!host) return;
+
+  try {
+    await dns.promises.resolveSrv(`_mongodb._tcp.${host}`);
+    return; // The system resolver is fine. Leave it alone.
+  } catch {
+    // Fall through and try public resolvers.
+  }
+
+  const fallbacks = ['1.1.1.1', '8.8.8.8'];
+  const original = dns.getServers();
+  dns.setServers([...fallbacks, ...original]);
+
+  try {
+    await dns.promises.resolveSrv(`_mongodb._tcp.${host}`);
+    console.warn(
+      `[db] the system DNS resolver (${original.join(', ')}) refused the SRV lookup for ${host};\n` +
+        `     using ${fallbacks.join(', ')} for this process instead.`,
+    );
+  } catch {
+    // Put it back rather than leaving the process on resolvers that also fail —
+    // the connection error that follows should name the real problem.
+    dns.setServers(original);
+  }
+}
+
 export async function connect(opts: ConnectOptions): Promise<Db> {
   if (db) return db;
 
+  await ensureSrvResolvable(opts.uri);
+
   client = new MongoClient(opts.uri, {
-    // Fail fast on a wrong URI rather than hanging for the 30s default: a dev
-    // whose Docker is not running should be told in seconds.
-    serverSelectionTimeoutMS: 5_000,
+    // Atlas over the public internet from Kathmandu is not a local socket; the
+    // 5s that suited a container on localhost times out on a slow link before
+    // the handshake finishes.
+    serverSelectionTimeoutMS: opts.uri.startsWith('mongodb+srv://') ? 20_000 : 5_000,
     retryWrites: true,
   });
 

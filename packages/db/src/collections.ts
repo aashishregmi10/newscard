@@ -9,7 +9,7 @@ import type {
   Staff,
   AuditRecord,
   AppConfig,
-} from '@newscard/schemas';
+} from '@saar/schemas';
 
 /**
  * Typed collection accessors.

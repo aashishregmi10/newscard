@@ -1,4 +1,4 @@
-import { MAX_CONSECUTIVE_SAME_SOURCE } from '@newscard/shared';
+import { MAX_CONSECUTIVE_SAME_SOURCE } from '@saar/shared';
 
 /**
  * Source diversity within a feed page.  Plan §2d — CORRECTED.

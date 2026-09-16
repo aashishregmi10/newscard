@@ -1,5 +1,5 @@
 import type { Db } from 'mongodb';
-import { COLLECTION_VALIDATORS } from '@newscard/schemas';
+import { COLLECTION_VALIDATORS } from '@saar/schemas';
 
 /**
  * Apply the $jsonSchema validators.  Spec Ch. 3.14.

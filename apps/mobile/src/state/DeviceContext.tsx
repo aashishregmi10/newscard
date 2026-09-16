@@ -27,9 +27,9 @@ import { safeNotify, remotePushSupported, pushUnavailableReason } from '../lib/p
  * no device identifiers, and why the app requests no identifier permissions.
  */
 
-const DEVICE_ID_KEY = 'newscard.deviceId.v1';
-const DEVICE_TOKEN_KEY = 'newscard.deviceToken.v1';
-const PROMPT_STATE_KEY = 'newscard.notifPrompt.v1';
+const DEVICE_ID_KEY = 'saar.deviceId.v1';
+const DEVICE_TOKEN_KEY = 'saar.deviceToken.v1';
+const PROMPT_STATE_KEY = 'saar.notifPrompt.v1';
 
 /**
  * Cards a reader must get through before we ask for notification permission.

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
-import { AppError } from '@newscard/shared';
+import { AppError } from '@saar/shared';
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-namespace

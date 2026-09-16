@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
-import { collections, getDb } from '@newscard/db';
-import { AppError, measureSummary, countGraphemes, countWords, type LimitType } from '@newscard/shared';
-import { ArticleStatusEnum, DEFAULT_CONFIG } from '@newscard/schemas';
+import { collections, getDb } from '@saar/db';
+import { AppError, measureSummary, countGraphemes, countWords, type LimitType } from '@saar/shared';
+import { ArticleStatusEnum, DEFAULT_CONFIG } from '@saar/schemas';
 import { requireRole, requireAuth } from '../auth/requireRole.js';
 import { asyncRoute } from '../middleware/index.js';
 import { transitionArticle } from '../services/transition.service.js';

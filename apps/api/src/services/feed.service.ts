@@ -1,7 +1,7 @@
 import { ObjectId, type Filter } from 'mongodb';
-import { collections, getDb, type ArticleDoc } from '@newscard/db';
-import { decodeCursor, encodeCursor, CursorError, AppError } from '@newscard/shared';
-import { isVirtualCategory, type ArticleCardDto, type Language } from '@newscard/schemas';
+import { collections, getDb, type ArticleDoc } from '@saar/db';
+import { decodeCursor, encodeCursor, CursorError, AppError } from '@saar/shared';
+import { isVirtualCategory, type ArticleCardDto, type Language } from '@saar/schemas';
 import { reorderForDiversity } from './diversity.js';
 import { toArticleCard } from '../dto/articleCard.dto.js';
 

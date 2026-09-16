@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { ObjectId } from 'mongodb';
-import { connect, close, collections, getDb, applyValidators } from '@newscard/db';
-import { DEFAULT_CONFIG, MVP_CATEGORIES } from '@newscard/schemas';
-import { countGraphemes, countWords } from '@newscard/shared';
+import { connect, close, collections, getDb, applyValidators } from '@saar/db';
+import { DEFAULT_CONFIG, MVP_CATEGORIES } from '@saar/schemas';
+import { countGraphemes, countWords } from '@saar/shared';
 import { publishArticle, retractArticle } from '../publish.service.js';
 
 /**

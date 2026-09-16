@@ -15,7 +15,7 @@ loadDotenv({ path: join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..
 import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { connect, close, warnIfNoTransactions } from '@newscard/db';
+import { connect, close, warnIfNoTransactions } from '@saar/db';
 import {
   requestId,
   attachSession,

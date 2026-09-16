@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { AppError, FEED_PAGE_SIZE } from '@newscard/shared';
-import { LanguageEnum } from '@newscard/schemas';
+import { AppError, FEED_PAGE_SIZE } from '@saar/shared';
+import { LanguageEnum } from '@saar/schemas';
 import { getFeed } from '../services/feed.service.js';
 import { injectAds } from '../services/ads.service.js';
-import { DEFAULT_AD_DENSITY } from '@newscard/shared';
+import { DEFAULT_AD_DENSITY } from '@saar/shared';
 import { asyncRoute } from '../middleware/index.js';
 import { loadEnv } from '../config/index.js';
 

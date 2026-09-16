@@ -1,7 +1,7 @@
 import { ObjectId, type Filter } from 'mongodb';
-import { getDb } from '@newscard/db';
-import { adSlotsForPage, clampDensity, type AdDensityConfig } from '@newscard/shared';
-import { isVirtualCategory, type AdCardDto, type ArticleCardDto, type Language } from '@newscard/schemas';
+import { getDb } from '@saar/db';
+import { adSlotsForPage, clampDensity, type AdDensityConfig } from '@saar/shared';
+import { isVirtualCategory, type AdCardDto, type ArticleCardDto, type Language } from '@saar/schemas';
 
 /**
  * Ad selection and injection.

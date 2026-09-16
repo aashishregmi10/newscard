@@ -1,11 +1,11 @@
 import type { NextFunction, Request, Response } from 'express';
-import { AppError, can, type Permission, type StaffRole } from '@newscard/shared';
+import { AppError, can, type Permission, type StaffRole } from '@saar/shared';
 
 /**
  * RBAC middleware.  Spec Ch. 5.7, plan §8.
  *
  * Routes declare the PERMISSION they need, never the roles that happen to have
- * it. The role→permission mapping lives in one table in @newscard/shared, so
+ * it. The role→permission mapping lives in one table in @saar/shared, so
  * the whole authorisation surface can be audited by reading one file instead of
  * grepping twelve handlers for `role === 'admin'`.
  */

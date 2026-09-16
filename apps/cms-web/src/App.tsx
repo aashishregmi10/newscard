@@ -26,7 +26,7 @@ function Login({ onDone }: { onDone: () => void }) {
   return (
     <div className="login-page">
       <form className="login-card" onSubmit={submit}>
-        <h1>NEWSCARD</h1>
+        <h1>SAAR</h1>
         <p className="sub">Editorial</p>
 
         {error && <div className="banner banner-error">{error}</div>}
@@ -101,7 +101,7 @@ export default function App() {
   return (
     <div className="shell">
       <header className="topbar">
-        <span className="brand">NEWSCARD</span>
+        <span className="brand">SAAR</span>
         <span className="who">Editorial</span>
         <div className="topbar-spacer" />
         <span className="who">

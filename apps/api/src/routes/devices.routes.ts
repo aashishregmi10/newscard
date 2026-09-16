@@ -1,9 +1,9 @@
 import { randomBytes, createHash, timingSafeEqual } from 'node:crypto';
 import { Router, type Request } from 'express';
 import { z } from 'zod';
-import { collections, getDb } from '@newscard/db';
-import { AppError, NOTIF_DAILY_CAP_MAX } from '@newscard/shared';
-import { LanguageEnum, PlatformEnum, clampDailyCap } from '@newscard/schemas';
+import { collections, getDb } from '@saar/db';
+import { AppError, NOTIF_DAILY_CAP_MAX } from '@saar/shared';
+import { LanguageEnum, PlatformEnum, clampDailyCap } from '@saar/schemas';
 import { asyncRoute } from '../middleware/index.js';
 import { deviceRegisterLimit } from '../middleware/rateLimit.js';
 

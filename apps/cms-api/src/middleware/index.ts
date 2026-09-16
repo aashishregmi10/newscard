@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
-import { AppError } from '@newscard/shared';
+import { AppError } from '@saar/shared';
 import { readSession, SESSION_COOKIE } from '../auth/session.js';
 
 declare global {

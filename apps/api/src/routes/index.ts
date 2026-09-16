@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { collections, getDb } from '@newscard/db';
-import { AppError, gone } from '@newscard/shared';
+import { collections, getDb } from '@saar/db';
+import { AppError, gone } from '@saar/shared';
 import { feedRoutes } from './feed.routes.js';
 import { deviceRoutes } from './devices.routes.js';
 import { validateRoutes } from './validate.routes.js';

@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
-import { getDb } from '@newscard/db';
-import { VIEWABLE_THRESHOLD_MS } from '@newscard/schemas';
+import { getDb } from '@saar/db';
+import { VIEWABLE_THRESHOLD_MS } from '@saar/schemas';
 
 /**
  * Advertiser reporting.

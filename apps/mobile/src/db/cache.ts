@@ -18,7 +18,10 @@ import type { Card } from '../api/client';
  * cannot open, the app must still fetch and display news.
  */
 
-const DB_NAME = 'newscard.db';
+// Renaming this abandons the old cache file rather than migrating it. That is
+// the right trade: the cache is a seven-day copy of the feed that refills
+// itself on the next load, so the cost is one refresh.
+const DB_NAME = 'saar.db';
 
 /** Ch. 9.3 — whichever limit is reached first. */
 export const RETENTION_DAYS = 7;

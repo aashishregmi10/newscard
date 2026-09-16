@@ -13,7 +13,7 @@
 (function () {
   'use strict';
 
-  var KEY = 'newscard.report.v1';
+  var KEY = 'saar.report.v1';
 
   var authForm = document.getElementById('auth');
   var campaignInput = document.getElementById('campaign');

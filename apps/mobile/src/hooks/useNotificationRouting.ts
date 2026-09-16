@@ -26,17 +26,17 @@ interface NotificationData {
   type?: string;
 }
 
-/** Accepts either an explicit slug or a `newscard://article/<slug>` deep link. */
+/** Accepts either an explicit slug or a `saar://article/<slug>` deep link. */
 function targetFrom(data: NotificationData | undefined): string | null {
   if (!data) return null;
   if (typeof data.slug === 'string' && data.slug) return `/article/${data.slug}`;
 
   if (typeof data.deepLink === 'string') {
-    const m = data.deepLink.match(/^newscard:\/\/article\/([^/?#]+)/i);
+    const m = data.deepLink.match(/^saar:\/\/article\/([^/?#]+)/i);
     if (m?.[1]) return `/article/${m[1]}`;
-    if (/^newscard:\/\/bookmarks/i.test(data.deepLink)) return '/saved';
-    if (/^newscard:\/\/settings/i.test(data.deepLink)) return '/settings';
-    if (/^newscard:\/\/feed/i.test(data.deepLink)) return '/';
+    if (/^saar:\/\/bookmarks/i.test(data.deepLink)) return '/saved';
+    if (/^saar:\/\/settings/i.test(data.deepLink)) return '/settings';
+    if (/^saar:\/\/feed/i.test(data.deepLink)) return '/';
   }
   return null;
 }

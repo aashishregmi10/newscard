@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { getDb } from '@newscard/db';
-import { AppError, encodeCursor, decodeCursor, CursorError } from '@newscard/shared';
+import { getDb } from '@saar/db';
+import { AppError, encodeCursor, decodeCursor, CursorError } from '@saar/shared';
 import { ObjectId } from 'mongodb';
-import { LanguageEnum } from '@newscard/schemas';
+import { LanguageEnum } from '@saar/schemas';
 import { asyncRoute } from '../middleware/index.js';
 import { loadEnv } from '../config/index.js';
 

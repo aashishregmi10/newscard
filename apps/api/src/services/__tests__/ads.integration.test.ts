@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
 import { ObjectId } from 'mongodb';
-import { connect, close, getDb } from '@newscard/db';
-import { DEFAULT_AD_DENSITY, violatesAdPolicy } from '@newscard/shared';
+import { connect, close, getDb } from '@saar/db';
+import { DEFAULT_AD_DENSITY, violatesAdPolicy } from '@saar/shared';
 import { selectCampaigns, injectAds } from '../ads.service.js';
-import type { ArticleCardDto } from '@newscard/schemas';
+import type { ArticleCardDto } from '@saar/schemas';
 
 /**
  * Ad selection and injection against a real MongoDB.

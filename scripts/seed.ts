@@ -11,9 +11,9 @@
 
 import 'dotenv/config';
 import { ObjectId } from 'mongodb';
-import { connect, close, collections } from '@newscard/db';
-import { MVP_CATEGORIES, DEFAULT_CONFIG } from '@newscard/schemas';
-import { countGraphemes, countWords } from '@newscard/shared';
+import { connect, close, collections } from '@saar/db';
+import { MVP_CATEGORIES, DEFAULT_CONFIG } from '@saar/schemas';
+import { countGraphemes, countWords } from '@saar/shared';
 import { hash as argonHash } from '@node-rs/argon2';
 import { STORIES, SOURCES } from './seedStories.js';
 import { generateFor } from './gen-images.js';

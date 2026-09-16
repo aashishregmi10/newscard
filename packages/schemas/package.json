@@ -1,5 +1,5 @@
 {
-  "name": "@newscard/schemas",
+  "name": "@saar/schemas",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -13,7 +13,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@newscard/shared": "*",
+    "@saar/shared": "*",
     "zod": "^3.24.1"
   }
 }

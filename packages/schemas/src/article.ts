@@ -68,7 +68,7 @@ export const Article = z.object({
    *  because Gate 2 may change it (Ch. 3.2.3). */
   summary: z.string().max(1200),
   summaryWordCount: z.number().int().nonnegative(),
-  /** Grapheme clusters, not code points. See @newscard/shared countGraphemes. */
+  /** Grapheme clusters, not code points. See @saar/shared countGraphemes. */
   summaryCharCount: z.number().int().nonnegative(),
   pullQuote: z.string().max(70).nullable().optional(),
   publisherUrl: HttpsUrl,

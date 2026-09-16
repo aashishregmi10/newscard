@@ -37,7 +37,7 @@ const DEFAULTS: Settings = {
   languageChosen: false,
 };
 
-const KEY = 'newscard.settings.v1';
+const KEY = 'saar.settings.v1';
 
 interface Ctx extends Settings {
   ready: boolean;

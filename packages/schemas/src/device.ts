@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { LanguageEnum, PlatformEnum } from './enums.js';
-import { NOTIF_DAILY_CAP_MAX } from '@newscard/shared';
+import { NOTIF_DAILY_CAP_MAX } from '@saar/shared';
 
 /**
  * The `devices` collection.  Spec Ch. 3.6.

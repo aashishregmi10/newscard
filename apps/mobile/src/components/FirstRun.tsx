@@ -37,7 +37,7 @@ export function FirstRun({ theme, onChoose }: Props) {
   return (
     <View style={[styles.root, { backgroundColor: theme.surface }]}>
       <View style={styles.top}>
-        <Text style={[styles.brand, { color: theme.accent }]}>NEWSCARD</Text>
+        <Text style={[styles.brand, { color: theme.accent }]}>SAAR</Text>
         <Text style={[styles.tag, { color: theme.textSecondary }]}>
           समाचार, ६० शब्दमा{'\n'}
           <Text style={styles.tagEn}>The news, in sixty words</Text>

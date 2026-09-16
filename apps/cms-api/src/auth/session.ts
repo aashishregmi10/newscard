@@ -1,6 +1,6 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { ObjectId } from 'mongodb';
-import { getDb } from '@newscard/db';
+import { getDb } from '@saar/db';
 import type { StaffSession } from './requireRole.js';
 
 /**

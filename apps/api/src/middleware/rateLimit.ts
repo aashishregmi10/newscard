@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
-import { getDb } from '@newscard/db';
-import { AppError } from '@newscard/shared';
+import { getDb } from '@saar/db';
+import { AppError } from '@saar/shared';
 
 /**
  * Rate limiting.  Spec Ch. 6.10.

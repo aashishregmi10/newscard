@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { getDb } from '@newscard/db';
-import { AppError } from '@newscard/shared';
+import { getDb } from '@saar/db';
+import { AppError } from '@saar/shared';
 import { asyncRoute } from '../middleware/index.js';
 
 /**

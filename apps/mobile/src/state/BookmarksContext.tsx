@@ -18,7 +18,7 @@ import type { Card } from '../api/client';
  * the offline cache in M5; the interface here will not change.
  */
 
-const KEY = 'newscard.bookmarks.v1';
+const KEY = 'saar.bookmarks.v1';
 
 interface Ctx {
   ready: boolean;

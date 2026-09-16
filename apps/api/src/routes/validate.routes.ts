@@ -1,8 +1,8 @@
 import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
-import { collections, getDb } from '@newscard/db';
-import { AppError } from '@newscard/shared';
+import { collections, getDb } from '@saar/db';
+import { AppError } from '@saar/shared';
 import { asyncRoute } from '../middleware/index.js';
 
 /**

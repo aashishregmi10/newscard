@@ -14,7 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * and undo it in Settings.
  */
 
-const KEY = 'newscard.filters.v1';
+const KEY = 'saar.filters.v1';
 
 interface Filters {
   mutedCategories: string[];

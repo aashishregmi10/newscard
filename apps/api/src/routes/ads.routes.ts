@@ -2,9 +2,9 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { ObjectId } from 'mongodb';
 import { Router } from 'express';
 import { z } from 'zod';
-import { getDb } from '@newscard/db';
-import { AppError } from '@newscard/shared';
-import { AdEventTypeEnum, VIEWABLE_THRESHOLD_MS } from '@newscard/schemas';
+import { getDb } from '@saar/db';
+import { AppError } from '@saar/shared';
+import { AdEventTypeEnum, VIEWABLE_THRESHOLD_MS } from '@saar/schemas';
 import { asyncRoute } from '../middleware/index.js';
 import { buildCampaignReport } from '../services/adReport.service.js';
 

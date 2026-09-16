@@ -1,4 +1,4 @@
-import { collections, getDb } from '@newscard/db';
+import { collections, getDb } from '@saar/db';
 
 /**
  * Append-only audit trail.  Spec Ch. 5.8.

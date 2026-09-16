@@ -1,5 +1,5 @@
 {
-  "name": "@newscard/cms-api",
+  "name": "@saar/cms-api",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,9 +10,9 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@newscard/db": "*",
-    "@newscard/schemas": "*",
-    "@newscard/shared": "*",
+    "@saar/db": "*",
+    "@saar/schemas": "*",
+    "@saar/shared": "*",
     "@node-rs/argon2": "^2.0.2",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",

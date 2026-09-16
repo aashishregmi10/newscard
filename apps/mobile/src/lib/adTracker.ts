@@ -34,7 +34,7 @@ import { postAdEvents, type AdCard, type AdEventInput } from '../api/client';
  *   content it measures.
  */
 
-const BUDGET_KEY = 'newscard.adBudget.v1';
+const BUDGET_KEY = 'saar.adBudget.v1';
 const FLUSH_INTERVAL_MS = 20_000;
 const MAX_BATCH = 50;
 

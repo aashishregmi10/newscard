@@ -1,5 +1,5 @@
-import type { ArticleDoc } from '@newscard/db';
-import type { ArticleCardDto } from '@newscard/schemas';
+import type { ArticleDoc } from '@saar/db';
+import type { ArticleCardDto } from '@saar/schemas';
 
 /**
  * Map a stored article to the public card.  Spec Ch. 6.3.
@@ -7,7 +7,7 @@ import type { ArticleCardDto } from '@newscard/schemas';
  * Fields are PICKED explicitly. Never serialise the document and delete unwanted
  * keys — a blacklist leaks every new field on the day it is added, and
  * `editorialNotes` would be first. The key set is asserted by a test in
- * @newscard/schemas.
+ * @saar/schemas.
  */
 export function toArticleCard(a: ArticleDoc): ArticleCardDto {
   return {

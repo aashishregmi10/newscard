@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { collections, getDb } from '@newscard/db';
-import { AppError } from '@newscard/shared';
+import { collections, getDb } from '@saar/db';
+import { AppError } from '@saar/shared';
 import { verifyPassword } from '../auth/password.js';
 import { createSession, destroySession, SESSION_COOKIE, SESSION_TTL_MS } from '../auth/session.js';
 import { asyncRoute } from '../middleware/index.js';

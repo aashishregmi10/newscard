@@ -13,7 +13,7 @@ import {
   applyValidators,
   syncIndexes,
   ALL_INDEXES,
-} from '@newscard/db';
+} from '@saar/db';
 
 const uri = process.env.MONGO_URI;
 if (!uri) {
