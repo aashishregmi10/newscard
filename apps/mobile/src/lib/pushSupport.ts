@@ -84,3 +84,56 @@ export function safeNotifySync<T>(fn: (n: Notifications) => T, fallback: T): T {
     return fallback;
   }
 }
+
+/**
+ * One-time runtime configuration, called at startup.
+ *
+ * Two settings that decide whether a delivered notification is actually SEEN,
+ * both easy to leave out and invisible when you do — the send succeeds, the
+ * server reports delivery, and the phone shows nothing.
+ *
+ *   1. The foreground handler. By default expo-notifications suppresses a
+ *      notification that arrives while the app is open. That is the exact
+ *      situation the phone is in during a demo, and during most of a reader's
+ *      session.
+ *
+ *   2. The Android channel. On Android 8+ every notification belongs to a
+ *      channel, and one naming a channel that does not exist is dropped
+ *      silently. The server sends channelId "default", so "default" has to be
+ *      created here. Importance HIGH is what makes it a heads-up banner rather
+ *      than a line in the shade — a breaking alert that only appears once you
+ *      pull down the shade is not an alert.
+ *
+ * Both calls are guarded: none of this exists in Expo Go on Android.
+ */
+export function configurePushRuntime(): void {
+  const n = getNotifications();
+  if (!n) return;
+
+  try {
+    n.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowBanner: true,
+        shouldShowList: true,
+        shouldPlaySound: true,
+        // A count nobody maintains decays into a permanent red dot, which
+        // teaches the reader to ignore it.
+        shouldSetBadge: false,
+      }),
+    });
+  } catch {
+    // A handler that cannot be installed costs a foreground banner, not the app.
+  }
+
+  if (Platform.OS === 'android') {
+    void n
+      .setNotificationChannelAsync('default', {
+        name: 'News alerts',
+        importance: n.AndroidImportance.HIGH,
+        sound: 'default',
+        vibrationPattern: [0, 250, 250, 250],
+        lockscreenVisibility: n.AndroidNotificationVisibility.PUBLIC,
+      })
+      .catch(() => undefined);
+  }
+}

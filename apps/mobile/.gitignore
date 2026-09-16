@@ -33,6 +33,19 @@ yarn-error.*
 # local env files
 .env*.local
 
+# Firebase.
+#
+# google-services.json is deliberately NOT ignored. It carries the project id,
+# sender id and an Android API key restricted by package name — all of which
+# ship inside the APK anyway, so ignoring it buys no secrecy. It costs
+# something real though: `eas build` archives the repository with git, so an
+# ignored file is simply absent in the cloud build and the build fails late
+# with "google-services.json not found" rather than at preflight.
+#
+# The service-account key IS a secret — it can send push to every user — and
+# never belongs in the repository.
+*-firebase-adminsdk-*.json
+
 # typescript
 *.tsbuildinfo
 

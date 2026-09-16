@@ -14,7 +14,12 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { API_BASE } from '../api/client';
 import { useSettings } from './SettingsContext';
-import { safeNotify, remotePushSupported, pushUnavailableReason } from '../lib/pushSupport';
+import {
+  safeNotify,
+  remotePushSupported,
+  pushUnavailableReason,
+  configurePushRuntime,
+} from '../lib/pushSupport';
 // NOTE: expo-notifications is never imported at module scope — it throws on
 // import in Expo Go on Android. pushSupport requires it lazily.
 
@@ -26,6 +31,16 @@ import { safeNotify, remotePushSupported, pushUnavailableReason } from '../lib/p
  * IMEI. That is precisely what lets the store privacy disclosure say we collect
  * no device identifiers, and why the app requests no identifier permissions.
  */
+
+/**
+ * The EAS project id, from app.json.
+ *
+ * getExpoPushTokenAsync cannot issue a token without it and throws rather than
+ * returning null, which safeNotify swallows — so a missing id presents as a
+ * device that registers perfectly and never receives anything.
+ */
+const EAS_PROJECT_ID = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
+const pushTokenOptions = EAS_PROJECT_ID ? { projectId: EAS_PROJECT_ID } : undefined;
 
 const DEVICE_ID_KEY = 'saar.deviceId.v1';
 const DEVICE_TOKEN_KEY = 'saar.deviceToken.v1';
@@ -65,6 +80,18 @@ interface Ctx {
   ready: boolean;
   deviceId: string | null;
   registered: boolean;
+  /**
+   * Whether this handset holds a push token.
+   *
+   * Distinct from `registered`, and the distinction is the whole diagnostic:
+   * a device registers with the API on first launch and can sit there forever
+   * with notifications enabled, permission granted and no way to receive one —
+   * because Expo Go cannot issue a token on Android, or the EAS project id is
+   * missing. Surfacing it turns a silent dead end into something the settings
+   * screen can state plainly.
+   */
+  pushRegistered: boolean;
+  pushUnavailable: string | null;
   prefs: NotifPrefs;
   /** OS-level permission, which is separate from our own preferences. */
   permission: 'granted' | 'denied' | 'undetermined';
@@ -106,6 +133,7 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
   const { languages } = useSettings();
   const [ready, setReady] = useState(false);
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [pushToken, setPushToken] = useState<string | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [prefs, setPrefsState] = useState<NotifPrefs>(DEFAULT_PREFS);
   const [permission, setPermission] = useState<Ctx['permission']>('undetermined');
@@ -150,6 +178,11 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
+    // Before anything else: without the foreground handler and the Android
+    // channel, a notification that arrives while the app is open is simply
+    // never shown, and every layer above reports success.
+    configurePushRuntime();
+
     void (async () => {
       const id = await uuid();
       setDeviceId(id);
@@ -164,9 +197,24 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
       if (promptState === 'dismissed') setPromptDismissed(true);
       if (perms) setPermission(perms.granted ? 'granted' : perms.canAskAgain ? 'undetermined' : 'denied');
 
-      // Register immediately with no push token. The device row must exist so
-      // preferences can be stored before permission is ever granted.
-      await register(id, null);
+      // Refresh the push token on every launch where permission already
+      // exists.
+      //
+      // Tokens rotate — on reinstall, on restore to a new handset, sometimes on
+      // their own — and a rotated token fails SILENTLY: the send succeeds, Expo
+      // accepts it, and the phone never rings. Fetching it here also means the
+      // first launch of a development build registers a token without making
+      // the reader answer a permission prompt they already answered.
+      //
+      // Registration still happens when there is no token. The device row must
+      // exist so preferences can be stored before permission is ever granted.
+      const existingToken =
+        perms?.granted && remotePushSupported
+          ? await safeNotify((n) => n.getExpoPushTokenAsync(pushTokenOptions), null)
+          : null;
+
+      if (existingToken?.data) setPushToken(existingToken.data);
+      await register(id, existingToken?.data ?? null);
       setReady(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -189,12 +237,11 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
       return granted;
     }
 
-    const projectId = Constants.expoConfig?.extra?.eas?.projectId as string | undefined;
-    const pushToken = await safeNotify(
-      (n) => n.getExpoPushTokenAsync(projectId ? { projectId } : undefined),
-      null,
-    );
-    if (pushToken) await register(deviceId, pushToken.data);
+    const fetched = await safeNotify((n) => n.getExpoPushTokenAsync(pushTokenOptions), null);
+    if (fetched) {
+      setPushToken(fetched.data);
+      await register(deviceId, fetched.data);
+    }
     return granted;
   }, [deviceId, register]);
 
@@ -230,6 +277,8 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
       ready,
       deviceId,
       registered: token !== null,
+      pushRegistered: pushToken !== null,
+      pushUnavailable: pushUnavailableReason,
       prefs,
       permission,
       promptDismissed,
@@ -239,7 +288,7 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
       setPrefs,
       dismissPrompt,
     }),
-    [ready, deviceId, token, prefs, permission, readEnough, promptDismissed, noteCardRead, requestPermission, setPrefs, dismissPrompt],
+    [ready, deviceId, token, pushToken, prefs, permission, readEnough, promptDismissed, noteCardRead, requestPermission, setPrefs, dismissPrompt],
   );
 
   return <DeviceCtx.Provider value={value}>{children}</DeviceCtx.Provider>;

@@ -8,7 +8,8 @@
     "_comment_userInterfaceStyle": "automatic, not light — the app has a real dark theme (Ch. 11.7) driven by useColorScheme, and 'light' would pin every device to the light palette.",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.saar.news"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +18,11 @@
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "_comment_package": "Must match the Android package name registered in Firebase EXACTLY. A mismatch produces a build that installs and then silently receives no push.",
+      "package": "com.saar.news",
+      "_comment_googleServicesFile": "Firebase project saar-8a829. expo-notifications reads this at prebuild and injects the google-services Gradle plugin itself — the Gradle snippets the Firebase console shows must NOT be applied by hand, because android/ is generated and regenerated on every build.",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -27,8 +32,15 @@
       "expo-status-bar",
       "expo-font",
       "expo-video",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-notifications"
     ],
-    "scheme": "saar"
+    "scheme": "saar",
+    "_comment_extra": "eas.projectId is what getExpoPushTokenAsync reads (src/state/DeviceContext.tsx). Without it the call throws and no device ever registers a token. This is the id from the Expo dashboard; `eas init --id` writes the same value.",
+    "extra": {
+      "eas": {
+        "projectId": "3335729f-034f-4796-9c14-b3de3c866eb2"
+      }
+    }
   }
 }

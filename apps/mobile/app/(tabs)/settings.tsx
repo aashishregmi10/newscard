@@ -1,4 +1,5 @@
 import { View, Text, ScrollView, StyleSheet, Switch, Pressable, Linking, Alert } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings, type ThemeMode } from '../../src/state/SettingsContext';
 import { useBookmarks } from '../../src/state/BookmarksContext';
@@ -383,6 +384,48 @@ export default function SettingsScreen() {
             label={ne ? 'सर्तहरू' : 'Terms of use'}
             theme={t}
             onPress={() => void Linking.openURL('https://example.invalid/terms')}
+          />
+          {/*
+            * The device id and push status, in the reader-facing settings
+            * screen rather than a hidden debug menu.
+            *
+            * Both are needed to answer "why did my phone not buzz", and that
+            * question gets asked by whoever is holding the phone — support, an
+            * editor testing copy, a reader. A diagnostic nobody can reach is a
+            * diagnostic that gets replaced by a guess. Neither value is
+            * sensitive: the id is a random UUID this install generated and is
+            * not derived from any hardware identifier.
+            */}
+          <Row
+            label={ne ? 'डिभाइस आइडी' : 'Device id'}
+            hint={ne ? 'थिच्दा प्रतिलिपि हुन्छ' : 'Tap to copy'}
+            theme={t}
+            onPress={() => {
+              if (!device.deviceId) return;
+              void Clipboard.setStringAsync(device.deviceId);
+              Alert.alert(ne ? 'प्रतिलिपि भयो' : 'Copied', device.deviceId);
+            }}
+            right={
+              <Text style={{ color: t.textSecondary }}>
+                {device.deviceId ? `${device.deviceId.slice(0, 8)}…` : '—'}
+              </Text>
+            }
+          />
+          <Row
+            label={ne ? 'पुश दर्ता' : 'Push registration'}
+            hint={device.pushRegistered ? undefined : (device.pushUnavailable ?? undefined)}
+            theme={t}
+            right={
+              <Text style={{ color: t.textSecondary }}>
+                {device.pushRegistered
+                  ? ne
+                    ? 'दर्ता भयो'
+                    : 'Registered'
+                  : ne
+                    ? 'छैन'
+                    : 'None'}
+              </Text>
+            }
           />
           <Row label={ne ? 'संस्करण' : 'Version'} theme={t} last right={
             <Text style={{ color: t.textSecondary }}>0.1.0</Text>

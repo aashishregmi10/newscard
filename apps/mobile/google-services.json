@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "220861601133",
+    "project_id": "saar-8a829",
+    "storage_bucket": "saar-8a829.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:220861601133:android:7abf81f1ac14fdc0793664",
+        "android_client_info": {
+          "package_name": "com.saar.news"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD0qWwhyVrdM0BzEFOuzv7lQQyBLoeNkew"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
