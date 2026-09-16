@@ -26,6 +26,7 @@ import {
 } from './middleware/index.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { articleRoutes } from './routes/articles.routes.js';
+import { notificationRoutes } from './routes/notifications.routes.js';
 import { ensureSessionIndexes } from './auth/session.js';
 
 const PORT = Number(process.env.CMS_PORT ?? 3001);
@@ -63,6 +64,7 @@ export function createCmsApp() {
 
   app.use('/api', authRoutes);
   app.use('/api', articleRoutes);
+  app.use('/api', notificationRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

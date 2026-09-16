@@ -111,6 +111,53 @@ export interface NewStoryOptions {
   sources: Array<{ slug: string; displayName: string; language: string; licensed: boolean }>;
 }
 
+
+export interface NotifyTargets {
+  articles: Array<{
+    id: string;
+    slug: string;
+    headline: string;
+    language: 'ne' | 'en';
+    categorySlug: string;
+    publishedAt: string | null;
+  }>;
+  devices: { total: number; withToken: number; notifEnabled: number };
+  /** Surfaced before the editor writes anything: during quiet hours a send is
+   *  mostly suppressed, and finding that out afterwards wastes the copy. */
+  quietHours: { active: boolean; opensAt: string | null };
+}
+
+export interface DispatchReport {
+  notificationId: string;
+  type: string;
+  devices: number;
+  noToken: number;
+  attempted: number;
+  accepted: number;
+  suppressed: number;
+  bySuppression: Record<string, number>;
+  unregistered: number;
+  failed: Array<{ deviceId: string; message: string }>;
+  heldForQuietHours: number;
+  quietHoursUntil: string | null;
+}
+
+export interface NotificationRow {
+  id: string;
+  type: string;
+  title: { ne: string; en: string };
+  deepLink: string;
+  audience: { languages: string[]; categories: string[] };
+  sentAt: string | null;
+  stats: { attempted: number; delivered: number; suppressed: number };
+  createdAt: string;
+}
+
+export interface Localised {
+  ne: string;
+  en: string;
+}
+
 export const api = {
   me: () => req<{ staff: Staff }>('/auth/me'),
 
@@ -155,4 +202,27 @@ export const api = {
       `/cms/articles/${id}/publish`,
       { method: 'POST', body: JSON.stringify({}) },
     ),
+
+  notifyTargets: () => req<NotifyTargets>('/cms/notifications/targets'),
+
+  notifyHistory: () => req<{ items: NotificationRow[] }>('/cms/notifications'),
+
+  notifySend: (body: {
+    type: string;
+    articleId: string | null;
+    title: Localised;
+    body: Localised;
+    audience: { languages: string[]; categories: string[] };
+  }) =>
+    req<{ id: string; report: DispatchReport }>('/cms/notifications', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** One handset, named explicitly. Bypasses the send gate — see the route. */
+  notifyTest: (body: { deviceId: string; title: string; body: string; deepLink?: string }) =>
+    req<{ ok: true; accepted: number }>('/cms/notifications/test', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
 };

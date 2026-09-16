@@ -3,6 +3,7 @@ import { api, ApiError, type Staff } from './api';
 import { Queue } from './components/Queue';
 import { Composer } from './components/Composer';
 import { NewStory } from './components/NewStory';
+import { Notify } from './components/Notify';
 
 function Login({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState('');
@@ -84,6 +85,11 @@ export default function App() {
   const [staff, setStaff] = useState<Staff | null | 'loading'>('loading');
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [notifying, setNotifying] = useState(false);
+
+  // Same permission the server enforces on the route. Showing an author a
+  // button that will be refused is worse than not showing it.
+  const canNotify = staff !== null && staff !== 'loading' && staff.role !== 'author';
 
   const check = () =>
     api
@@ -107,6 +113,11 @@ export default function App() {
         <span className="who">
           {staff.email} · {staff.role}
         </span>
+        {canNotify && !notifying && (
+          <button className="btn btn-sm" onClick={() => setNotifying(true)}>
+            Notifications
+          </button>
+        )}
         <button
           className="btn btn-sm"
           onClick={async () => {
@@ -114,6 +125,7 @@ export default function App() {
             setStaff(null);
             setOpenId(null);
             setCreating(false);
+            setNotifying(false);
           }}
         >
           Sign out
@@ -122,7 +134,9 @@ export default function App() {
 
       <main className="main">
         <div className="wrap">
-          {openId ? (
+          {notifying ? (
+            <Notify onBack={() => setNotifying(false)} />
+          ) : openId ? (
             <Composer id={openId} onBack={() => setOpenId(null)} />
           ) : creating ? (
             <NewStory

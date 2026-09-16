@@ -14,6 +14,9 @@
       "path": "./apps/api"
     },
     {
+      "path": "./apps/worker"
+    },
+    {
       "path": "./apps/cms-api"
     }
   ]

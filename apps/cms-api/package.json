@@ -13,6 +13,7 @@
     "@saar/db": "*",
     "@saar/schemas": "*",
     "@saar/shared": "*",
+    "@saar/worker": "*",
     "@node-rs/argon2": "^2.0.2",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
