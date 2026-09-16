@@ -15,7 +15,7 @@ loadDotenv({ path: join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..
 import express from 'express';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import { connect, close, warnIfNoTransactions } from '@saar/db';
+import { connect, close, warnIfNoTransactions, ensureRateCounterIndexes } from '@saar/db';
 import {
   requestId,
   attachSession,
@@ -27,6 +27,7 @@ import {
 import { authRoutes } from './routes/auth.routes.js';
 import { articleRoutes } from './routes/articles.routes.js';
 import { notificationRoutes } from './routes/notifications.routes.js';
+import { clientErrorRoutes } from './routes/clientErrors.routes.js';
 import { ensureSessionIndexes } from './auth/session.js';
 
 const PORT = Number(process.env.CMS_PORT ?? 3001);
@@ -65,6 +66,7 @@ export function createCmsApp() {
   app.use('/api', authRoutes);
   app.use('/api', articleRoutes);
   app.use('/api', notificationRoutes);
+  app.use('/api', clientErrorRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);
@@ -80,6 +82,8 @@ async function main(): Promise<void> {
   // supported. Warn, because a replica set is still the safer deployment.
   await warnIfNoTransactions();
   await ensureSessionIndexes();
+  // Shared with the read API — the login limiter writes to the same counters.
+  await ensureRateCounterIndexes();
 
   const server = createCmsApp().listen(PORT, () => {
     console.log(`cms-api listening on http://localhost:${PORT} (allowing ${ORIGIN})`);

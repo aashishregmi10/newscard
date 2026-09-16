@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { hash, verify } from '@node-rs/argon2';
 
 /**
@@ -51,4 +52,27 @@ export function passwordPolicyError(plain: string): string | null {
     return `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
   }
   return null;
+}
+
+/**
+ * Spend the same time on a missing account as on a real one.
+ *
+ * Without this, login answers instantly when no such address exists and takes
+ * an Argon2id verification (~100ms, deliberately) when it does. That gap is
+ * measurable over the network, so the login form quietly becomes an oracle for
+ * "is this person an editor here" — which is exactly what the single generic
+ * error message was written to prevent.
+ *
+ * The dummy hash is built once, on the first miss, so a server that never sees
+ * a bad address never pays for it.
+ */
+let dummyHash: Promise<string> | null = null;
+
+export async function equalisePasswordTiming(supplied: string): Promise<void> {
+  dummyHash ??= hashPassword(randomBytes(32).toString("hex"));
+  try {
+    await verify(await dummyHash, supplied, OPTIONS);
+  } catch {
+    // Always false. The point is the elapsed time, not the answer.
+  }
 }

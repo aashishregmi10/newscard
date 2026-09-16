@@ -24,10 +24,12 @@ interface Props {
 interface State {
   error: Error | null;
   info: ErrorInfo | null;
+  /** Production only: the reader asked to see the diagnostic block. */
+  showDetails: boolean;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  override state: State = { error: null, info: null };
+  override state: State = { error: null, info: null, showDetails: false };
 
   static getDerivedStateFromError(error: Error): Partial<State> {
     return { error };
@@ -44,12 +46,28 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private reset = (): void => {
-    this.setState({ error: null, info: null });
+    this.setState({ error: null, info: null, showDetails: false });
   };
 
   override render(): ReactNode {
-    const { error, info } = this.state;
+    const { error, info, showDetails } = this.state;
     if (!error) return this.props.children;
+
+    /**
+     * A stack trace is for us; a reader gets a sentence.
+     *
+     * In development the diagnostic block is the whole point of this screen —
+     * it is what turned "Sorry, something went wrong" into something fixable.
+     * In production it is wrong: internal module paths and a wall of monospace
+     * tell a reader nothing they can act on, and shipping them is how an app
+     * leaks its own structure to anyone who can make it crash.
+     *
+     * So production gets a sentence and a way back, with the detail one tap
+     * away for the times someone is reading the error out over the phone to
+     * support. The report has already been sent either way.
+     */
+    const dev = typeof __DEV__ !== 'undefined' && __DEV__;
+    const detailed = dev || showDetails;
 
     const env = [
       `platform      ${Platform.OS} ${Platform.Version}`,
@@ -62,11 +80,15 @@ export class ErrorBoundary extends Component<Props, State> {
     return (
       <View style={styles.root}>
         <ScrollView contentContainerStyle={styles.body}>
-          <Text style={styles.title}>Something broke</Text>
+          <Text style={styles.title}>{dev ? 'Something broke' : 'Something went wrong'}</Text>
           <Text style={styles.sub}>
-            This screen exists so the actual error is visible. Copy the block below.
+            {dev
+              ? 'This screen exists so the actual error is visible. Copy the block below.'
+              : 'This part of the app stopped working. Your saved stories are safe. Try again, or reopen the app.'}
           </Text>
 
+          {detailed ? (
+          <>
           <Text style={styles.label}>ERROR</Text>
           <View style={styles.block}>
             <Text style={styles.mono} selectable>
@@ -102,6 +124,13 @@ export class ErrorBoundary extends Component<Props, State> {
               </View>
             </>
           ) : null}
+
+          </>
+          ) : (
+            <Pressable onPress={() => this.setState({ showDetails: true })} hitSlop={10}>
+              <Text style={styles.detailsLink}>Show technical details</Text>
+            </Pressable>
+          )}
 
           <Pressable style={styles.btn} onPress={this.reset}>
             <Text style={styles.btnText}>Try again</Text>
@@ -146,4 +175,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+  detailsLink: { color: '#7fa8d4', fontSize: 13, marginTop: 8, textDecorationLine: 'underline' },
 });

@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { collections, getDb } from '@saar/db';
 import { AppError } from '@saar/shared';
-import { verifyPassword } from '../auth/password.js';
+import { equalisePasswordTiming, verifyPassword } from '../auth/password.js';
 import { createSession, destroySession, SESSION_COOKIE, SESSION_TTL_MS } from '../auth/session.js';
 import { asyncRoute } from '../middleware/index.js';
+import { clearLoginAttempts, loginLimit } from '../middleware/rateLimit.js';
 
 export const authRoutes = Router();
 
@@ -18,6 +19,11 @@ const LOCKOUT_MS = 15 * 60 * 1000;
 
 authRoutes.post(
   '/auth/login',
+  // Per-IP, on top of the per-account lockout below. The lockout stops one
+  // password being ground against one account; it does nothing about the same
+  // password being sprayed across every account, and nothing about the CPU an
+  // unbounded queue of Argon2id verifications costs.
+  loginLimit,
   asyncRoute(async (req, res) => {
     const parsed = LoginSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError('BAD_REQUEST', 'Email and password are required.');
@@ -30,7 +36,12 @@ authRoutes.post(
     // enumerator.
     const reject = () => new AppError('UNAUTHENTICATED', 'Email or password is incorrect.');
 
-    if (!staff || !staff.isActive) throw reject();
+    if (!staff || !staff.isActive) {
+      // Spend the same time we would have spent verifying, so the response
+      // time does not answer a question the error message refuses to.
+      await equalisePasswordTiming(parsed.data.password);
+      throw reject();
+    }
 
     if (staff.lockedUntil && staff.lockedUntil.getTime() > Date.now()) {
       throw new AppError('FORBIDDEN', 'Account temporarily locked. Try again shortly.');
@@ -57,6 +68,10 @@ authRoutes.post(
       { _id: staff._id },
       { $set: { failedLoginCount: 0, lockedUntil: null, lastLoginAt: new Date() } },
     );
+
+    // A person who mistyped twice and then got it right should not carry
+    // those attempts for the rest of the window.
+    await clearLoginAttempts(req);
 
     const token = await createSession({
       _id: staff._id,

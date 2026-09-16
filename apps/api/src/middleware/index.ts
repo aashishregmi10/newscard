@@ -27,8 +27,11 @@ export function requestId(req: Request, res: Response, next: NextFunction): void
  * Strip MongoDB operators from user input.  Spec Ch. 15.4.
  *
  * Without this, a query parameter like `{"$ne": null}` reaches a filter and
- * changes its meaning. Runs before any handler touches the body, and mutates in
- * place because Express 5 makes req.query a getter.
+ * changes its meaning. Runs before any handler touches the body.
+ *
+ * Everything is mutated IN PLACE rather than reassigned. On Express 4 either
+ * would work; on Express 5 req.query is a getter and an assignment throws, so
+ * in-place scrubbing is what survives the upgrade.
  */
 export function sanitizeMongo(req: Request, _res: Response, next: NextFunction): void {
   const scrub = (value: unknown, depth = 0): void => {
@@ -44,7 +47,6 @@ export function sanitizeMongo(req: Request, _res: Response, next: NextFunction):
 
   scrub(req.body);
   scrub(req.params);
-  // req.query is a getter in Express 5; scrub the object it returns in place.
   scrub(req.query);
   next();
 }
@@ -68,10 +70,9 @@ export function errorHandler(
   const status = (err as { status?: unknown; statusCode?: unknown })?.status ??
     (err as { statusCode?: unknown })?.statusCode;
   if (typeof status === 'number' && status >= 400 && status < 500) {
-    const code = status === 413 ? 'BAD_REQUEST' : 'BAD_REQUEST';
     res.status(status).json({
       error: {
-        code,
+        code: 'BAD_REQUEST',
         message:
           status === 413 ? 'Request body is too large.' : 'The request was malformed.',
         requestId: req.requestId,

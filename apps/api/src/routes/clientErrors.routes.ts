@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { getDb } from '@saar/db';
 import { AppError } from '@saar/shared';
 import { asyncRoute } from '../middleware/index.js';
+import { clientErrorLimit } from '../middleware/rateLimit.js';
 
 /**
  * Crash and error reports from the app.
@@ -44,13 +45,11 @@ const ReportSchema = z.object({
   occurredAt: z.string().datetime().optional(),
 });
 
-/** Kept long enough to see whether a release fixed something, and no longer. */
-export const CLIENT_ERROR_TTL_DAYS = 60;
-
 export const clientErrorRoutes = Router();
 
 clientErrorRoutes.post(
   '/client-errors',
+  clientErrorLimit,
   asyncRoute(async (req, res) => {
     const parsed = ReportSchema.safeParse(req.body);
     // A malformed report is dropped without complaint. The reporter runs inside
@@ -100,29 +99,11 @@ clientErrorRoutes.post(
   }),
 );
 
-/**
- * GET /v1/client-errors — what is currently broken, worst first.
+/*
+ * There is deliberately no GET here.
  *
- * Ordered by the number of DISTINCT installs affected rather than by raw count,
- * because one device in a crash loop is a curiosity and two hundred devices
- * hitting the same fault once each is an incident.
+ * Reading these means reading stack traces, internal module paths and the
+ * shape of the app — an operations view, not something the public API should
+ * hand to anyone who guesses the path. It lives in the CMS behind a staff
+ * session instead: apps/cms-api/src/routes/clientErrors.routes.ts.
  */
-clientErrorRoutes.get(
-  '/client-errors',
-  asyncRoute(async (req, res) => {
-    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    const rows = await getDb()
-      .collection('clientErrors')
-      .aggregate([
-        { $match: { lastSeen: { $gte: since } } },
-        { $addFields: { deviceCount: { $size: { $ifNull: ['$devices', []] } } } },
-        { $sort: { deviceCount: -1, count: -1 } },
-        { $limit: 100 },
-        { $project: { _id: 0, devices: 0 } },
-      ])
-      .toArray();
-
-    res.setHeader('Cache-Control', 'no-store');
-    res.json({ since: since.toISOString(), items: rows });
-  }),
-);

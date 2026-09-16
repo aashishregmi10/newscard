@@ -70,6 +70,9 @@ v1.get(
       dbOk = false;
     }
 
+    // Never cacheable. A proxy holding a 200 from before an outage is worse
+    // than no health check, because it is trusted.
+    res.setHeader('Cache-Control', 'no-store');
     res.status(dbOk ? 200 : 503).json({
       status: dbOk ? 'ok' : 'degraded',
       db: dbOk,

@@ -6,6 +6,7 @@ import { getDb } from '@saar/db';
 import { AppError } from '@saar/shared';
 import { AdEventTypeEnum, VIEWABLE_THRESHOLD_MS } from '@saar/schemas';
 import { asyncRoute } from '../middleware/index.js';
+import { adEventsLimit } from '../middleware/rateLimit.js';
 import { buildCampaignReport } from '../services/adReport.service.js';
 
 export const adRoutes = Router();
@@ -34,6 +35,7 @@ const EventsSchema = z.object({
  */
 adRoutes.post(
   '/ads/events',
+  adEventsLimit,
   asyncRoute(async (req, res) => {
     const parsed = EventsSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError('BAD_REQUEST', 'Invalid ad events.');

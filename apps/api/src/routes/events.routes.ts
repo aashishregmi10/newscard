@@ -5,6 +5,7 @@ import { getDb } from '@saar/db';
 import { AppError } from '@saar/shared';
 import { clampDwell, MAX_DWELL_MS } from '@saar/schemas';
 import { asyncRoute } from '../middleware/index.js';
+import { eventsLimit } from '../middleware/rateLimit.js';
 
 /**
  * POST /v1/events — reading measurement.  Spec Ch. 3.8, 6.8.
@@ -49,6 +50,10 @@ export const eventRoutes = Router();
 
 eventRoutes.post(
   '/events',
+  // Unauthenticated by design — measurement must never be in the reader’s
+  // way — which is exactly why it needs a ceiling. Keyed per device where a
+  // bearer token is present, per IP where it is not.
+  eventsLimit,
   asyncRoute(async (req, res) => {
     const parsed = BodySchema.safeParse(req.body);
     if (!parsed.success) throw new AppError('BAD_REQUEST', 'Invalid events.');

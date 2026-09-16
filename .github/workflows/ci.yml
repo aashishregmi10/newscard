@@ -94,3 +94,28 @@ jobs:
       - name: Native module versions match the SDK
         run: npx expo install --check
         working-directory: apps/mobile
+
+  cms-web:
+    name: Editorial web app
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # apps/cms-web is not an npm workspace either — it carries its own React
+      # and its own lockfile — so nothing above installs or checks it. Until
+      # this job existed a type error in the CMS reached main unnoticed: the
+      # root tsc -b has no project reference to it, and the root lint passes
+      # over it without ever resolving its types.
+      - name: Install workspace
+        run: npm ci
+
+      - name: Install cms-web
+        run: npm ci --prefix apps/cms-web
+
+      - name: Typecheck and build
+        run: npm run build --prefix apps/cms-web
