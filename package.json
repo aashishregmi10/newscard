@@ -32,7 +32,10 @@
     "media:videos": "tsx scripts/fetch-demo-videos.ts",
     "db:migrate": "tsx scripts/migrate-to-atlas.ts",
     "gen:types": "tsx scripts/gen-client-types.ts",
-    "test:mobile": "npm test --prefix apps/mobile"
+    "test:mobile": "npm test --prefix apps/mobile",
+    "demo:check": "tsx scripts/demo-check.ts",
+    "demo:seed": "tsx scripts/seed-demo-queue.ts",
+    "demo": "node scripts/demo.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

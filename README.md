@@ -70,6 +70,16 @@ npm run mobile           # Expo / Metro         → port 8082
 `npm run mobile` is the **only** supported way to start the app. Never run `npx expo` from the
 repository root — see `apps/mobile/RUNNING.md` for what breaks and why.
 
+### Showing it to someone
+
+```bash
+npm run demo          # all three servers at once, with preflight and the phone's address
+npm run demo:check    # walks every surface a demo touches and names what is broken
+npm run demo:seed     # puts stories back in the editorial queue after a rehearsal
+```
+
+`docs/demo.md` is the runbook: what to click, in what order, and what will not work yet.
+
 ### Transactions are optional
 
 `infra/docker-compose.dev.yml` will run MongoDB as a single-node replica set if you want one, but
