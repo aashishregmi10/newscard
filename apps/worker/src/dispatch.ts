@@ -49,10 +49,10 @@ export interface DispatchReport {
    * Breaking news the gate HELD for quiet hours rather than dropped, and the
    * time the window opens.
    *
-   * Be honest about what happens next: holding is decided here and nothing
-   * schedules the retry yet, so these are currently not delivered at all. The
-   * count is surfaced rather than folded into `suppressed` so the gap stays
-   * visible in the CMS instead of reading as successful delivery.
+   * These ARE delivered: the device ids are recorded on the notification and
+   * sweepDeferred() sends to exactly those handsets once the window opens. The
+   * count stays separate from `suppressed` because the two mean opposite
+   * things — one is "not yet", the other is "never".
    */
   heldForQuietHours: number;
   quietHoursUntil: string | null;
@@ -105,6 +105,14 @@ function pickLanguage(
 
 export interface DispatchOptions {
   /**
+   * Send to these devices only.
+   *
+   * Used by the quiet-hours sweep, which must reach the handsets that were HELD
+   * and no others — re-running a full dispatch would deliver the notification a
+   * second time to everyone who already got it.
+   */
+  onlyDeviceIds?: string[];
+  /**
    * Injectable clock, for tests. Quiet hours make wall-clock behaviour
    * untestable otherwise: half the branches only exist between 21:30 and 06:30
    * NPT, and a suite that passes at noon and fails at midnight is worse than no
@@ -129,7 +137,10 @@ export async function dispatchNotification(
   // Loaded in one go. At demo and launch scale this is a few thousand documents
   // at most; past that it wants a cursor and a bounded send window — a change
   // to this function, and not to the gate.
-  const devices = (await c.devices.find({}).toArray()) as DeviceDoc[];
+  const sweeping = Array.isArray(opts.onlyDeviceIds);
+  const devices = (await c.devices
+    .find(sweeping ? { deviceId: { $in: opts.onlyDeviceIds! } } : {})
+    .toArray()) as DeviceDoc[];
 
   const report: DispatchReport = {
     notificationId,
@@ -147,6 +158,8 @@ export async function dispatchNotification(
   };
 
   const targets: PushTarget[] = [];
+  /** Held for quiet hours. These are delivered later by sweepDeferred. */
+  const deferredDeviceIds: string[] = [];
 
   for (const d of devices) {
     if (!isValidPushToken(d.fcmToken)) {
@@ -175,6 +188,7 @@ export async function dispatchNotification(
       if (decision.deferUntil) {
         report.heldForQuietHours++;
         report.quietHoursUntil = decision.deferUntil.toISOString();
+        deferredDeviceIds.push(d.deviceId);
       }
       continue;
     }
@@ -219,30 +233,65 @@ export async function dispatchNotification(
     );
   }
 
+  /**
+   * Record the outcome.
+   *
+   * A sweep ADDS to the totals rather than replacing them: it is the second
+   * half of one send, and overwriting would erase the first half from the
+   * record. A first dispatch sets them.
+   *
+   * Either way the deferral state is rewritten from what this run actually
+   * found, so a sweep that delivered everything clears it and a sweep that
+   * somehow ran inside the window re-arms it.
+   */
+  const deferral =
+    deferredDeviceIds.length > 0
+      ? {
+          deferredUntil: report.quietHoursUntil ? new Date(report.quietHoursUntil) : null,
+          deferredDeviceIds,
+          deferredSweptAt: null,
+        }
+      : { deferredUntil: null, deferredDeviceIds: [], deferredSweptAt: null };
+
+  const dispatchSummary = {
+    devices: report.devices,
+    noToken: report.noToken,
+    bySuppression: report.bySuppression,
+    unregistered: report.unregistered,
+    failed: report.failed.length,
+    heldForQuietHours: report.heldForQuietHours,
+  };
+
   await c.notifications.updateOne(
     { _id: notif._id },
-    {
-      $set: {
-        sentAt: now,
-        stats: {
-          attempted: report.attempted,
-          // Accepted by Expo. Replaced with true delivery when receipts are
-          // reconciled; never inflated by treating a ticket as a delivery.
-          delivered: report.accepted,
-          suppressed: report.suppressed,
+    sweeping
+      ? {
+          $inc: {
+            'stats.attempted': report.attempted,
+            'stats.delivered': report.accepted,
+          },
+          $push: { tickets: { $each: outcome.accepted } },
+          $set: { ...deferral, sweptAt: now, lastSweep: dispatchSummary, updatedAt: now },
+        }
+      : {
+          $set: {
+            sentAt: now,
+            stats: {
+              attempted: report.attempted,
+              // Accepted by Expo. Replaced with true delivery when receipts are
+              // reconciled; never inflated by treating a ticket as a delivery.
+              delivered: report.accepted,
+              suppressed: report.suppressed,
+            },
+            // { deviceId, ticketId } pairs, not bare ids: a receipt reporting
+            // a dead handset has to be traceable back to the token to clear.
+            tickets: outcome.accepted,
+            receiptsCheckedAt: null,
+            dispatch: dispatchSummary,
+            ...deferral,
+            updatedAt: now,
+          },
         },
-        ticketIds: outcome.accepted.map((a) => a.ticketId),
-        dispatch: {
-          devices: report.devices,
-          noToken: report.noToken,
-          bySuppression: report.bySuppression,
-          unregistered: report.unregistered,
-          failed: report.failed.length,
-          heldForQuietHours: report.heldForQuietHours,
-        },
-        updatedAt: now,
-      },
-    },
   );
 
   return report;

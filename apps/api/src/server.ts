@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
  */
 loadDotenv({ path: join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.env') });
 import { connect, close, warnIfNoTransactions } from '@saar/db';
+import { drainHttpServer } from '@saar/shared';
 import { loadEnv } from './config/index.js';
 import { createApp } from './app.js';
 import { ensureRateLimitIndexes } from './middleware/rateLimit.js';
@@ -33,7 +34,15 @@ async function main(): Promise<void> {
 
   const shutdown = async (signal: string): Promise<void> => {
     console.log(`\n${signal} — shutting down`);
-    server.close();
+    // Await the drain. server.close() only stops ACCEPTING; exiting without
+    // waiting for it killed every request still being served, which on a
+    // rolling deploy is a burst of failed reads attributed to nothing.
+    const { drained, waitedMs } = await drainHttpServer(server);
+    console.log(
+      drained
+        ? `drained in ${waitedMs}ms`
+        : `gave up draining after ${waitedMs}ms — some requests were cut`,
+    );
     await close();
     process.exit(0);
   };

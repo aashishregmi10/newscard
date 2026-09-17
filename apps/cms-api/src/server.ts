@@ -28,6 +28,8 @@ import { authRoutes } from './routes/auth.routes.js';
 import { articleRoutes } from './routes/articles.routes.js';
 import { notificationRoutes } from './routes/notifications.routes.js';
 import { clientErrorRoutes } from './routes/clientErrors.routes.js';
+import { drainHttpServer } from '@saar/shared';
+import { startDeferredSweep, startReceiptReconciliation } from '@saar/worker';
 import { ensureSessionIndexes } from './auth/session.js';
 
 const PORT = Number(process.env.CMS_PORT ?? 3001);
@@ -85,13 +87,30 @@ async function main(): Promise<void> {
   // Shared with the read API — the login limiter writes to the same counters.
   await ensureRateCounterIndexes();
 
+  // Breaking news held for quiet hours is released by this. It lives in the
+  // CMS because the CMS is the process that sends; the sweep claims each
+  // notification with a compare-and-swap, so running it in more than one
+  // process is safe rather than merely unlikely to collide.
+  const stopSweep = startDeferredSweep();
+  // Turns "Expo accepted it" into "a handset showed it". Until this ran,
+  // stats.delivered was the accepted count wearing the delivered name.
+  const stopReceipts = startReceiptReconciliation();
+
   const server = createCmsApp().listen(PORT, () => {
     console.log(`cms-api listening on http://localhost:${PORT} (allowing ${ORIGIN})`);
   });
 
   const shutdown = async (sig: string) => {
     console.log(`\n${sig} — shutting down`);
-    server.close();
+    stopSweep();
+    stopReceipts();
+    // See the note in apps/api/src/server.ts: close() only stops accepting.
+    const { drained, waitedMs } = await drainHttpServer(server);
+    console.log(
+      drained
+        ? `drained in ${waitedMs}ms`
+        : `gave up draining after ${waitedMs}ms — some requests were cut`,
+    );
     await close();
     process.exit(0);
   };

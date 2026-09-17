@@ -12,5 +12,14 @@
 
 export { dispatchNotification, nptDayKey, effectiveSentToday } from './dispatch.js';
 export type { DispatchReport, DispatchOptions } from './dispatch.js';
+export { sweepDeferred, startDeferredSweep, SWEEP_INTERVAL_MS } from './sweepDeferred.js';
+export type { SweepResult } from './sweepDeferred.js';
+export {
+  reconcileReceipts,
+  startReceiptReconciliation,
+  RECEIPT_DELAY_MS,
+  RECONCILE_INTERVAL_MS,
+} from './reconcileReceipts.js';
+export type { ReconcileResult } from './reconcileReceipts.js';
 export { sendPush, checkReceipts, isValidPushToken } from './push/expoPush.js';
 export type { PushTarget, SendOutcome, ReceiptOutcome } from './push/expoPush.js';
