@@ -110,6 +110,14 @@ jobs:
         run: npm test
         working-directory: apps/mobile
 
+      # Typecheck proves the TYPES resolve; this proves the MODULE GRAPH does.
+      # A missing asset, a bad dynamic import or a package that has no native
+      # entry point all pass tsc and fail here — which is the difference
+      # between finding out now and finding out on a handset.
+      - name: App bundles
+        run: npx expo export --platform android --output-dir /tmp/expo-export
+        working-directory: apps/mobile
+
   cms-web:
     name: Editorial web app
     runs-on: ubuntu-latest
