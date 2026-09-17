@@ -5,10 +5,17 @@ import helmet from 'helmet';
 import compression from 'compression';
 import { requestId, sanitizeMongo, errorHandler, notFoundHandler } from './middleware/index.js';
 import { v1 } from './routes/index.js';
+import { mediaRoot } from '@saar/shared';
 import { publicReadLimit } from './middleware/rateLimit.js';
 
-/** repo root, from apps/api/src */
-const MEDIA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'media');
+/**
+ * One definition, shared with the CMS that writes here and the seed scripts
+ * that generate the corpus. Each used to compute `../../../media` from its own
+ * file, which agreed by coincidence — and the first deployment putting the API
+ * and the CMS on different paths would have separated them silently, the
+ * symptom being uploaded images that 404 only in production.
+ */
+const MEDIA_DIR = mediaRoot();
 
 /** apps/api/public — the advertiser report page. Static, no build step. */
 const PUBLIC_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');

@@ -28,6 +28,7 @@ import { authRoutes } from './routes/auth.routes.js';
 import { articleRoutes } from './routes/articles.routes.js';
 import { notificationRoutes } from './routes/notifications.routes.js';
 import { clientErrorRoutes } from './routes/clientErrors.routes.js';
+import { mediaRoutes } from './routes/media.routes.js';
 import { createLogger, drainHttpServer } from '@saar/shared';
 import { startDeferredSweep, startReceiptReconciliation } from '@saar/worker';
 import { ensureSessionIndexes } from './auth/session.js';
@@ -72,6 +73,7 @@ export function createCmsApp(ORIGIN = 'http://localhost:5173') {
   app.use('/api', articleRoutes);
   app.use('/api', notificationRoutes);
   app.use('/api', clientErrorRoutes);
+  app.use('/api', mediaRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

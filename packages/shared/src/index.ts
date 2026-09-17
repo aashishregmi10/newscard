@@ -9,4 +9,5 @@ export * from './adPolicy.js';
 export * from './clientClock.js';
 export * from './shutdown.js';
 export * from './logger.js';
+export * from './mediaPath.js';
 export * from './constants.js';

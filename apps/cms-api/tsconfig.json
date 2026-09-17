@@ -19,6 +19,9 @@
     },
     {
       "path": "../../packages/http"
+    },
+    {
+      "path": "../../packages/media"
     }
   ],
   "include": [

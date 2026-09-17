@@ -21,6 +21,11 @@ import { createHash } from 'node:crypto';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import ffmpegPath from 'ffmpeg-static';
+// One implementation, in @saar/media. The copy that used to live here read
+// ffmpeg’s stderr only from the FAILURE path — but a null mux over a readable
+// file exits zero, so it returned 0 for every valid video. The `|| want.seconds`
+// fallback below is what hid it.
+import { probeDuration } from '@saar/media';
 import sharp from 'sharp';
 import { DEMO_VIDEOS } from './seedVideosData.js';
 
@@ -155,20 +160,6 @@ function ffmpeg(args: string[]): void {
   });
 }
 
-function probeDuration(file: string): number {
-  // ffprobe is not shipped with ffmpeg-static, so the duration comes from
-  // ffmpeg's own null-muxer pass. Slower than ffprobe and one less dependency.
-  try {
-    execFileSync(ffmpegPath as unknown as string, ['-hide_banner', '-i', file, '-f', 'null', '-'], {
-      stdio: ['ignore', 'ignore', 'pipe'],
-    });
-  } catch (e) {
-    const err = (e as { stderr?: Buffer }).stderr?.toString() ?? '';
-    const m = err.match(/Duration:\s*(\d+):(\d+):(\d+\.?\d*)/);
-    if (m) return Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]);
-  }
-  return 0;
-}
 
 /**
  * Source clip in, three vertical MP4s and a poster out.
@@ -321,7 +312,7 @@ export async function fetchAllVideos(rawCdnBase: string): Promise<Cache> {
         if (!res.ok) throw new Error(`http ${res.status}`);
         writeFileSync(tmp, Buffer.from(await res.arrayBuffer()));
 
-        const total = probeDuration(tmp);
+        const total = await probeDuration(tmp);
         // Start a little in, and never ask for more than the source holds.
         const startAt = total > want.seconds + 4 ? 2 : 0;
         const seconds = Math.max(6, Math.min(want.seconds, Math.floor(total - startAt) || want.seconds));

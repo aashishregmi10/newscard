@@ -10,18 +10,21 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@node-rs/argon2": "^2.0.2",
     "@saar/db": "*",
+    "@saar/http": "*",
     "@saar/schemas": "*",
     "@saar/shared": "*",
     "@saar/worker": "*",
-    "@node-rs/argon2": "^2.0.2",
+    "@types/multer": "^2.2.0",
     "cookie-parser": "^1.4.7",
     "dotenv": "^17.4.2",
     "express": "^5.1.0",
     "helmet": "^8.0.0",
     "mongodb": "^6.12.0",
+    "multer": "^2.4.0",
     "zod": "^3.24.1",
-    "@saar/http": "*"
+    "@saar/media": "*"
   },
   "devDependencies": {
     "@types/cookie-parser": "^1.4.8",
