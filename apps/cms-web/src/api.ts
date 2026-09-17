@@ -100,6 +100,22 @@ export interface ArticleImageData {
   urls: { sm: string | null; md: string | null; lg: string | null };
 }
 
+export interface ShortItem {
+  id: string;
+  slug: string;
+  status: 'draft' | 'published' | 'retracted';
+  language: 'ne' | 'en';
+  title: string;
+  caption: string;
+  durationSeconds: number;
+  posterUrl: string;
+  credit: string;
+  sourceName: string;
+  categorySlug: string;
+  publishedAt: string | null;
+  createdAt: string;
+}
+
 /** What the transcoder returns: three renditions the player chooses between. */
 export interface UploadedVideo {
   key: string;
@@ -298,6 +314,34 @@ export const api = {
     form.append('credit', credit);
     return upload<{ video: UploadedVideo }>('/cms/media/video', form);
   },
+
+  shorts: () => req<{ items: ShortItem[] }>('/cms/shorts'),
+
+  createShort: (body: {
+    language: 'ne' | 'en';
+    categorySlug: string;
+    sourceSlug: string;
+    title: string;
+    caption: string;
+    credit: string;
+    licence: ImageLicence;
+    durationSeconds: number;
+    posterUrl: string;
+    posterBlurHash: string;
+    renditions: UploadedVideo['renditions'];
+  }) => req<{ id: string }>('/cms/shorts', { method: 'POST', body: JSON.stringify(body) }),
+
+  publishShort: (id: string) =>
+    req<{ status: string; publishedAt: string }>(`/cms/shorts/${id}/publish`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
+  retractShort: (id: string) =>
+    req<{ status: string }>(`/cms/shorts/${id}/retract`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
 
   notifyTargets: () => req<NotifyTargets>('/cms/notifications/targets'),
 

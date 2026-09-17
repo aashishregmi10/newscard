@@ -4,6 +4,7 @@ import { Queue } from './components/Queue';
 import { Composer } from './components/Composer';
 import { NewStory } from './components/NewStory';
 import { Notify } from './components/Notify';
+import { Shorts } from './components/Shorts';
 
 function Login({ onDone }: { onDone: () => void }) {
   const [email, setEmail] = useState('');
@@ -86,6 +87,7 @@ export default function App() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [notifying, setNotifying] = useState(false);
+  const [shorts, setShorts] = useState(false);
 
   // Same permission the server enforces on the route. Showing an author a
   // button that will be refused is worse than not showing it.
@@ -113,8 +115,13 @@ export default function App() {
         <span className="who">
           {staff.email} · {staff.role}
         </span>
+        {!shorts && (
+          <button className="btn btn-sm" onClick={() => { setShorts(true); setNotifying(false); }}>
+            Shorts
+          </button>
+        )}
         {canNotify && !notifying && (
-          <button className="btn btn-sm" onClick={() => setNotifying(true)}>
+          <button className="btn btn-sm" onClick={() => { setNotifying(true); setShorts(false); }}>
             Notifications
           </button>
         )}
@@ -126,6 +133,7 @@ export default function App() {
             setOpenId(null);
             setCreating(false);
             setNotifying(false);
+            setShorts(false);
           }}
         >
           Sign out
@@ -134,7 +142,9 @@ export default function App() {
 
       <main className="main">
         <div className="wrap">
-          {notifying ? (
+          {shorts ? (
+            <Shorts onBack={() => setShorts(false)} />
+          ) : notifying ? (
             <Notify onBack={() => setNotifying(false)} />
           ) : openId ? (
             <Composer id={openId} onBack={() => setOpenId(null)} />
