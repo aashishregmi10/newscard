@@ -3,7 +3,7 @@ import { ObjectId } from 'mongodb';
 import { Router } from 'express';
 import { z } from 'zod';
 import { getDb } from '@saar/db';
-import { AppError } from '@saar/shared';
+import { AppError, clampClientTimestamp } from '@saar/shared';
 import { AdEventTypeEnum, VIEWABLE_THRESHOLD_MS } from '@saar/schemas';
 import { asyncRoute } from '../middleware/index.js';
 import { adEventsLimit } from '../middleware/rateLimit.js';
@@ -51,7 +51,12 @@ adRoutes.post(
       // attention, and letting it through would inflate median dwell.
       dwellMs: Math.min(e.dwellMs, 120_000),
       categorySlug: e.categorySlug,
-      occurredAt: e.occurredAt ? new Date(e.occurredAt) : now,
+      // Clamped, and expired on receivedAt rather than on this — see the
+      // note in events.routes.ts. It matters more here: these rows back an
+      // advertiser report, so a row that quietly vanished or never expired is
+      // a number somebody paid for.
+      occurredAt: clampClientTimestamp(e.occurredAt, now),
+      receivedAt: now,
     }));
 
     if (docs.length > 0) {

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { getDb } from '@saar/db';
-import { AppError } from '@saar/shared';
+import { AppError, clampClientTimestamp } from '@saar/shared';
 import { asyncRoute } from '../middleware/index.js';
 import { clientErrorLimit } from '../middleware/rateLimit.js';
 
@@ -69,7 +69,14 @@ clientErrorRoutes.post(
      * database for no benefit.
      */
     const fingerprint = `${r.platform}:${r.appVersion}:${r.context ?? '-'}:${r.message.slice(0, 200)}`;
-    const now = r.occurredAt ? new Date(r.occurredAt) : new Date();
+    // Server time, not the handset’s.
+    //
+    // lastSeen does two jobs — it expires the row, and it orders the "what is
+    // broken this week" view — and both were at the mercy of a clock we do not
+    // control. One report dated 2030 would have pinned itself to the top of
+    // that view permanently and never expired.
+    const now = new Date();
+    const reportedAt = clampClientTimestamp(r.occurredAt, now);
 
     await db.collection('clientErrors').updateOne(
       { fingerprint },
@@ -85,7 +92,10 @@ clientErrorRoutes.post(
           // are the same stack, and storing them again buys nothing.
           stack: r.stack ?? null,
         },
-        $set: { lastSeen: now, osVersion: r.osVersion ?? null, fatal: r.fatal },
+        // reportedAt is kept alongside as the device’s own claim: a large
+        // gap from lastSeen says the handset’s clock is wrong, which is worth
+        // knowing and must not drive anything.
+        $set: { lastSeen: now, reportedAt, osVersion: r.osVersion ?? null, fatal: r.fatal },
         $inc: { count: 1 },
         // A set, so one handset reporting a hundred times counts once towards
         // "how many installs does this affect" — the number that decides

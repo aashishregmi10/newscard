@@ -2,7 +2,7 @@ import { ObjectId } from 'mongodb';
 import { Router } from 'express';
 import { z } from 'zod';
 import { getDb } from '@saar/db';
-import { AppError } from '@saar/shared';
+import { AppError, clampClientTimestamp } from '@saar/shared';
 import { clampDwell, MAX_DWELL_MS } from '@saar/schemas';
 import { asyncRoute } from '../middleware/index.js';
 import { eventsLimit } from '../middleware/rateLimit.js';
@@ -71,7 +71,14 @@ eventRoutes.post(
       shared: e.shared,
       categorySlug: e.categorySlug ?? null,
       language: e.language ?? null,
-      occurredAt: e.occurredAt ? new Date(e.occurredAt) : now,
+      // What the HANDSET says happened, clamped: a clock behind by a month
+      // would otherwise write a row the TTL monitor deletes within the minute,
+      // and a clock ahead by years would write one that never expires.
+      occurredAt: clampClientTimestamp(e.occurredAt, now),
+      // What we KNOW: when it reached us. The TTL index expires on this, so
+      // retention is a promise the server keeps rather than one the client can
+      // override by being wrong about the time.
+      receivedAt: now,
     }));
 
     await getDb().collection('readEvents').insertMany(docs);

@@ -6,4 +6,5 @@ export * from './errors.js';
 export * from './permissions.js';
 export * from './notificationGate.js';
 export * from './adPolicy.js';
+export * from './clientClock.js';
 export * from './constants.js';

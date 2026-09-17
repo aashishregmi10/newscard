@@ -113,7 +113,12 @@ const DEVICES: IndexSpec[] = [
 
 const READ_EVENTS: IndexSpec[] = [
   {
-    key: { occurredAt: 1 },
+    // receivedAt, NOT occurredAt. occurredAt comes from the handset, and a TTL
+    // index keyed on a clock we do not control fails silently in both
+    // directions: a slow clock deletes the row within the minute, a fast one
+    // means it never expires. Retention is a privacy commitment, so it is
+    // measured by the one clock we own.
+    key: { receivedAt: 1 },
     name: 'ttl_90d',
     // Behavioural data we no longer need is a liability, not an asset. MongoDB
     // expires these rows without an application job.
@@ -168,7 +173,8 @@ const AD_EVENTS: IndexSpec[] = [
       'whole event collection on each ad served — the one query on the serving hot path',
   },
   {
-    key: { occurredAt: 1 },
+    // Server clock, for the same reason as readEvents above.
+    key: { receivedAt: 1 },
     name: 'ad_events_ttl',
     expireAfterSeconds: AD_EVENT_TTL_DAYS * 24 * 60 * 60,
     serves: 'Automatic expiry of raw events; campaign totals are denormalised and survive',
@@ -195,7 +201,7 @@ const CLIENT_ERRORS: IndexSpec[] = [
     key: { lastSeen: 1 },
     name: 'client_error_ttl',
     expireAfterSeconds: CLIENT_ERROR_TTL_DAYS * 24 * 60 * 60,
-    serves: 'Expiry — long enough to see whether a release fixed something',
+    serves: 'Expiry — lastSeen is set from the server clock, never the report',
   },
 ];
 
