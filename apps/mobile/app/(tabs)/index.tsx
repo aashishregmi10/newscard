@@ -9,6 +9,7 @@ import { CardMenu } from '../../src/components/CardMenu';
 import { NotifPrompt } from '../../src/components/NotifPrompt';
 import { fetchCategories, type Card } from '../../src/api/client';
 import { useSettings } from '../../src/state/SettingsContext';
+import { useNetwork } from '../../src/state/NetworkContext';
 import { useFilters } from '../../src/state/FiltersContext';
 
 /**
@@ -23,12 +24,35 @@ import { useFilters } from '../../src/state/FiltersContext';
  * for moving one step, which is the common case.
  */
 
+/**
+ * The rail to show before the server has answered.
+ *
+ * ── Why this is all seven and not just `top` ────────────────────────────────
+ *
+ * It used to be one entry. When the server could not be reached — it was simply
+ * not running — the app started with a single tab and stayed that way, because
+ * the fetch below runs once on mount and its failure is silent. Every section
+ * vanished, the stories looked lost, and nothing on screen suggested the cause.
+ *
+ * The seven sections are FIXED by specification, not discovered at runtime, so
+ * a bootstrap list is honest rather than a guess. The server stays
+ * authoritative: it decides order, labels and which are active, and overwrites
+ * this the moment it answers. This only has to be right enough to give a reader
+ * with no network the app they had yesterday.
+ */
 const FALLBACK_CATEGORIES: CategoryOption[] = [
   { slug: 'top', label: { ne: 'मुख्य समाचार', en: 'Top Stories' } },
+  { slug: 'nepal', label: { ne: 'नेपाल', en: 'Nepal' } },
+  { slug: 'politics', label: { ne: 'राजनीति', en: 'Politics' } },
+  { slug: 'business', label: { ne: 'अर्थतन्त्र', en: 'Business' } },
+  { slug: 'world', label: { ne: 'विश्व', en: 'World' } },
+  { slug: 'sports', label: { ne: 'खेलकुद', en: 'Sports' } },
+  { slug: 'tech', label: { ne: 'प्रविधि', en: 'Technology' } },
 ];
 
 export default function FeedScreen() {
   const { theme, textScale, dataSaver, languages } = useSettings();
+  const { online } = useNetwork();
   const filters = useFilters();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -63,12 +87,35 @@ export default function FeedScreen() {
   const [menuCard, setMenuCard] = useState<Card | null>(null);
   const pager = useRef<CategoryPagerHandle>(null);
 
+  /**
+   * Load the real sections, and try again when the network comes back.
+   *
+   * Fetched once on mount was not enough. A reader who opens the app before
+   * the connection settles — or while the server is down — kept whatever the
+   * first attempt produced for the whole session, with no way to recover but
+   * force-closing the app. Retrying on `online` costs one request and removes
+   * the only state this screen could get permanently stuck in.
+   */
+  const [categoriesLoaded, setCategoriesLoaded] = useState(false);
+
   useEffect(() => {
-    // Non-fatal: the feed still works on `top` if this never resolves.
+    if (categoriesLoaded || !online) return;
+    let cancelled = false;
+
     fetchCategories()
-      .then((c) => c.length && setCategories(c))
+      .then((c) => {
+        if (cancelled || c.length === 0) return;
+        setCategories(c);
+        setCategoriesLoaded(true);
+      })
+      // Non-fatal: the bootstrap rail above is already usable, and this runs
+      // again the next time connectivity returns.
       .catch(() => undefined);
-  }, []);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [online, categoriesLoaded]);
 
   /** Rail tap → jump the pager. The pager's own callback then updates `index`,
    *  so tap and swipe converge on one source of truth. */
