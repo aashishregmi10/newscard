@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { router } from 'expo-router';
 import { safeNotify, safeNotifySync } from '../lib/pushSupport';
+import { targetFrom, type NotificationData } from '../lib/notificationTarget';
 
 /**
  * Notification tap → the right card.  Spec Ch. 10.7, test N-09.
@@ -20,26 +21,11 @@ import { safeNotify, safeNotifySync } from '../lib/pushSupport';
  *          rarely force-stop the app first.
  */
 
-interface NotificationData {
-  slug?: string;
-  deepLink?: string;
-  type?: string;
-}
-
-/** Accepts either an explicit slug or a `saar://article/<slug>` deep link. */
-function targetFrom(data: NotificationData | undefined): string | null {
-  if (!data) return null;
-  if (typeof data.slug === 'string' && data.slug) return `/article/${data.slug}`;
-
-  if (typeof data.deepLink === 'string') {
-    const m = data.deepLink.match(/^saar:\/\/article\/([^/?#]+)/i);
-    if (m?.[1]) return `/article/${m[1]}`;
-    if (/^saar:\/\/bookmarks/i.test(data.deepLink)) return '/saved';
-    if (/^saar:\/\/settings/i.test(data.deepLink)) return '/settings';
-    if (/^saar:\/\/feed/i.test(data.deepLink)) return '/';
-  }
-  return null;
-}
+/**
+ * `targetFrom` — the decision about WHERE a payload points — lives in
+ * ../lib/notificationTarget, so it can be tested without React Native. What
+ * remains here is the subscription, which cannot be.
+ */
 
 export function useNotificationRouting(): void {
   /** Guards against navigating twice when a cold-start tap also fires the
