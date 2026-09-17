@@ -150,6 +150,9 @@ export interface NotificationRow {
   audience: { languages: string[]; categories: string[] };
   sentAt: string | null;
   stats: { attempted: number; delivered: number; suppressed: number };
+  /** Null until push receipts have been reconciled; until then `delivered`
+   *  means accepted for delivery, which is not the same thing. */
+  receiptsCheckedAt: string | null;
   createdAt: string;
 }
 

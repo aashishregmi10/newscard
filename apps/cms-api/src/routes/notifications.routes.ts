@@ -122,6 +122,11 @@ notificationRoutes.get(
         audience: d.audience,
         sentAt: d.sentAt ? (d.sentAt as Date).toISOString() : null,
         stats: d.stats,
+        // Until receipts are reconciled, stats.delivered is the count Expo
+        // ACCEPTED. The CMS needs to know which of the two it is showing, or it
+        // repeats the overstatement in a nicer font.
+        receiptsCheckedAt:
+          (d as { receiptsCheckedAt?: Date | null }).receiptsCheckedAt?.toISOString() ?? null,
         dispatch: (d as { dispatch?: unknown }).dispatch ?? null,
         createdAt: d.createdAt.toISOString(),
       })),

@@ -51,6 +51,19 @@ function Row({
   return (
     <Wrapper
       onPress={onPress}
+      /**
+       * Only a TAPPABLE row is announced as one control.
+       *
+       * A row whose `right` is a Switch must leave that switch individually
+       * focusable, or a screen-reader user can hear the setting and not change
+       * it — which is worse than an unlabelled control. So grouping is applied
+       * to rows that are themselves buttons, and the switches carry their own
+       * labels at each call site.
+       */
+      accessible={onPress ? true : undefined}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={onPress ? label : undefined}
+      accessibilityHint={onPress ? hint : undefined}
       style={[
         styles.row,
         !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider },
@@ -84,6 +97,12 @@ function Segmented<T extends string>({
           <Pressable
             key={o.key}
             onPress={() => onChange(o.key)}
+            // A segmented control is a radio group: without the role and the
+            // state, a screen reader announces four unrelated buttons and never
+            // says which one is currently chosen.
+            accessibilityRole="radio"
+            accessibilityState={{ selected: on, checked: on }}
+            accessibilityLabel={o.label}
             style={[styles.segItem, on && { backgroundColor: theme.accent }]}
           >
             <Text
@@ -126,6 +145,7 @@ export default function SettingsScreen() {
             theme={t}
             right={
               <Switch
+                accessibilityLabel="नेपाली"
                 value={s.languages.includes('ne')}
                 onValueChange={() => s.toggleLanguage('ne')}
                 trackColor={{ true: t.accent }}
@@ -138,6 +158,7 @@ export default function SettingsScreen() {
             last
             right={
               <Switch
+                accessibilityLabel="English"
                 value={s.languages.includes('en')}
                 onValueChange={() => s.toggleLanguage('en')}
                 trackColor={{ true: t.accent }}
@@ -163,6 +184,7 @@ export default function SettingsScreen() {
             last
             right={
               <Switch
+                accessibilityLabel={ne ? 'डाटा सेभर' : 'Data Saver'}
                 value={s.dataSaver}
                 onValueChange={s.setDataSaver}
                 trackColor={{ true: t.accent }}
@@ -186,13 +208,23 @@ export default function SettingsScreen() {
             theme={t}
             right={
               device.permission === 'undetermined' ? (
-                <Pressable onPress={() => void device.requestPermission()}>
+                <Pressable
+                  onPress={() => void device.requestPermission()}
+                  accessibilityRole="button"
+                  accessibilityLabel={ne ? 'सूचना सुरु गर्नुहोस्' : 'Turn on notifications'}
+                  accessibilityHint={
+                    ne
+                      ? 'फोनले अनुमति सोध्नेछ।'
+                      : 'Your phone will ask for permission.'
+                  }
+                >
                   <Text style={{ color: t.accent, fontWeight: '600' }}>
                     {ne ? 'सुरु गर्नुहोस्' : 'Turn on'}
                   </Text>
                 </Pressable>
               ) : (
                 <Switch
+                  accessibilityLabel={ne ? 'सूचना' : 'Notifications'}
                   value={device.prefs.enabled && device.permission === 'granted'}
                   disabled={device.permission === 'denied'}
                   onValueChange={(v) => device.setPrefs({ enabled: v })}
@@ -206,6 +238,7 @@ export default function SettingsScreen() {
             theme={t}
             right={
               <Switch
+                accessibilityLabel={ne ? 'ठूला समाचार' : 'Breaking news'}
                 value={device.prefs.channels.breaking}
                 disabled={!device.prefs.enabled}
                 onValueChange={(v) => device.setPrefs({ channels: { ...device.prefs.channels, breaking: v } })}
@@ -219,6 +252,7 @@ export default function SettingsScreen() {
             theme={t}
             right={
               <Switch
+                accessibilityLabel={ne ? 'दैनिक सारांश' : 'Daily digest'}
                 value={device.prefs.channels.digest}
                 disabled={!device.prefs.enabled}
                 onValueChange={(v) => device.setPrefs({ channels: { ...device.prefs.channels, digest: v } })}
@@ -231,6 +265,7 @@ export default function SettingsScreen() {
             theme={t}
             right={
               <Switch
+                accessibilityLabel={ne ? 'मन पर्ने विषय' : 'Topics you follow'}
                 value={device.prefs.channels.categories}
                 disabled={!device.prefs.enabled}
                 onValueChange={(v) =>

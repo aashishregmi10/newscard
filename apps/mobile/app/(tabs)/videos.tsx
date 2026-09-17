@@ -156,7 +156,12 @@ export default function VideosScreen() {
         <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
           {error ?? (ne ? 'नयाँ भिडियो आएपछि यहाँ देखिनेछ।' : 'New shorts will appear here.')}
         </Text>
-        <Pressable style={[styles.retry, { borderColor: theme.divider }]} onPress={() => void load()}>
+        <Pressable
+          style={[styles.retry, { borderColor: theme.divider }]}
+          onPress={() => void load()}
+          accessibilityRole="button"
+          accessibilityLabel={ne ? 'भिडियो पुनः लोड गर्नुहोस्' : 'Reload shorts'}
+        >
           <Text style={{ color: theme.accent, fontWeight: '600' }}>
             {ne ? 'पुनः प्रयास' : 'Try again'}
           </Text>

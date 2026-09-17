@@ -399,8 +399,18 @@ export function Notify({ onBack }: Props) {
                     {h.sentAt ? new Date(h.sentAt).toLocaleString() : 'not sent'} · {h.deepLink}
                   </div>
                 </div>
-                <div className="row-right">
+                {/*
+                  * "delivered" only means delivered once receipts have been
+                  * reconciled. Until then it is the count the push service
+                  * ACCEPTED, and labelling that as delivery is how a dashboard
+                  * ends up always reading 100% — which is worse than showing
+                  * nothing, because it gets believed.
+                  */}
+                <div className="row-right" title={h.receiptsCheckedAt ? 'Confirmed by push receipts' : 'Accepted by the push service; receipts not yet reconciled'}>
                   {h.stats.delivered}/{h.stats.attempted}
+                  <div className="row-meta">
+                    {h.receiptsCheckedAt ? 'delivered' : 'accepted'}
+                  </div>
                 </div>
               </div>
             ))}
