@@ -53,6 +53,13 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
+      # Must follow Typecheck: the generator imports the BUILT schemas, and
+      # against a stale dist/ it would report no drift when there is drift.
+      - name: Client types match the schemas
+        run: npm run gen:types
+        env:
+          CI: true
+
       - name: Lint
         run: npm run lint
 

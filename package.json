@@ -30,7 +30,8 @@
     "media:gen": "tsx scripts/gen-images.ts",
     "media:fetch": "tsx scripts/fetch-demo-images.ts",
     "media:videos": "tsx scripts/fetch-demo-videos.ts",
-    "db:migrate": "tsx scripts/migrate-to-atlas.ts"
+    "db:migrate": "tsx scripts/migrate-to-atlas.ts",
+    "gen:types": "tsx scripts/gen-client-types.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

@@ -7,6 +7,7 @@
  */
 
 import Constants from 'expo-constants';
+import type { AdCardDto, ArticleCardDto, VideoCardDto, VideoRendition } from './generated/dto';
 
 /**
  * Where the API lives.
@@ -47,43 +48,26 @@ export function resolveMediaUrl(url: string | null | undefined): string | null {
   return `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 
-export interface CardImage {
-  credit: string;
-  blurHash: string | null;
-  width: number | null;
-  height: number | null;
-  urls: { sm: string | null; md: string | null; lg: string | null };
-}
-
-export interface Card {
-  id: string;
-  slug: string;
-  language: 'ne' | 'en';
-  headline: string;
-  summary: string;
-  pullQuote: string | null;
-  category: { slug: string; label: { ne: string; en: string } };
-  source: { name: string; logoUrl: string | null };
-  author: string | null;
-  originatingAgency: string | null;
-  publisherUrl: string;
-  publishedAt: string;
-  sourcePublishedAt: string | null;
-  image: CardImage | null;
-}
-
-export interface AdCard {
-  kind: 'ad';
-  id: string;
-  campaignId: string;
-  language: 'ne' | 'en';
-  advertiser: string;
-  headline: string;
-  body: string;
-  callToAction: { ne: string; en: string };
-  landingUrl: string;
-  image: { blurHash: string | null; urls: { sm: string | null; md: string | null; lg: string | null } } | null;
-}
+/**
+ * The server’s card shapes.
+ *
+ * GENERATED from packages/schemas — see scripts/gen-client-types.ts. These were
+ * hand-written here until they were not: the app is deliberately outside the
+ * npm workspace (Metro must not find two copies of React), so it could not
+ * import the schemas and kept its own copy instead. The copy agreed with the
+ * server because someone remembered, and nothing failed when someone forgot.
+ *
+ * Now a field added on the server is a compile error here rather than a value
+ * the app silently ignores, and `npm run gen:types` is checked by CI.
+ *
+ * The aliases below keep the names the app already speaks: a `Card` is what the
+ * feed shows, whatever the DTO is called on the wire.
+ */
+export type Card = ArticleCardDto;
+export type CardImage = NonNullable<ArticleCardDto['image']>;
+export type AdCard = AdCardDto;
+export type VideoCard = VideoCardDto;
+export type { VideoRendition } from './generated/dto';
 
 /** A feed entry is either editorial or an ad. Discriminated on `kind` so the
  *  two can never be confused at a call site. */
@@ -266,31 +250,6 @@ export async function postAdEvents(deviceId: string, events: AdEventInput[]): Pr
 }
 
 /* ------------------------------------------------------------------ videos */
-
-export interface VideoRendition {
-  quality: 'low' | 'medium' | 'high';
-  url: string;
-  width: number;
-  height: number;
-  bytes: number;
-}
-
-export interface VideoCard {
-  kind: 'video';
-  id: string;
-  slug: string;
-  language: 'ne' | 'en';
-  title: string;
-  caption: string;
-  durationSeconds: number;
-  posterUrl: string;
-  posterBlurHash: string | null;
-  renditions: VideoRendition[];
-  credit: string;
-  source: { name: string };
-  category: { slug: string; label: { ne: string; en: string } };
-  publishedAt: string;
-}
 
 export interface VideoPage {
   items: VideoCard[];
