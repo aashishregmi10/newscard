@@ -1,4 +1,4 @@
-import { View, Text, StyleSheet, Pressable, Linking, Share } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Share } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRef, memo } from 'react';
@@ -9,6 +9,7 @@ import { relativeTime } from '../lib/relativeTime';
 import { useBookmarks } from '../state/BookmarksContext';
 import { LINE_HEIGHT, TYPE, fontFor, type Theme } from '../theme/tokens';
 import { notePublisherOpen } from '../lib/telemetry';
+import { openArticleInApp } from '../lib/openArticle';
 
 /**
  * One story card.  Spec Ch. 7.2.
@@ -67,7 +68,8 @@ function NewsCardInner({ card, theme, height, textScale, dataSaver, onMenu }: Pr
     // Reported before the browser takes over: once the app is in the
     // background a queued event may never be sent.
     notePublisherOpen(card);
-    void Linking.openURL(card.publisherUrl);
+    // In-app, so dismissing returns to this card rather than to a cold start.
+    void openArticleInApp(card.publisherUrl, theme);
   };
 
   return (

@@ -69,10 +69,49 @@ function VideoCardInner({
   const [allowed, setAllowed] = useState(unmetered && !dataSaver);
   const [ready, setReady] = useState(false);
 
+  /** Paused by the reader, as distinct from paused because it scrolled away. */
+  const [paused, setPaused] = useState(false);
+  const [position, setPosition] = useState(0);
+  const [scrubbing, setScrubbing] = useState(false);
+  const trackWidth = useRef(0);
+
   const player = useVideoPlayer(allowed ? uri : null, (p) => {
     p.loop = true;
     p.muted = true;
   });
+
+  /**
+   * The length to scrub against.
+   *
+   * `durationSeconds` comes from the server and is known before a single byte
+   * of video is fetched, so the bar is the right length from the first frame
+   * rather than snapping when metadata arrives. The player's own duration wins
+   * once it has one, because it is the truth about this file.
+   */
+  const duration = player.duration > 0 ? player.duration : video.durationSeconds;
+
+  /**
+   * Follow playback, but not while the reader has hold of the bar.
+   *
+   * Polled rather than subscribed: a timeUpdate listener fires far more often
+   * than four times a second and every one of them is a React render on a
+   * device we are trying not to make work hard.
+   */
+  useEffect(() => {
+    if (!allowed || !ready || scrubbing) return;
+    const id = setInterval(() => setPosition(player.currentTime), 250);
+    return () => clearInterval(id);
+  }, [allowed, ready, scrubbing, player]);
+
+  const seekTo = (seconds: number): void => {
+    const clamped = Math.max(0, Math.min(duration, seconds));
+    player.currentTime = clamped;
+    setPosition(clamped);
+  };
+
+  /** Where in the clip a touch at `x` points, given the track's width. */
+  const seekFromTouch = (x: number): number =>
+    trackWidth.current > 0 ? (x / trackWidth.current) * duration : 0;
 
   // Mute is a property of the whole tab, not of one card: the reader turns
   // sound on once and it stays on as they scroll.
@@ -89,9 +128,21 @@ function VideoCardInner({
    */
   useEffect(() => {
     if (!allowed) return;
-    if (active) player.play();
+    // Both conditions, and in this order: scrolling away always pauses, and a
+    // reader who paused deliberately stays paused when they scroll back.
+    if (active && !paused) player.play();
     else player.pause();
-  }, [active, allowed, player]);
+  }, [active, allowed, paused, player]);
+
+  /**
+   * Scrolling to another short clears a deliberate pause.
+   *
+   * Otherwise a reader who paused one clip finds the next one silently frozen,
+   * and the cause is three swipes behind them.
+   */
+  useEffect(() => {
+    if (!active) setPaused(false);
+  }, [active]);
 
   const statusRef = useRef(false);
   useEffect(() => {
@@ -156,6 +207,36 @@ function VideoCardInner({
         </View>
       ) : null}
 
+      {/*
+        * Tap anywhere to pause or resume — what the format has trained people
+        * to expect, and reachable wherever the thumb happens to be. Rendered
+        * before the controls below so they sit above it and stay tappable.
+        */}
+      {allowed && ready ? (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => setPaused((p) => !p)}
+          accessibilityRole="button"
+          accessibilityLabel={
+            paused
+              ? video.language === 'ne'
+                ? 'चलाउनुहोस्'
+                : 'Play'
+              : video.language === 'ne'
+                ? 'रोक्नुहोस्'
+                : 'Pause'
+          }
+        >
+          {paused ? (
+            <View style={styles.centre}>
+              <View style={styles.pausedBadge}>
+                <MaterialCommunityIcons name="play" size={30} color="#fff" />
+              </View>
+            </View>
+          ) : null}
+        </Pressable>
+      ) : null}
+
       {/* Sound control. Top right, away from the thumb that is scrolling. */}
       {allowed ? (
         <Pressable
@@ -175,6 +256,74 @@ function VideoCardInner({
       {/* Everything readable sits over a scrim, because footage is
           unpredictable and white text on a bright frame is unreadable. */}
       <View style={styles.scrim} pointerEvents="none" />
+
+      {/*
+        * The scrub bar.
+        *
+        * Wider than it looks: the visible line is 3px, the touch target is 28,
+        * because a 3px target is unusable with a thumb and the alternative is a
+        * bar thick enough to sit on top of the footage.
+        *
+        * Built on the responder system rather than a gesture library — a track
+        * needs press, move and release on one view, which is exactly what the
+        * responder system is, and the alternative would be a dependency for
+        * three callbacks.
+        */}
+      {allowed && ready ? (
+        <View
+          style={styles.trackTouch}
+          onLayout={(e) => {
+            trackWidth.current = e.nativeEvent.layout.width;
+          }}
+          onStartShouldSetResponder={() => true}
+          onMoveShouldSetResponder={() => true}
+          onResponderGrant={(e) => {
+            setScrubbing(true);
+            setPosition(seekFromTouch(e.nativeEvent.locationX));
+          }}
+          onResponderMove={(e) => setPosition(seekFromTouch(e.nativeEvent.locationX))}
+          onResponderRelease={(e) => {
+            // Seek once, on release. Seeking on every move makes the decoder
+            // work far harder than the reader is asking it to.
+            seekTo(seekFromTouch(e.nativeEvent.locationX));
+            setScrubbing(false);
+          }}
+          onResponderTerminate={() => setScrubbing(false)}
+          accessibilityRole="adjustable"
+          accessibilityLabel={video.language === 'ne' ? 'भिडियोको स्थिति' : 'Video position'}
+          accessibilityValue={{
+            min: 0,
+            max: Math.round(duration),
+            now: Math.round(position),
+          }}
+          accessibilityActions={[{ name: 'increment' }, { name: 'decrement' }]}
+          onAccessibilityAction={(e) => {
+            // Five seconds a step: enough to be worth doing on a 90-second clip,
+            // small enough not to overshoot the thing being looked for.
+            if (e.nativeEvent.actionName === 'increment') seekTo(position + 5);
+            if (e.nativeEvent.actionName === 'decrement') seekTo(position - 5);
+          }}
+        >
+          <View style={styles.trackLine}>
+            <View
+              style={[
+                styles.trackFill,
+                { width: `${duration > 0 ? Math.min(100, (position / duration) * 100) : 0}%` },
+              ]}
+            />
+          </View>
+          {/* The handle appears only while scrubbing: a permanent dot on a
+              three-pixel line reads as damage rather than as a control. */}
+          {scrubbing ? (
+            <View
+              style={[
+                styles.trackHandle,
+                { left: `${duration > 0 ? Math.min(100, (position / duration) * 100) : 0}%` },
+              ]}
+            />
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={styles.text}>
         <Text style={styles.meta}>
@@ -251,6 +400,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
 
+  pausedBadge: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+
   scrim: {
     position: 'absolute',
     left: 0,
@@ -258,6 +416,31 @@ const styles = StyleSheet.create({
     bottom: 0,
     height: '52%',
     backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+
+  // 28pt of touch around a 3pt line. The target is the point; the line is only
+  // what the reader sees.
+  trackTouch: {
+    paddingHorizontal: 20,
+    height: 28,
+    justifyContent: 'center',
+  },
+  trackLine: {
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.28)',
+    overflow: 'hidden',
+  },
+  trackFill: { height: 3, borderRadius: 2, backgroundColor: '#fff' },
+  trackHandle: {
+    position: 'absolute',
+    // Centred on the fill: half the handle's width back, plus the track's own
+    // left padding.
+    marginLeft: 20 - 7,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#fff',
   },
 
   text: { paddingHorizontal: 20, paddingBottom: 26 },

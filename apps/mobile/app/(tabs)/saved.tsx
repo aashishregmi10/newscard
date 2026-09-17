@@ -1,9 +1,10 @@
-import { View, Text, FlatList, StyleSheet, Pressable, Linking } from 'react-native';
+import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '../../src/state/SettingsContext';
 import { useBookmarks } from '../../src/state/BookmarksContext';
 import { blurHashAverageColor } from '../../src/api/client';
 import { relativeTime } from '../../src/lib/relativeTime';
+import { openArticleInApp } from '../../src/lib/openArticle';
 
 /**
  * Saved stories.  Spec Ch. 9.4.
@@ -54,7 +55,9 @@ export default function SavedScreen() {
             return (
               <Pressable
                 style={[styles.row, { borderColor: theme.divider, backgroundColor: theme.surfaceRaised }]}
-                onPress={() => void Linking.openURL(item.publisherUrl)}
+                // In-app, same as tapping a card in the feed: a saved story
+                // is the same reader action reached from somewhere else.
+                onPress={() => void openArticleInApp(item.publisherUrl, theme)}
               >
                 <View
                   style={[

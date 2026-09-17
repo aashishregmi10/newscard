@@ -99,6 +99,16 @@ export function CardMenu({
             })
           }
         />
+        {/*
+          * Deliberately the SYSTEM browser, while tapping the card opens the
+          * in-app one.
+          *
+          * Once the two are distinguishable this item means something specific:
+          * take this out of the app, to the browser where I am signed in, where
+          * my extensions are, where I can save it. Making both do the same
+          * thing would be the easier change and would remove a choice the
+          * reader actually has.
+          */}
         <Item
           label={T.browser[lang]}
           onPress={() => void Linking.openURL(card.publisherUrl)}
