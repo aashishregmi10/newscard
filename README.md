@@ -32,8 +32,13 @@ the spec wins and the code is wrong.
 | `apps/worker` | Notification dispatch over Expo Push. Ingestion is **blocked on Gate 1** (see below) |
 | `apps/mobile` | Expo app: feed, category rail, article, shorts, saved, settings, offline cache, notifications |
 
-**192 tests passing** across 12 files. `npm run typecheck`, `npm run lint` and
-`npm run check:forbidden` are clean, and CI runs all four on every push.
+**229 tests passing** — 209 at the root (`npm test`) and 20 in the mobile app
+(`npm run test:mobile`). The app runs its own suite because it is not an npm workspace: its tsconfig
+extends `expo/tsconfig.base`, which resolves only from its own `node_modules`, so the root runner
+cannot transform its files at all.
+
+`npm run typecheck`, `npm run lint`, `npm run gen:types` and `npm run check:forbidden` are clean,
+and CI runs all of them on every push across three jobs.
 
 ---
 

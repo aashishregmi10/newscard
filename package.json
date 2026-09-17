@@ -31,7 +31,8 @@
     "media:fetch": "tsx scripts/fetch-demo-images.ts",
     "media:videos": "tsx scripts/fetch-demo-videos.ts",
     "db:migrate": "tsx scripts/migrate-to-atlas.ts",
-    "gen:types": "tsx scripts/gen-client-types.ts"
+    "gen:types": "tsx scripts/gen-client-types.ts",
+    "test:mobile": "npm test --prefix apps/mobile"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

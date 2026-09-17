@@ -102,6 +102,14 @@ jobs:
         run: npx expo install --check
         working-directory: apps/mobile
 
+      # The app runs its own suite rather than the root one. Its tsconfig
+      # extends expo/tsconfig.base, which resolves only from this directory —
+      # so the root runner cannot transform these files, and the server job
+      # (which installs the workspace, not the app) would fail on them.
+      - name: Test
+        run: npm test
+        working-directory: apps/mobile
+
   cms-web:
     name: Editorial web app
     runs-on: ubuntu-latest
