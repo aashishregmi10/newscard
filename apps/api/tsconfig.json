@@ -5,10 +5,25 @@
     "outDir": "./dist"
   },
   "references": [
-    { "path": "../../packages/shared" },
-    { "path": "../../packages/schemas" },
-    { "path": "../../packages/db" }
+    {
+      "path": "../../packages/shared"
+    },
+    {
+      "path": "../../packages/schemas"
+    },
+    {
+      "path": "../../packages/db"
+    },
+    {
+      "path": "../../packages/http"
+    }
   ],
-  "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist", "src/**/__tests__/**"]
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/__tests__/**"
+  ]
 }

@@ -13,13 +13,15 @@ import { fileURLToPath } from 'node:url';
  */
 loadDotenv({ path: join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.env') });
 import { connect, close, warnIfNoTransactions } from '@saar/db';
-import { drainHttpServer } from '@saar/shared';
+import { createLogger, drainHttpServer } from '@saar/shared';
 import { loadEnv } from './config/index.js';
 import { createApp } from './app.js';
 import { ensureRateLimitIndexes } from './middleware/rateLimit.js';
 
 async function main(): Promise<void> {
   const env = loadEnv();
+  // LOG_LEVEL was validated at boot and then read by nothing. It is read here.
+  const log = createLogger({ level: env.LOG_LEVEL, service: 'api' });
 
   await connect({ uri: env.MONGO_URI });
   // The read API never opens a transaction, so a standalone MongoDB is fine
@@ -29,20 +31,34 @@ async function main(): Promise<void> {
 
   const app = createApp();
   const server = app.listen(env.API_PORT, () => {
-    console.log(`api listening on http://localhost:${env.API_PORT} (${env.NODE_ENV})`);
+    log.info('api listening', {
+      url: `http://localhost:${env.API_PORT}`,
+      env: env.NODE_ENV,
+    });
+  });
+
+  // Without this, a port already in use exits with an unhandled 'error' event
+  // and twenty lines of Node internals — for a condition that has one obvious
+  // cause and one obvious fix. Everything else in this project fails at boot
+  // with a sentence; this should too.
+  server.on('error', (e: NodeJS.ErrnoException) => {
+    if (e.code === 'EADDRINUSE') {
+      log.error(`port ${env.API_PORT} is already in use`, {
+        hint: 'another api process is probably still running; stop it or set API_PORT',
+      });
+      process.exit(1);
+    }
+    throw e;
   });
 
   const shutdown = async (signal: string): Promise<void> => {
-    console.log(`\n${signal} — shutting down`);
+    log.info('shutting down', { signal });
     // Await the drain. server.close() only stops ACCEPTING; exiting without
     // waiting for it killed every request still being served, which on a
     // rolling deploy is a burst of failed reads attributed to nothing.
     const { drained, waitedMs } = await drainHttpServer(server);
-    console.log(
-      drained
-        ? `drained in ${waitedMs}ms`
-        : `gave up draining after ${waitedMs}ms — some requests were cut`,
-    );
+    if (drained) log.info('drained', { waitedMs });
+    else log.warn('gave up draining — some requests were cut', { waitedMs });
     await close();
     process.exit(0);
   };

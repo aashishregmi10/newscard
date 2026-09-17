@@ -28,14 +28,17 @@ import { authRoutes } from './routes/auth.routes.js';
 import { articleRoutes } from './routes/articles.routes.js';
 import { notificationRoutes } from './routes/notifications.routes.js';
 import { clientErrorRoutes } from './routes/clientErrors.routes.js';
-import { drainHttpServer } from '@saar/shared';
+import { createLogger, drainHttpServer } from '@saar/shared';
 import { startDeferredSweep, startReceiptReconciliation } from '@saar/worker';
 import { ensureSessionIndexes } from './auth/session.js';
+import { loadCmsEnv } from './config/index.js';
 
-const PORT = Number(process.env.CMS_PORT ?? 3001);
-const ORIGIN = process.env.CMS_ORIGIN ?? 'http://localhost:5173';
-
-export function createCmsApp() {
+/**
+ * The allowed origin is passed in rather than read from the environment here,
+ * so building the app needs no environment at all — which is what lets a test
+ * mount it in-process.
+ */
+export function createCmsApp(ORIGIN = 'http://localhost:5173') {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', 1);
@@ -76,10 +79,13 @@ export function createCmsApp() {
 }
 
 async function main(): Promise<void> {
-  const uri = process.env.MONGO_URI;
-  if (!uri) throw new Error('MONGO_URI is not set. Copy .env.example to .env first.');
+  // Parsed and validated once, failing at boot with the offending variable
+  // named — rather than surfacing an hour later as NaN in a port or undefined
+  // in a URI.
+  const env = loadCmsEnv();
+  const log = createLogger({ level: env.LOG_LEVEL, service: 'cms-api' });
 
-  await connect({ uri });
+  await connect({ uri: env.MONGO_URI });
   // Publishing no longer requires transactions, so a standalone MongoDB is
   // supported. Warn, because a replica set is still the safer deployment.
   await warnIfNoTransactions();
@@ -96,21 +102,21 @@ async function main(): Promise<void> {
   // stats.delivered was the accepted count wearing the delivered name.
   const stopReceipts = startReceiptReconciliation();
 
-  const server = createCmsApp().listen(PORT, () => {
-    console.log(`cms-api listening on http://localhost:${PORT} (allowing ${ORIGIN})`);
+  const server = createCmsApp(env.CMS_ORIGIN).listen(env.CMS_PORT, () => {
+    log.info('cms-api listening', {
+      url: `http://localhost:${env.CMS_PORT}`,
+      allowingOrigin: env.CMS_ORIGIN,
+    });
   });
 
   const shutdown = async (sig: string) => {
-    console.log(`\n${sig} — shutting down`);
+    log.info('shutting down', { signal: sig });
     stopSweep();
     stopReceipts();
     // See the note in apps/api/src/server.ts: close() only stops accepting.
     const { drained, waitedMs } = await drainHttpServer(server);
-    console.log(
-      drained
-        ? `drained in ${waitedMs}ms`
-        : `gave up draining after ${waitedMs}ms — some requests were cut`,
-    );
+    if (drained) log.info('drained', { waitedMs });
+    else log.warn('gave up draining — some requests were cut', { waitedMs });
     await close();
     process.exit(0);
   };

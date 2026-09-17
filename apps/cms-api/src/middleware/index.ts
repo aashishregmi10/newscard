@@ -1,22 +1,23 @@
-import { randomUUID } from 'node:crypto';
 import type { NextFunction, Request, Response } from 'express';
 import { AppError } from '@saar/shared';
 import { readSession, SESSION_COOKIE } from '../auth/session.js';
 
-declare global {
-  // eslint-disable-next-line @typescript-eslint/no-namespace
-  namespace Express {
-    interface Request {
-      requestId: string;
-    }
-  }
-}
-
-export function requestId(req: Request, res: Response, next: NextFunction): void {
-  req.requestId = randomUUID();
-  res.setHeader('X-Request-Id', req.requestId);
-  next();
-}
+/**
+ * CMS-specific middleware.
+ *
+ * The generic plumbing — request ids, Mongo sanitisation, the error envelope —
+ * is re-exported from @saar/http rather than defined again here. It used to be
+ * defined twice, and the copies had already drifted.
+ *
+ * What remains below is genuinely specific to an authenticated admin tool.
+ */
+export {
+  requestId,
+  sanitizeMongo,
+  errorHandler,
+  notFoundHandler,
+  asyncRoute,
+} from '@saar/http';
 
 /** Attach the session, if any. Does not reject — requireAuth does that. */
 export function attachSession(req: Request, _res: Response, next: NextFunction): void {
@@ -40,54 +41,4 @@ export function requireCsrfHeader(req: Request, _res: Response, next: NextFuncti
     return;
   }
   next();
-}
-
-export function sanitizeMongo(req: Request, _res: Response, next: NextFunction): void {
-  const scrub = (value: unknown, depth = 0): void => {
-    if (depth > 10 || value === null || typeof value !== 'object') return;
-    for (const key of Object.keys(value as Record<string, unknown>)) {
-      if (key.startsWith('$') || key.includes('.')) {
-        delete (value as Record<string, unknown>)[key];
-        continue;
-      }
-      scrub((value as Record<string, unknown>)[key], depth + 1);
-    }
-  };
-  scrub(req.body);
-  scrub(req.params);
-  scrub(req.query);
-  next();
-}
-
-export function errorHandler(err: unknown, req: Request, res: Response, _next: NextFunction): void {
-  if (err instanceof AppError) {
-    res.status(err.status).json(err.toEnvelope(req.requestId));
-    return;
-  }
-  const status =
-    (err as { status?: unknown })?.status ?? (err as { statusCode?: unknown })?.statusCode;
-  if (typeof status === 'number' && status >= 400 && status < 500) {
-    res.status(status).json({
-      error: { code: 'BAD_REQUEST', message: 'The request was malformed.', requestId: req.requestId, details: null },
-    });
-    return;
-  }
-  console.error(`[${req.requestId}] unhandled`, err);
-  res.status(500).json({
-    error: { code: 'INTERNAL', message: 'Something went wrong on our side.', requestId: req.requestId, details: null },
-  });
-}
-
-export function notFoundHandler(req: Request, res: Response): void {
-  res.status(404).json({
-    error: { code: 'NOT_FOUND', message: 'Not found.', requestId: req.requestId, details: null },
-  });
-}
-
-export function asyncRoute(
-  fn: (req: Request, res: Response) => Promise<void>,
-): (req: Request, res: Response, next: NextFunction) => void {
-  return (req, res, next) => {
-    fn(req, res).catch(next);
-  };
 }

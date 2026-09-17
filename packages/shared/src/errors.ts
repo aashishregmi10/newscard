@@ -4,6 +4,12 @@
  * Clients switch on `code`, never on `message` and never on the HTTP status
  * alone. `requestId` is echoed on every response and shown in the app's
  * diagnostic screen, so a user report maps to one line in the logs.
+ *
+ * Every code in this table is CONSTRUCTED somewhere. UPGRADE_REQUIRED (426) and
+ * MAINTENANCE (503) were defined here and never thrown, and a reader cannot
+ * tell a reserved code from a forgotten one — which matters more here than
+ * elsewhere, because this table is the client's entire vocabulary for what can
+ * go wrong. Add them back alongside the flow that raises them.
  */
 
 export const ERROR_CODES = {
@@ -15,10 +21,8 @@ export const ERROR_CODES = {
   INVALID_TRANSITION: { status: 409, message: 'That state change is not allowed.' },
   GONE: { status: 410, message: 'This story was withdrawn.' },
   VALIDATION_FAILED: { status: 422, message: 'The request failed validation.' },
-  UPGRADE_REQUIRED: { status: 426, message: 'Please update the app to continue.' },
   RATE_LIMITED: { status: 429, message: 'Too many requests.' },
   INTERNAL: { status: 500, message: 'Something went wrong on our side.' },
-  MAINTENANCE: { status: 503, message: 'Down for maintenance.' },
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

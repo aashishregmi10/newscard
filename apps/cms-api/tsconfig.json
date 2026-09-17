@@ -16,6 +16,9 @@
     },
     {
       "path": "../worker"
+    },
+    {
+      "path": "../../packages/http"
     }
   ],
   "include": [

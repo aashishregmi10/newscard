@@ -1,13 +1,12 @@
-import type { NextFunction, Request, Response } from 'express';
-import { AppError } from '@saar/shared';
-import { ensureRateCounterIndexes, hitRateCounter } from '@saar/db';
+import { ensureRateCounterIndexes } from '@saar/db';
+import { rateLimit, byIp, byDeviceToken } from '@saar/http';
 
 /**
- * Rate limiting.  Spec Ch. 6.10.
+ * Rate limiting rules for the public read API.  Spec Ch. 6.10.
  *
- * The counter itself lives in @saar/db, because the CMS needs the same one and
- * neither server should import the other. This file is the Express adapter and
- * the table of rules.
+ * The counter lives in @saar/db and the Express adapter in @saar/http. What is
+ * left here is the table of limits, which is where it belongs: a limit is a
+ * product decision about one route, not a property of limiting.
  *
  * ── The Nepal-specific tuning that matters ──────────────────────────────────
  * Carrier-grade NAT is widespread here, so a single apparent IP can be an
@@ -15,65 +14,25 @@ import { ensureRateCounterIndexes, hitRateCounter } from '@saar/db';
  * generously and exist only to blunt crude abuse; the per-device limits do the
  * real work. A limit tuned as though one IP equals one user locks out a whole
  * neighbourhood.
+ *
+ * Every rule here fails OPEN, which is the default: if the counter store is
+ * unavailable, serving the news matters more than enforcing a limit whose
+ * purpose is to blunt abuse. The CMS sign-in limiter answers this the opposite
+ * way, and says why.
  */
 
 /** Kept under its old name — server.ts and the integration suite both call it. */
 export const ensureRateLimitIndexes = ensureRateCounterIndexes;
 
-export interface RateRule {
-  /** Human name, used in the counter key and in logs. */
-  name: string;
-  limit: number;
-  windowMs: number;
-  /** What to count against. Returning null skips the check entirely. */
-  key: (req: Request) => string | null;
-}
-
-export function rateLimit(rule: RateRule) {
-  return (req: Request, res: Response, next: NextFunction): void => {
-    const id = rule.key(req);
-    if (id === null) {
-      next();
-      return;
-    }
-
-    hitRateCounter(rule.name, id, rule.limit, rule.windowMs)
-      .then(({ allowed, retryAfterSec }) => {
-        res.setHeader('X-RateLimit-Limit', String(rule.limit));
-        if (!allowed) {
-          res.setHeader('Retry-After', String(retryAfterSec));
-          next(
-            new AppError('RATE_LIMITED', 'Too many requests. Please slow down.', {
-              retryAfterSec,
-            }),
-          );
-          return;
-        }
-        next();
-      })
-      .catch(() => {
-        // FAIL OPEN. If the counter store is unavailable, serving news is more
-        // important than enforcing a limit whose purpose is to blunt abuse. A
-        // rate limiter that takes the site down when its database hiccups has
-        // caused a worse outage than the one it was preventing.
-        next();
-      });
-  };
-}
-
-const ip = (req: Request): string => req.ip ?? 'unknown';
-const deviceToken = (req: Request): string | null => {
-  const auth = req.get('authorization');
-  if (!auth?.startsWith('Bearer ')) return null;
-  return auth.slice(7, 39); // a prefix is enough to bucket by, and logs less
-};
+export type { RateRule } from '@saar/http';
+export { rateLimit } from '@saar/http';
 
 /** Generous: one IP may be a whole CGNAT cell (see header note). */
 export const publicReadLimit = rateLimit({
   name: 'read',
   limit: 120,
   windowMs: 60_000,
-  key: ip,
+  key: byIp,
 });
 
 /**
@@ -88,7 +47,7 @@ export const eventsLimit = rateLimit({
   name: 'events',
   limit: 30,
   windowMs: 60_000,
-  key: (req) => deviceToken(req) ?? ip(req),
+  key: byDeviceToken,
 });
 
 /**
@@ -102,7 +61,7 @@ export const adEventsLimit = rateLimit({
   name: 'adevents',
   limit: 20,
   windowMs: 60_000,
-  key: (req) => deviceToken(req) ?? ip(req),
+  key: byDeviceToken,
 });
 
 /**
@@ -117,12 +76,12 @@ export const clientErrorLimit = rateLimit({
   name: 'cerr',
   limit: 60,
   windowMs: 60_000,
-  key: ip,
+  key: byIp,
 });
 
 export const deviceRegisterLimit = rateLimit({
   name: 'devreg',
   limit: 10,
   windowMs: 60 * 60_000,
-  key: ip,
+  key: byIp,
 });
