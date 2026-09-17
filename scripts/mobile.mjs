@@ -325,13 +325,28 @@ async function checkApi() {
     return ok('read API is up on port 3000');
   }
 
-  console.log(
-    `  ${c.yellow('note')}  the read API is NOT running on port 3000.
-` +
-      `        ${c.dim('The app will show "Could not reach the server" and fall back to cached stories.')}
-` +
-      `        ${c.dim('Start it in a second terminal:  npm run dev:api')}`,
-  );
+  /**
+   * Loud, not a note.
+   *
+   * This is the commonest way the app looks broken while being fine: Metro is
+   * up, the app loads, the feed is empty or stale, and the reason is a server
+   * nobody started. It has already cost one session — the stories were all
+   * present in the database the whole time and looked lost.
+   *
+   * It stays a warning rather than a failure, because starting Metro without
+   * the API is legitimate when you are working on the offline path.
+   */
+  console.log('');
+  console.log(`  ${c.red('╭───────────────────────────────────────────────────────────────╮')}`);
+  console.log(`  ${c.red('│')} ${c.bold('The read API is NOT running.')}                                 ${c.red('│')}`);
+  console.log(`  ${c.red('│')}                                                               ${c.red('│')}`);
+  console.log(`  ${c.red('│')} The app will load and show an empty or stale feed. Nothing    ${c.red('│')}`);
+  console.log(`  ${c.red('│')} is lost — it simply has no server to fetch from.              ${c.red('│')}`);
+  console.log(`  ${c.red('│')}                                                               ${c.red('│')}`);
+  console.log(`  ${c.red('│')} Stop this and run ${c.bold('npm run demo')} instead — it starts the API,   ${c.red('│')}`);
+  console.log(`  ${c.red('│')} the CMS and the editorial site together.                      ${c.red('│')}`);
+  console.log(`  ${c.red('╰───────────────────────────────────────────────────────────────╯')}`);
+  console.log('');
 }
 
 /** A Metro left running from a previous session holds the port and confuses the app. */
