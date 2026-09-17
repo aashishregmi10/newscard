@@ -180,8 +180,16 @@ workspaces are adequate here. Switching later is: delete `node_modules`, add `pn
 `pnpm install`. The trade-off accepted meanwhile is no strict linking, so an undeclared
 (phantom) dependency will not be caught.
 
-**Known dependency debt.** `npm audit` reports a moderate advisory in `qs`, reached through
-Express 4. It is fixed in `qs@6.16.0`, which Express 4 does not allow; the real remedy is Express 5,
-whose breaking change (`req.query` becomes a getter) the middleware is already written to survive.
-Vitest 2 also carries advisories that Vitest 3 fixes. Neither is urgent, and both are version bumps
-that deserve their own change rather than riding along with a feature.
+**Known dependency debt.** Two moderate advisories remain, both blocked on things outside this
+repository:
+
+- **`qs`**, reached through Express. Fixed in `qs@6.16.0`. Express 5 and body-parser 2 both *permit*
+  that version (`^6.14.0` and `^6.15.2`), so an `overrides` entry ought to resolve it — but npm on
+  this machine does not apply the `overrides` field at all, even after deleting the lockfile and
+  regenerating. It is written down here rather than left as a surprise; it clears by itself the
+  moment Express ships a release that resolves `qs` higher.
+- **`@vitest/mocker`**, dev-only. `npm audit` reports the first fixed version as Vitest **4.1.11** —
+  another major, so it waits for a deliberate upgrade rather than riding along with a feature.
+
+Both were worse before: Vitest 2 carried a *critical* (arbitrary file read via the UI server) and a
+*high* (a Vite path traversal), and both were cleared by moving to Vitest 3.

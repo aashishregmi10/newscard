@@ -147,16 +147,24 @@ with a large payoff, and it is a prerequisite for everything else here.
 
 ### ⚠️ Medium — outstanding dependency advisories
 
-| Advisory | Severity | Path | Remedy |
+| Advisory | Severity | Path | Status |
 |---|---|---|---|
-| `qs` array-limit bypass + DoS | Moderate | Express 4 → `qs ~6.15.1` | Express 5 (patched `qs` is 6.16.0, outside Express 4's range) |
-| Vitest UI arbitrary file read; mocker path traversal | **Critical** (dev only) | `vitest@2` | Vitest 3 |
-| Vite path traversal | High (dev only) | via Vitest 2 | Vitest 3 |
+| Vitest UI arbitrary file read | **Critical** (dev) | `vitest@2` | **Cleared** — Vitest 3 |
+| Vite path traversal | High (dev) | via `vitest@2` | **Cleared** — Vitest 3 |
+| `@vitest/mocker` path traversal | Moderate (dev) | `vitest` | Open; first fixed release is Vitest **4.1.11** |
+| `qs` array-limit bypass + DoS | Moderate | Express → `qs` | Open; see below |
 
-Neither is exploitable in the current deployment — the Vitest ones require running the UI server,
-and the `qs` issues need specific query shapes — but "not currently exploitable" is a weaker
-position than "patched", and both fixes are version bumps rather than redesigns. The middleware is
-already written to survive the Express 5 `req.query` change.
+> **A correction.** An earlier draft of this document said the `qs` remedy was Express 5, on the
+> reasoning that Express 4 pinned `~6.15.1` and so excluded the patched 6.16.0. Express 5 was
+> adopted and the advisory **did not clear**: 5.2.1 resolves `qs@6.15.3` too. Express 5 and
+> body-parser 2 do at least *permit* 6.16.0 (`^6.14.0` and `^6.15.2`), so an `overrides` entry
+> should settle it — but npm on this machine does not apply the `overrides` field at all, verified
+> by deleting the lockfile and regenerating. The upgrade was still worth doing; it just did not buy
+> what was claimed.
+
+Neither remaining advisory is exploitable in the current deployment — the Vitest one needs the UI
+server, and the `qs` issues need specific query shapes — but "not currently exploitable" is a weaker
+position than "patched".
 
 ### ⚠️ Medium — accessibility is partial
 
