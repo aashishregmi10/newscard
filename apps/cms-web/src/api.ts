@@ -55,6 +55,67 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   return body as T;
 }
 
+/**
+ * Multipart upload.
+ *
+ * A sibling of req() rather than an option on it, because the difference is not
+ * a flag: the browser must set Content-Type itself so it can include the
+ * multipart boundary, and req() always sends application/json. Setting it by
+ * hand produces a request the server cannot parse and an error that says
+ * nothing useful.
+ */
+async function upload<T>(path: string, form: FormData): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(BASE + path, {
+      method: 'POST',
+      body: form,
+      credentials: 'include',
+      headers: { 'X-Requested-With': 'newscard-cms' },
+    });
+  } catch {
+    throw new ApiError('Cannot reach the CMS server. Is it running?', 'NETWORK', 0, null);
+  }
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    const e = body?.error;
+    throw new ApiError(
+      e?.message ?? `Upload failed (${res.status})`,
+      e?.code ?? 'UNKNOWN',
+      res.status,
+      e?.details ?? null,
+    );
+  }
+  return body as T;
+}
+
+export type ImageLicence = 'publisher_licensed' | 'agency' | 'cc_by' | 'own';
+
+export interface ArticleImageData {
+  credit: string;
+  licence: ImageLicence;
+  blurHash: string | null;
+  width: number | null;
+  height: number | null;
+  urls: { sm: string | null; md: string | null; lg: string | null };
+}
+
+/** What the transcoder returns: three renditions the player chooses between. */
+export interface UploadedVideo {
+  key: string;
+  durationSeconds: number;
+  posterUrl: string;
+  posterBlurHash: string;
+  credit: string;
+  renditions: Array<{
+    quality: 'low' | 'medium' | 'high';
+    url: string;
+    width: number;
+    height: number;
+    bytes: number;
+  }>;
+}
+
 export interface Staff {
   staffId: string;
   email: string;
@@ -97,6 +158,7 @@ export interface ArticleDetail {
   editorialNotes: string | null;
   revisionCount: number;
   measured: number;
+  image: ArticleImageData | null;
 }
 
 export interface ClusterSibling {
@@ -188,7 +250,16 @@ export const api = {
       `/cms/articles/${id}`,
     ),
 
-  save: (id: string, patch: { headline?: string; summary?: string; pullQuote?: string | null }) =>
+  save: (
+    id: string,
+    patch: {
+      headline?: string;
+      summary?: string;
+      pullQuote?: string | null;
+      /** null removes the image, which is how an editor changes their mind. */
+      image?: ArticleImageData | null;
+    },
+  ) =>
     req<{ ok: true; savedAt: string }>(`/cms/articles/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(patch),
@@ -205,6 +276,28 @@ export const api = {
       `/cms/articles/${id}/publish`,
       { method: 'POST', body: JSON.stringify({}) },
     ),
+
+  /**
+   * Upload a photograph and get back the three renditions.
+   *
+   * It does NOT attach them to the article — the composer holds the result and
+   * saves it, so an upload the editor then abandons leaves an orphaned key
+   * rather than a half-edited story.
+   */
+  uploadImage: (file: File, credit: string, licence: ImageLicence) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('credit', credit);
+    form.append('licence', licence);
+    return upload<{ image: ArticleImageData }>('/cms/media/image', form);
+  },
+
+  uploadVideo: (file: File, credit: string) => {
+    const form = new FormData();
+    form.append('file', file);
+    form.append('credit', credit);
+    return upload<{ video: UploadedVideo }>('/cms/media/video', form);
+  },
 
   notifyTargets: () => req<NotifyTargets>('/cms/notifications/targets'),
 

@@ -1,5 +1,13 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { api, ApiError, type ArticleDetail, type ClusterSibling, type Limits } from '../api';
+import {
+  api,
+  ApiError,
+  type ArticleDetail,
+  type ArticleImageData,
+  type ClusterSibling,
+  type Limits,
+} from '../api';
+import { ImagePicker } from './ImagePicker';
 
 /**
  * The composer.  Spec Ch. 5.4.
@@ -62,6 +70,7 @@ export function Composer({ id, onBack }: Props) {
   const [limits, setLimits] = useState<Limits | null>(null);
   const [headline, setHeadline] = useState('');
   const [summary, setSummary] = useState('');
+  const [image, setImage] = useState<ArticleImageData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [save, setSave] = useState<SaveState>('idle');
@@ -81,13 +90,14 @@ export function Composer({ id, onBack }: Props) {
         setLimits(r.limits);
         setHeadline(r.article.headline);
         setSummary(r.article.summary);
+        setImage(r.article.image);
         dirty.current = false;
       })
       .catch((e: ApiError) => setError(e.message));
   }, [id]);
 
   const persist = useCallback(
-    async (patch: { headline?: string; summary?: string }) => {
+    async (patch: { headline?: string; summary?: string; image?: ArticleImageData | null }) => {
       setSave('saving');
       try {
         await api.save(id, patch);
@@ -105,7 +115,7 @@ export function Composer({ id, onBack }: Props) {
   /** Autosave 1.5s after typing stops (Ch. 5.6). Long enough not to fire on
    *  every keystroke, short enough that a closed tab loses almost nothing. */
   const scheduleSave = useCallback(
-    (patch: { headline?: string; summary?: string }) => {
+    (patch: { headline?: string; summary?: string; image?: ArticleImageData | null }) => {
       dirty.current = true;
       setSave('idle');
       if (timer.current) clearTimeout(timer.current);
@@ -249,6 +259,21 @@ export function Composer({ id, onBack }: Props) {
               </div>
             )}
           </div>
+
+          {/*
+            * Saved immediately rather than on the autosave timer. An upload is
+            * a deliberate act with a visible result, and leaving it unsaved for
+            * 1.5 seconds means a closed tab loses a file the editor watched
+            * finish uploading.
+            */}
+          <ImagePicker
+            image={image}
+            disabled={busy}
+            onChange={(next) => {
+              setImage(next);
+              void persist({ image: next });
+            }}
+          />
 
           <div className="actions">
             <button

@@ -3,7 +3,7 @@ import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { collections, getDb } from '@saar/db';
 import { AppError, measureSummary, countGraphemes, countWords, type LimitType } from '@saar/shared';
-import { ArticleStatusEnum, DEFAULT_CONFIG } from '@saar/schemas';
+import { ArticleStatusEnum, DEFAULT_CONFIG, ImageLicenceEnum } from '@saar/schemas';
 import { requireRole, requireAuth } from '../auth/requireRole.js';
 import { asyncRoute } from '../middleware/index.js';
 import { transitionArticle } from '../services/transition.service.js';
@@ -118,10 +118,52 @@ articleRoutes.get(
   }),
 );
 
+/**
+ * A media URL, relative OR absolute.
+ *
+ * `ArticleImage.urls` in @saar/schemas uses `z.string().url()`, which a
+ * relative path fails — and relative is what this system deliberately stores
+ * outside production, so the URLs survive the development machine's IP
+ * changing. Production sets CDN_BASE_URL and they become absolute.
+ *
+ * Declared here rather than by loosening the shared schema: that one is the
+ * storage contract and the DTO-leak test asserts against it.
+ */
+const MediaUrl = z
+  .string()
+  .min(1)
+  .refine((u) => u.startsWith('/') || /^https?:\/\//i.test(u), {
+    message: 'must be an absolute URL or a path beginning with /',
+  });
+
+/**
+ * The image, as the composer sends it back after an upload.
+ *
+ * Credit and licence are required whenever there is an image at all, because
+ * an uncredited photograph is the highest legal risk this product carries and
+ * publishing refuses one without a recognised licence. Setting `image` to null
+ * removes it, which is how an editor changes their mind.
+ */
+const ImagePatch = z
+  .object({
+    credit: z.string().min(1),
+    licence: ImageLicenceEnum,
+    blurHash: z.string().min(6).nullable().optional(),
+    width: z.number().int().positive().nullable().optional(),
+    height: z.number().int().positive().nullable().optional(),
+    urls: z.object({
+      sm: MediaUrl.nullable().optional(),
+      md: MediaUrl.nullable().optional(),
+      lg: MediaUrl.nullable().optional(),
+    }),
+  })
+  .nullable();
+
 const PatchSchema = z.object({
   headline: z.string().min(1).max(90).optional(),
   summary: z.string().min(1).max(1200).optional(),
   pullQuote: z.string().max(70).nullable().optional(),
+  image: ImagePatch.optional(),
 });
 
 /** PATCH /cms/articles/:id — autosave from the composer. */
