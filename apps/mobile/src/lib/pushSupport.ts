@@ -130,7 +130,16 @@ export function configurePushRuntime(): void {
       .setNotificationChannelAsync('default', {
         name: 'News alerts',
         importance: n.AndroidImportance.HIGH,
-        sound: 'default',
+        // No `sound` key. On a CHANNEL it names a custom sound FILE that must
+        // be bundled through the expo-notifications plugin, so passing
+        // 'default' makes it hunt for a file called "default" and log:
+        //
+        //   Custom sound 'default' not found in native app
+        //
+        // Omitting it is what selects the system notification sound. The word
+        // 'default' only means "the normal sound" in the push MESSAGE payload,
+        // which is a different API — see apps/worker/src/push/expoPush.ts,
+        // where it is correct and stays.
         vibrationPattern: [0, 250, 250, 250],
         lockscreenVisibility: n.AndroidNotificationVisibility.PUBLIC,
       })
