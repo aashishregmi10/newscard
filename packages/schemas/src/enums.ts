@@ -38,6 +38,40 @@ export type DraftSource = z.infer<typeof DraftSourceEnum>;
 export const IngestMethodEnum = z.enum(['rss', 'api', 'manual']);
 export type IngestMethod = z.infer<typeof IngestMethodEnum>;
 
+/**
+ * On what basis we read a publisher's feed.
+ *
+ * -- Why this exists separately from the licence ----------------------------
+ *
+ * One field was answering two different questions, and they have different
+ * answers:
+ *
+ *   May we POLL them for leads?      A public feed is enough.
+ *   May we PUBLISH a summary?        Needs an agreement. Always.
+ *
+ * Reading a feed a publisher chose to syndicate, in order to learn that a story
+ * exists, is not the same act as reproducing it. A lead here is a headline, a
+ * link and a timestamp — a reference, never content, and never shown to a
+ * reader. `agreement` is the stricter basis and remains the default, so an
+ * existing source keeps exactly the behaviour it had.
+ *
+ * The publish gate is untouched by this and still demands `licence.status ===
+ * 'agreed'`. Nothing reaches a reader on the strength of a public feed.
+ */
+export const IngestBasisEnum = z.enum(['agreement', 'public_feed']);
+export type IngestBasis = z.infer<typeof IngestBasisEnum>;
+
+/**
+ * What has happened to an incoming lead.
+ *
+ * `new` until an editor acts on it. `promoted` once it has become a draft, and
+ * the draft's id is kept so the same story is never offered twice. `dismissed`
+ * when it is not for us — also kept, because a lead that reappears on every
+ * poll after being rejected is worse than one that was never fetched.
+ */
+export const LeadStatusEnum = z.enum(['new', 'promoted', 'dismissed']);
+export type LeadStatus = z.infer<typeof LeadStatusEnum>;
+
 export const StaffRoleEnum = z.enum(['author', 'reviewer', 'admin']);
 export type StaffRole = z.infer<typeof StaffRoleEnum>;
 

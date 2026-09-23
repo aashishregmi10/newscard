@@ -2,6 +2,7 @@ export * from './enums.js';
 export * from './common.js';
 export * from './article.js';
 export * from './source.js';
+export * from './lead.js';
 export * from './category.js';
 export * from './device.js';
 export * from './staff.js';

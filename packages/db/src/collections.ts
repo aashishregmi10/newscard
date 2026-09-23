@@ -5,6 +5,7 @@ import type {
   Device,
   Notification,
   ReadEvent,
+  Lead,
   Source,
   Staff,
   AuditRecord,
@@ -43,6 +44,12 @@ export type ArticleDoc = WithId<
   }
 >;
 export type SourceDoc = WithId<Source>;
+/** `sourceId` and `promotedArticleId` are ObjectId in storage, hex at the API. */
+export type LeadDoc = WithId<
+  Omit<IdFieldsAsObjectId<Lead, 'sourceId'>, 'promotedArticleId'> & {
+    promotedArticleId: ObjectId | null;
+  }
+>;
 export type CategoryDoc = WithId<Category>;
 export type DeviceDoc = WithId<Device>;
 export type StaffDoc = WithId<Staff>;
@@ -59,6 +66,7 @@ export type ConfigDoc = WithId<AppConfig & { _key: 'singleton' }>;
 export interface Collections {
   articles: Collection<ArticleDoc>;
   sources: Collection<SourceDoc>;
+  leads: Collection<LeadDoc>;
   categories: Collection<CategoryDoc>;
   devices: Collection<DeviceDoc>;
   staff: Collection<StaffDoc>;
@@ -72,6 +80,7 @@ export function collections(db: Db): Collections {
   return {
     articles: db.collection<ArticleDoc>('articles'),
     sources: db.collection<SourceDoc>('sources'),
+    leads: db.collection<LeadDoc>('leads'),
     categories: db.collection<CategoryDoc>('categories'),
     devices: db.collection<DeviceDoc>('devices'),
     staff: db.collection<StaffDoc>('staff'),
@@ -85,6 +94,7 @@ export function collections(db: Db): Collections {
 export const COLLECTION_NAMES = [
   'articles',
   'sources',
+  'leads',
   'categories',
   'devices',
   'staff',

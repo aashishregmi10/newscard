@@ -80,6 +80,53 @@ const SOURCES: IndexSpec[] = [
   },
 ];
 
+const LEADS: IndexSpec[] = [
+  {
+    key: { canonicalUrl: 1 },
+    name: 'lead_url_unique',
+    unique: true,
+    serves: 'Ingestion dedup — the same story must not be offered twice',
+  },
+  {
+    /* The triage screen: new leads, newest first. Status is an equality match
+       so it leads; fetchedAt carries the sort. Reordering these makes the
+       default view a collection scan. */
+    key: { status: 1, fetchedAt: -1 },
+    name: 'lead_triage',
+    serves: 'GET /cms/leads — the triage queue',
+  },
+  {
+    key: { sourceId: 1, fetchedAt: -1 },
+    name: 'lead_by_source',
+    serves: 'Per-publisher lead history and volume checks',
+  },
+  {
+    key: { fingerprint: 1 },
+    name: 'lead_fingerprint',
+    serves: 'Catching a story re-issued under a new URL',
+  },
+  {
+    key: { clusterKey: 1 },
+    name: 'lead_cluster',
+    sparse: true,
+    serves: 'Grouping the same story from several publishers',
+  },
+  {
+    /*
+     * Expiry keyed on a date this server sets at write time.
+     *
+     * Note the contrast with the three TTLs the engineering review flagged as a
+     * High finding: those are keyed on a client-supplied clock, so a handset
+     * with a wrong date controls its own retention. Nothing client-side ever
+     * touches `purgeAt`.
+     */
+    key: { purgeAt: 1 },
+    name: 'lead_expiry',
+    expireAfterSeconds: 0,
+    serves: 'A lead nobody acted on is not an asset — it expires',
+  },
+];
+
 const CATEGORIES: IndexSpec[] = [
   { key: { slug: 1 }, name: 'category_slug_unique', unique: true, serves: 'Category lookup' },
   { key: { order: 1 }, name: 'category_order', serves: 'GET /v1/categories — display order' },
@@ -222,6 +269,7 @@ const VIDEOS: IndexSpec[] = [
 export const ALL_INDEXES = {
   articles: ARTICLES,
   sources: SOURCES,
+  leads: LEADS,
   categories: CATEGORIES,
   devices: DEVICES,
   readEvents: READ_EVENTS,

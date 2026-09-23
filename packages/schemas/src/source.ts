@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { IngestMethodEnum, LanguageEnum, LicenceStatusEnum } from './enums.js';
+import { IngestBasisEnum, IngestMethodEnum, LanguageEnum, LicenceStatusEnum } from './enums.js';
 
 /**
  * The `sources` collection.  Spec Ch. 3.5.
@@ -21,6 +21,13 @@ export const SourceLicence = z.object({
 
 export const SourceIngest = z.object({
   method: IngestMethodEnum,
+  /**
+   * On what basis we read this feed. See IngestBasisEnum.
+   *
+   * Defaults to `agreement`, the stricter of the two, so a source written
+   * before this field existed keeps exactly the behaviour it had.
+   */
+  basis: IngestBasisEnum.default('agreement'),
   feedUrl: z.string().url().nullable().optional(),
   /** Never below 5, clamped in code and not only in the admin UI (Ch. 4.4). */
   pollIntervalMin: z.number().int().min(5).default(15),
@@ -64,7 +71,32 @@ export const Source = z
   });
 export type Source = z.infer<typeof Source>;
 
-/** The one predicate that decides whether we may ingest from a publisher. */
-export function isPollable(s: { isActive: boolean; licence: { status: string }; ingest: { method: string } }): boolean {
-  return s.isActive && s.licence.status === 'agreed' && (s.ingest.method === 'rss' || s.ingest.method === 'api');
+/**
+ * The one predicate that decides whether we may ingest from a publisher.
+ *
+ * -- Why this is not the same question as "may we publish" -------------------
+ *
+ * It used to demand `licence.status === 'agreed'`, which made it identical to
+ * the publish gate — and that is what made ingestion unbuildable while Gate 1
+ * was open. Reading a feed a publisher chose to syndicate, to learn that a
+ * story exists, is not the act of reproducing it. A lead is a headline, a link
+ * and a timestamp; it is shown to an editor and never to a reader.
+ *
+ * So there are two gates now, and they are deliberately different strengths:
+ *
+ *   this               → may we FETCH a reference?   public feed is enough
+ *   publish.service.ts → may we PUBLISH a summary?   agreement, always
+ *
+ * `basis` defaults to `agreement`, so a source that predates the field behaves
+ * exactly as it did. Nothing about publication changed.
+ */
+export function isPollable(s: {
+  isActive: boolean;
+  licence: { status: string };
+  ingest: { method: string; basis?: string };
+}): boolean {
+  if (!s.isActive) return false;
+  if (s.ingest.method !== 'rss' && s.ingest.method !== 'api') return false;
+  if ((s.ingest.basis ?? 'agreement') === 'public_feed') return true;
+  return s.licence.status === 'agreed';
 }

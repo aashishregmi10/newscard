@@ -90,11 +90,42 @@ export const sourceValidator: MongoValidator = {
         required: ['method', 'pollIntervalMin'],
         properties: {
           method: { enum: ['rss', 'api', 'manual'] },
+          // The legal basis on which we read this feed. Absent on documents
+          // written before the field existed, which `isPollable` reads as the
+          // stricter 'agreement'.
+          basis: { enum: ['agreement', 'public_feed'] },
           // Politeness clamp lives in code AND here, so a direct database edit
           // cannot configure a 1-minute poll against a publisher.
           pollIntervalMin: { bsonType: 'int', minimum: 5 },
         },
       },
+    },
+  },
+};
+
+/**
+ * `leads` — what the collector found.
+ *
+ * `canonicalUrl` is required and pattern-checked at the database because it is
+ * the dedup key AND the link a reader eventually taps. A lead that reached
+ * storage with a `javascript:` URL would be an href we put on a page.
+ *
+ * Note what is NOT required: headline aside, every field the publisher supplied
+ * is optional, because feeds omit things constantly and a missing extract is
+ * not a reason to lose the story.
+ */
+export const leadValidator: MongoValidator = {
+  $jsonSchema: {
+    bsonType: 'object',
+    required: ['sourceId', 'canonicalUrl', 'headline', 'language', 'status', 'fetchedAt', 'purgeAt'],
+    properties: {
+      canonicalUrl: { bsonType: 'string', pattern: '^https?://' },
+      headline: { bsonType: 'string', minLength: 1, maxLength: 300 },
+      language: { enum: ['ne', 'en'] },
+      status: { enum: ['new', 'promoted', 'dismissed'] },
+      fetchedAt: { bsonType: 'date' },
+      // Server-set, never client-supplied. Drives the TTL index.
+      purgeAt: { bsonType: 'date' },
     },
   },
 };
@@ -149,6 +180,7 @@ export const staffValidator: MongoValidator = {
 export const COLLECTION_VALIDATORS = {
   articles: articleValidator,
   sources: sourceValidator,
+  leads: leadValidator,
   categories: categoryValidator,
   devices: deviceValidator,
   staff: staffValidator,

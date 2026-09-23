@@ -2,6 +2,7 @@ export * from './cursor.js';
 export * from './grapheme.js';
 export * from './devanagari.js';
 export * from './similarity.js';
+export * from './feedParse.js';
 export * from './errors.js';
 export * from './permissions.js';
 export * from './notificationGate.js';
