@@ -295,7 +295,7 @@ export function Queue({ page, perPage, search, onCount }: QueueProps) {
 
   if (error !== null) {
     return (
-      <div className="page">
+      <div className="page page-list">
         <Head total={null} limits={null} />
         <Banner tone="error">{error}</Banner>
         <div className="actions actions-plain">
@@ -309,7 +309,7 @@ export function Queue({ page, perPage, search, onCount }: QueueProps) {
 
   if (loading || matched === null) {
     return (
-      <div className="page">
+      <div className="page page-list">
         <Head total={null} limits={null} />
         <QueueSkeleton />
       </div>
@@ -319,7 +319,7 @@ export function Queue({ page, perPage, search, onCount }: QueueProps) {
   const searching = search.trim() !== '';
 
   return (
-    <div className="page">
+    <div className="page page-list">
       <Head total={all?.length ?? 0} limits={data?.limits ?? null} />
 
       <div className="toolbar">

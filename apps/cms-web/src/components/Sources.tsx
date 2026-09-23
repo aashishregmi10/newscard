@@ -138,7 +138,7 @@ export function Sources({ tab, page, perPage, search, role }: SourcesProps) {
   const searching = search.trim() !== '';
 
   return (
-    <div className="page">
+    <div className="page page-list">
       <h1 className="sr-only">Publishers</h1>
       <div className="detail-bar">
         <Breadcrumbs items={crumbs({ label: 'Publishers' })} showBack={false} />

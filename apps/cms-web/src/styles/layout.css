@@ -337,6 +337,39 @@
   margin-inline: auto;
 }
 
+/*
+ * A form that holds two fields side by side.
+ *
+ * 720px is a one-field column: put two 6-column fields in it and each is about
+ * 340px, which is narrower than a publisher name reads comfortably. 1180px
+ * gives each of them roughly 560px, and still stops well short of the full
+ * 1900px, where a row of fields becomes something nobody can scan across.
+ *
+ * So this is not "wider because there was room". It is the narrowest width at
+ * which the two-column arrangement is actually better than one column.
+ */
+.page-form {
+  max-width: 1180px;
+  margin-inline: auto;
+}
+
+/*
+ * A list of rows.
+ *
+ * Wider than a form and still bounded, because the two are limited by
+ * different things. A form's measure is set by how wide one field needs to
+ * be to read a publisher name in: about 560px, so 1180px for two of them.
+ * A list's is set by how far the eye has to travel from the title on the
+ * left to the badge on the right — and at 1900px that gap is most of a
+ * screen of nothing, with the row it belongs to hard to follow across it.
+ *
+ * So there are two numbers here rather than one, and that is the reason.
+ */
+.page-list {
+  max-width: 1440px;
+  margin-inline: auto;
+}
+
 /* ── Page header ──────────────────────────────────────────────────────────── */
 
 .page-head {

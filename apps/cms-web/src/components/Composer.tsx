@@ -98,7 +98,7 @@ function ComposerSkeleton() {
             <Skeleton height={170} style={{ marginTop: 10 }} />
           </div>
         </div>
-        <div className="panel">
+        <div className="panel sticky-aside">
           <div className="panel-body">
             <Skeleton height={11} width={110} style={{ marginBottom: 16 }} />
             <Skeleton height={13} />
@@ -406,7 +406,7 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
                 className="textarea textarea-prose"
                 lang={language}
                 value={summary}
-                rows={9}
+                rows={7}
                 onChange={(e) => {
                   setSummary(e.target.value);
                   scheduleSave();
@@ -484,7 +484,7 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
           </p>
         </Panel>
 
-        <div className="panel">
+        <div className="panel sticky-aside">
           <div className="panel-body">
             <Tabs
               tabs={tabs}

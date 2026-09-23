@@ -3,6 +3,7 @@ import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useResource } from '../hooks/useResource';
 import { crumbs } from '../lib/crumbs';
 import { relativeTime } from '../lib/format';
+import { mediaUrl } from '../lib/media';
 import { clampPage, pageCountOf, pageSlice } from '../lib/pagination';
 import { shortStatus } from '../lib/status';
 import { Routes, type PerPage } from '../nav';
@@ -13,7 +14,6 @@ import {
   Breadcrumbs,
   Button,
   EmptyState,
-  Icon,
   LangTag,
   Pagination,
   Skeleton,
@@ -75,7 +75,7 @@ export function Shorts({ page, perPage }: { page: number; perPage: PerPage }) {
   };
 
   return (
-    <div className="page">
+    <div className="page page-list">
       <h1 className="sr-only">Shorts</h1>
       <div className="detail-bar">
         <Breadcrumbs items={crumbs({ label: 'Shorts' })} showBack={false} />
@@ -135,9 +135,19 @@ export function Shorts({ page, perPage }: { page: number; perPage: PerPage }) {
 
               return (
                 <li className="item" key={short.id}>
-                  <span className={`item-lead ${look.leadClass}`}>
-                    <Icon name={look.icon} />
-                  </span>
+                  {/*
+                    * The poster, not a play icon.
+                    *
+                    * Every row in a video library carried the same generic
+                    * glyph, so the only thing distinguishing one clip from
+                    * another was its title — and a clip is the one kind of
+                    * content nobody remembers by title. The cover frame is
+                    * already stored on the record and costs nothing to show.
+                    *
+                    * The status still reads as a badge on the right, so
+                    * replacing the tinted lead loses no information.
+                    */}
+                  <img className="item-poster" src={mediaUrl(short.posterUrl)} alt="" />
 
                   <span className="item-body">
                     <span className="item-title" lang={short.language}>

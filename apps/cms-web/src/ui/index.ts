@@ -18,6 +18,7 @@ export { EmptyState } from './EmptyState';
 export { Counter, Field, Fieldset, type FieldControlProps } from './Field';
 export { FileDrop } from './FileDrop';
 export { Icon, type IconName } from './Icon';
+export { Listbox, type ListboxOption } from './Listbox';
 export { Pagination } from './Pagination';
 export { Panel } from './Panel';
 export { SearchInput } from './SearchInput';

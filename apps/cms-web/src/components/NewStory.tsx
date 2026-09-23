@@ -4,7 +4,18 @@ import { useResource } from '../hooks/useResource';
 import { crumbs } from '../lib/crumbs';
 import { Routes } from '../nav';
 import { navigate } from '../useRoute';
-import { Banner, Breadcrumbs, Button, Field, Fieldset, Segmented, Select, Skeleton } from '../ui';
+import {
+  Badge,
+  Banner,
+  Breadcrumbs,
+  Button,
+  Field,
+  Fieldset,
+  Listbox,
+  Panel,
+  Segmented,
+  Skeleton,
+} from '../ui';
 
 /**
  * Starting a story.
@@ -18,6 +29,27 @@ import { Banner, Breadcrumbs, Button, Field, Fieldset, Segmented, Select, Skelet
  * story appears in, and whether we are allowed to publish it at all. Asking for
  * them up front is the difference between a draft that can be finished and one
  * that fails at the publish gate an hour later.
+ *
+ * -- Why the fields sit two to a row ----------------------------------------
+ *
+ * Four short controls stacked one per row made a column of four boxes down the
+ * middle of a 1900px screen, each of them 720px wide for a value that is never
+ * longer than a publisher's name. The eye travels the whole height of the
+ * window to read four words.
+ *
+ * They are now a 12-column grid, six each: language beside section, publisher
+ * beside headline. Two rows instead of four, each control about 560px, which is
+ * still wider than anything that goes in one. The measure did not go away — it
+ * went from 720px to 1180px, which is the width at which two fields are better
+ * than one rather than merely possible.
+ *
+ * -- Why there is a column beside the form ----------------------------------
+ *
+ * Not to fill the space. The licence state of the chosen publisher decides
+ * whether this story can ever reach a reader, and it used to be a grey note
+ * under the select that said so in passing. It is the single most consequential
+ * thing on the screen, so it is stated where it cannot be skimmed past, and it
+ * changes as the publisher changes.
  *
  * -- Derived, not synchronised ----------------------------------------------
  *
@@ -94,7 +126,7 @@ export function NewStory({ onCreated, onCancel }: Props) {
 
   if (loadError !== null && options === null) {
     return (
-      <div className="page page-narrow">
+      <div className="page page-form">
         <Banner tone="error">{loadError}</Banner>
         <div className="actions actions-plain">
           <Button icon="refresh" onClick={reload}>
@@ -109,20 +141,12 @@ export function NewStory({ onCreated, onCancel }: Props) {
   }
 
   return (
-    <div className="page page-narrow">
+    <div className="page page-form">
       <h1 className="sr-only">New story</h1>
       <div className="detail-bar">
         <Breadcrumbs
           items={crumbs({ label: 'Queue', route: Routes.queue() }, { label: 'New story' })}
         />
-        {/*
-          * Only the control belongs here.
-          *
-          * A sentence of explanation was in this bar too, and on a 720px form
-          * it did not fit beside the trail — so it wrapped onto a second line
-          * and sat right-aligned under the breadcrumbs, which read as a
-          * layout fault. It is the panel's subtitle now, where it has room.
-          */}
         <div className="detail-bar-actions">
           <Button size="sm" disabled={busy} onClick={goToQueue}>
             Cancel
@@ -130,128 +154,199 @@ export function NewStory({ onCreated, onCancel }: Props) {
         </div>
       </div>
 
-      <div className="panel">
-        <header className="panel-head">
-          <h2 className="panel-title">Where this story goes</h2>
-          <span className="panel-head-note">Three questions. The rest is the composer’s job.</span>
-        </header>
-        <form className="panel-body" onSubmit={submit}>
-          {loading || options === null ? (
-            <div aria-busy="true">
-              <Skeleton height={11} width={70} />
-              <Skeleton height={38} width={200} style={{ marginTop: 10, marginBottom: 26 }} />
-              <Skeleton height={11} width={70} />
-              <Skeleton height={40} style={{ marginTop: 10, marginBottom: 26 }} />
-              <Skeleton height={11} width={70} />
-              <Skeleton height={40} style={{ marginTop: 10 }} />
-            </div>
-          ) : (
-            <>
-              <Fieldset legend="Language">
-                {(g) => (
-                  <Segmented
-                    {...g}
-                    aria-label="Language"
-                    value={language}
-                    onChange={setLanguage}
-                    options={[
-                      { value: 'ne', label: 'नेपाली', lang: 'ne' },
-                      { value: 'en', label: 'English', lang: 'en' },
-                    ]}
-                  />
-                )}
-              </Fieldset>
+      <div className="grid">
+        <div className="col-8">
+          <Panel
+            title="Where this story goes"
+            note="Three questions. The rest is the composer’s job."
+          >
+            <form onSubmit={submit}>
+              {loading || options === null ? (
+                <div className="grid" aria-busy="true">
+                  <div className="col-6">
+                    <Skeleton height={11} width={70} />
+                    <Skeleton height={40} style={{ marginTop: 10 }} />
+                  </div>
+                  <div className="col-6">
+                    <Skeleton height={11} width={70} />
+                    <Skeleton height={40} style={{ marginTop: 10 }} />
+                  </div>
+                  <div className="col-6">
+                    <Skeleton height={11} width={70} />
+                    <Skeleton height={40} style={{ marginTop: 10 }} />
+                  </div>
+                  <div className="col-6">
+                    <Skeleton height={11} width={70} />
+                    <Skeleton height={40} style={{ marginTop: 10 }} />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="grid">
+                    <div className="col-6">
+                      <Fieldset legend="Language">
+                        {(g) => (
+                          <Segmented
+                            {...g}
+                            aria-label="Language"
+                            value={language}
+                            onChange={setLanguage}
+                            options={[
+                              { value: 'ne', label: 'नेपाली', lang: 'ne' },
+                              { value: 'en', label: 'English', lang: 'en' },
+                            ]}
+                          />
+                        )}
+                      </Fieldset>
+                    </div>
 
-              <Field label="Section">
-                {(f) => (
-                  <Select
-                    {...f}
-                    value={category?.slug ?? ''}
-                    onChange={(e) => setCategoryChoice(e.target.value)}
-                    required
-                  >
-                    {categories.map((c) => (
-                      <option key={c.slug} value={c.slug}>
-                        {language === 'ne' ? c.label.ne : c.label.en}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
+                    <div className="col-6">
+                      <Field label="Section">
+                        {(f) => (
+                          <Listbox
+                            {...f}
+                            value={category?.slug ?? ''}
+                            onChange={(v) => setCategoryChoice(v)}
+                            options={categories.map((c) => ({
+                              value: c.slug,
+                              label: language === 'ne' ? c.label.ne : c.label.en,
+                              lang: language,
+                            }))}
+                          />
+                        )}
+                      </Field>
+                    </div>
 
-              <Field
-                label="Publisher"
-                note={
-                  source !== null && !source.licensed
-                    ? 'This publisher has no agreed licence, so the story could not be published.'
-                    : undefined
-                }
-                noteTone="warn"
-              >
-                {(f) => (
-                  <Select
-                    {...f}
-                    value={source?.slug ?? ''}
-                    onChange={(e) => setSourceChoice(e.target.value)}
-                    required
-                  >
-                    {sources.length === 0 && (
-                      <option value="">No publisher for this language</option>
-                    )}
-                    {sources.map((s) => (
-                      <option key={s.slug} value={s.slug} disabled={!s.licensed}>
-                        {s.displayName}
-                        {s.licensed ? '' : ' — no agreed licence'}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
+                    <div className="col-6">
+                      <Field label="Publisher">
+                        {(f) => (
+                          <Listbox
+                            {...f}
+                            value={source?.slug ?? ''}
+                            onChange={(v) => setSourceChoice(v)}
+                            emptyLabel="No publisher for this language"
+                            /*
+                              * An unlicensed publisher is listed, greyed, with
+                              * the reason on its own line rather than glued to
+                              * the end of the name. Hiding it would be kinder
+                              * to the code and worse for the editor, who would
+                              * look for a publisher they know exists and
+                              * conclude the list was broken.
+                              */
+                            options={sources.map((s) => ({
+                              value: s.slug,
+                              label: s.displayName,
+                              disabled: !s.licensed,
+                              disabledReason: 'No agreed licence',
+                            }))}
+                          />
+                        )}
+                      </Field>
+                    </div>
 
-              {/*
-                * "optional" is one word here, not a sentence.
-                *
-                * The label sits on the field's border and the notch is cut to
-                * its width — so a label reading "Headline optional — you can
-                * write it in the composer" cuts a gap most of the way across
-                * the top of the box, and fills the empty field with a line of
-                * grey text. The explanation belongs in the helper line.
-                */}
-              <Field
-                label="Headline"
-                optional="optional"
-                note="You can write it in the composer instead."
-              >
-                {(f) => (
-                  <input
-                    {...f}
-                    className="input"
-                    lang={language}
-                    value={headline}
-                    maxLength={90}
-                    placeholder={language === 'ne' ? 'शीर्षक' : 'Headline'}
-                    onChange={(e) => setHeadline(e.target.value)}
-                  />
-                )}
-              </Field>
+                    {/*
+                      * "optional" is one word here, not a sentence.
+                      *
+                      * The label sits on the field's border and the notch is
+                      * cut to its width — so a label reading "Headline
+                      * optional — you can write it in the composer" cuts a gap
+                      * most of the way across the top of the box, and fills the
+                      * empty field with a line of grey text. The explanation
+                      * belongs in the helper line.
+                      */}
+                    <div className="col-6">
+                      <Field
+                        label="Headline"
+                        optional="optional"
+                        note="You can write it in the composer instead."
+                      >
+                        {(f) => (
+                          <input
+                            {...f}
+                            className="input"
+                            lang={language}
+                            value={headline}
+                            maxLength={90}
+                            placeholder={language === 'ne' ? 'शीर्षक' : 'Headline'}
+                            onChange={(e) => setHeadline(e.target.value)}
+                          />
+                        )}
+                      </Field>
+                    </div>
+                  </div>
 
-              {error !== null && <Banner tone="error">{error}</Banner>}
+                  {error !== null && <Banner tone="error">{error}</Banner>}
 
-              <div className="actions">
-                <Button
-                  type="submit"
-                  variant="primary"
-                  icon="plus"
-                  block
-                  busy={busy}
-                  disabled={source === null || category === null}
-                >
-                  Create the draft and open the composer
-                </Button>
-              </div>
-            </>
-          )}
-        </form>
+                  <div className="actions">
+                    <Button
+                      type="submit"
+                      variant="primary"
+                      icon="plus"
+                      busy={busy}
+                      disabled={source === null || category === null}
+                    >
+                      Create the draft and open the composer
+                    </Button>
+                  </div>
+                </>
+              )}
+            </form>
+          </Panel>
+        </div>
+
+        <aside className="col-4">
+          <Panel title="Before you start" headingLevel={2}>
+            {source === null ? (
+              <p className="prose">
+                There is no publisher on file for this language yet. A story has to be filed
+                against one, so add the publisher first.
+              </p>
+            ) : source.licensed ? (
+              <>
+                <p className="meta-line">
+                  <Badge tone="ok" icon="checkCircle">
+                    Licensed
+                  </Badge>
+                </p>
+                <p className="prose" style={{ marginTop: 'var(--s3)' }}>
+                  We have an agreed licence with {source.displayName}, so a summary of their
+                  reporting can be published once a reviewer has approved it.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="meta-line">
+                  <Badge tone="bad" icon="alertCircle">
+                    No agreed licence
+                  </Badge>
+                </p>
+                <p className="prose" style={{ marginTop: 'var(--s3)' }}>
+                  {source.displayName} has not agreed a licence. You can write the draft, but
+                  publishing will refuse it — the gate is on the publisher, not on the story, and
+                  it is checked again at the moment of publication.
+                </p>
+              </>
+            )}
+
+            <h3 className="field-legend" style={{ marginTop: 'var(--s6)' }}>
+              What happens next
+            </h3>
+            <ol className="steps">
+              <li>
+                <strong>Draft.</strong> The composer opens with the source article beside the
+                summary box. Everything autosaves.
+              </li>
+              <li>
+                <strong>Review.</strong> Another editor reads it. You cannot approve your own
+                summary once a second editor is active.
+              </li>
+              <li>
+                <strong>Publish.</strong> The licence, the picture’s credit and the length are all
+                checked again before it reaches a reader.
+              </li>
+            </ol>
+          </Panel>
+        </aside>
       </div>
     </div>
   );

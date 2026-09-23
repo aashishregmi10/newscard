@@ -105,7 +105,7 @@ export function Notify({ tab }: { tab: NotifyTab }) {
 
   if (loading || data === null) {
     return (
-      <div className="page">
+      <div className="page page-form">
         <Header reach={null} />
         {loadError !== null ? (
           <>
@@ -137,7 +137,7 @@ export function Notify({ tab }: { tab: NotifyTab }) {
   ];
 
   return (
-    <div className="page">
+    <div className="page page-form">
       <Header reach={targets.devices.withToken} />
 
       <Tabs
@@ -326,34 +326,45 @@ function Compose({ targets, onSent }: { targets: NotifyTargets; onSent: () => vo
         * how the wrong language ends up in the wrong half.
         */}
       <Panel title="The copy">
+        {/*
+          * The two languages sit side by side, not stacked.
+          *
+          * They are the same sentence written twice, and the job is to check
+          * they say the same thing. Stacked, with a counter and a label between
+          * them, that comparison is a scroll; beside each other it is a glance.
+          */}
         <Fieldset legend="Title">
           {() => (
-            <>
-              <Field label="नेपाली" counter={<CopyCount value={titleNe} />}>
-                {(f) => (
-                  <input
-                    {...f}
-                    className="input"
-                    lang="ne"
-                    maxLength={COPY_MAX}
-                    value={titleNe}
-                    onChange={(e) => setTitleNe(e.target.value)}
-                  />
-                )}
-              </Field>
-              <Field label="English" counter={<CopyCount value={titleEn} />}>
-                {(f) => (
-                  <input
-                    {...f}
-                    className="input"
-                    lang="en"
-                    maxLength={COPY_MAX}
-                    value={titleEn}
-                    onChange={(e) => setTitleEn(e.target.value)}
-                  />
-                )}
-              </Field>
-            </>
+            <div className="grid">
+              <div className="col-6">
+                <Field label="नेपाली" counter={<CopyCount value={titleNe} />}>
+                  {(f) => (
+                    <input
+                      {...f}
+                      className="input"
+                      lang="ne"
+                      maxLength={COPY_MAX}
+                      value={titleNe}
+                      onChange={(e) => setTitleNe(e.target.value)}
+                    />
+                  )}
+                </Field>
+              </div>
+              <div className="col-6">
+                <Field label="English" counter={<CopyCount value={titleEn} />}>
+                  {(f) => (
+                    <input
+                      {...f}
+                      className="input"
+                      lang="en"
+                      maxLength={COPY_MAX}
+                      value={titleEn}
+                      onChange={(e) => setTitleEn(e.target.value)}
+                    />
+                  )}
+                </Field>
+              </div>
+            </div>
           )}
         </Fieldset>
 
@@ -362,32 +373,36 @@ function Compose({ targets, onSent }: { targets: NotifyTargets; onSent: () => vo
           note="Both languages are required. A device tells us which languages its reader accepts, and we never send copy in one they have not asked for — so a single-language notification would simply not reach the other half of the audience."
         >
           {() => (
-            <>
-              <Field label="नेपाली" counter={<CopyCount value={bodyNe} />}>
-                {(f) => (
-                  <input
-                    {...f}
-                    className="input"
-                    lang="ne"
-                    maxLength={COPY_MAX}
-                    value={bodyNe}
-                    onChange={(e) => setBodyNe(e.target.value)}
-                  />
-                )}
-              </Field>
-              <Field label="English" counter={<CopyCount value={bodyEn} />}>
-                {(f) => (
-                  <input
-                    {...f}
-                    className="input"
-                    lang="en"
-                    maxLength={COPY_MAX}
-                    value={bodyEn}
-                    onChange={(e) => setBodyEn(e.target.value)}
-                  />
-                )}
-              </Field>
-            </>
+            <div className="grid">
+              <div className="col-6">
+                <Field label="नेपाली" counter={<CopyCount value={bodyNe} />}>
+                  {(f) => (
+                    <input
+                      {...f}
+                      className="input"
+                      lang="ne"
+                      maxLength={COPY_MAX}
+                      value={bodyNe}
+                      onChange={(e) => setBodyNe(e.target.value)}
+                    />
+                  )}
+                </Field>
+              </div>
+              <div className="col-6">
+                <Field label="English" counter={<CopyCount value={bodyEn} />}>
+                  {(f) => (
+                    <input
+                      {...f}
+                      className="input"
+                      lang="en"
+                      maxLength={COPY_MAX}
+                      value={bodyEn}
+                      onChange={(e) => setBodyEn(e.target.value)}
+                    />
+                  )}
+                </Field>
+              </div>
+            </div>
           )}
         </Fieldset>
 

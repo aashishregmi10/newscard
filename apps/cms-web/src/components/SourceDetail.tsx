@@ -14,9 +14,9 @@ import {
   Button,
   Field,
   Fieldset,
+  Listbox,
   Panel,
   Segmented,
-  Select,
   Skeleton,
 } from '../ui';
 
@@ -97,7 +97,7 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
 
   if (loadError !== null && data === null) {
     return (
-      <div className="page page-narrow">
+      <div className="page page-form">
         <Banner tone="error">{loadError}</Banner>
         <div className="actions actions-plain">
           <Button icon="arrowLeft" onClick={() => navigate(Routes.sources())}>
@@ -113,7 +113,7 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
 
   if (loading || data === null) {
     return (
-      <div className="page page-narrow" aria-busy="true">
+      <div className="page page-form" aria-busy="true">
         <div className="detail-bar">
           <Skeleton height={16} width={240} />
         </div>
@@ -180,7 +180,7 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
   };
 
   return (
-    <div className="page page-narrow">
+    <div className="page page-form">
       <h1 className="sr-only">{data.displayName}</h1>
       <div className="detail-bar">
         <Breadcrumbs
@@ -226,71 +226,83 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
 
         {isAdmin ? (
           <>
-            <Fieldset legend="Status">
-              {(g) => (
-                <Segmented
-                  {...g}
-                  aria-label="Licence status"
-                  value={status}
-                  onChange={(next) => {
-                    setStatus(next);
-                    setConfirming(false);
-                  }}
-                  options={[
-                    { value: 'unknown', label: 'Not asked' },
-                    { value: 'pending', label: 'Pending' },
-                    { value: 'agreed', label: 'Agreed' },
-                    { value: 'refused', label: 'Refused' },
-                  ]}
-                />
-              )}
-            </Fieldset>
+            <div className="grid">
+              <div className="col-6">
+                <Fieldset legend="Status">
+                  {(g) => (
+                    <Segmented
+                      {...g}
+                      aria-label="Licence status"
+                      value={status}
+                      onChange={(next) => {
+                        setStatus(next);
+                        setConfirming(false);
+                      }}
+                      options={[
+                        { value: 'unknown', label: 'Not asked' },
+                        { value: 'pending', label: 'Pending' },
+                        { value: 'agreed', label: 'Agreed' },
+                        { value: 'refused', label: 'Refused' },
+                      ]}
+                    />
+                  )}
+                </Fieldset>
+              </div>
 
-            <Field label="Agreement reference" optional="optional">
-              {(f) => (
-                <input
-                  {...f}
-                  className="input"
-                  placeholder="Signed MOU, 12 Sept 2026"
-                  value={agreementRef}
-                  onChange={(e) => setAgreementRef(e.target.value)}
-                />
-              )}
-            </Field>
+              {/* The evidence for the status beside it, because one is the
+                  claim and the other is what backs it up. */}
+              <div className="col-6">
+                <Field label="Agreement reference" optional="optional">
+                  {(f) => (
+                    <input
+                      {...f}
+                      className="input"
+                      placeholder="Signed MOU, 12 Sept 2026"
+                      value={agreementRef}
+                      onChange={(e) => setAgreementRef(e.target.value)}
+                    />
+                  )}
+                </Field>
+              </div>
 
-            <Field label="Agreed on" optional="optional">
-              {(f) => (
-                <input
-                  {...f}
-                  className="input"
-                  type="date"
-                  value={agreedAt}
-                  onChange={(e) => setAgreedAt(e.target.value)}
-                />
-              )}
-            </Field>
+              <div className="col-6">
+                <Field label="Agreed on" optional="optional">
+                  {(f) => (
+                    <input
+                      {...f}
+                      className="input"
+                      type="date"
+                      value={agreedAt}
+                      onChange={(e) => setAgreedAt(e.target.value)}
+                    />
+                  )}
+                </Field>
+              </div>
 
-            <Field
-              label="Takedown contact"
-              invalid={needsContact}
-              note={
-                needsContact
-                  ? 'A licensed publisher needs a takedown contact — we promise a 24-hour response and cannot meet it without one.'
-                  : 'Where a takedown demand goes. Required once a licence is agreed.'
-              }
-              noteTone={needsContact ? 'bad' : 'default'}
-            >
-              {(f) => (
-                <input
-                  {...f}
-                  className="input"
-                  type="email"
-                  placeholder="legal@publisher.example.invalid"
-                  value={contactEmail}
-                  onChange={(e) => setContactEmail(e.target.value)}
-                />
-              )}
-            </Field>
+              <div className="col-6">
+                <Field
+                  label="Takedown contact"
+                  invalid={needsContact}
+                  note={
+                    needsContact
+                      ? 'A licensed publisher needs a takedown contact — we promise a 24-hour response and cannot meet it without one.'
+                      : 'Where a takedown demand goes. Required once a licence is agreed.'
+                  }
+                  noteTone={needsContact ? 'bad' : 'default'}
+                >
+                  {(f) => (
+                    <input
+                      {...f}
+                      className="input"
+                      type="email"
+                      placeholder="legal@publisher.example.invalid"
+                      value={contactEmail}
+                      onChange={(e) => setContactEmail(e.target.value)}
+                    />
+                  )}
+                </Field>
+              </div>
+            </div>
 
             {wouldWithdraw && (
               <Field
@@ -372,177 +384,201 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
           </Banner>
         )}
 
-        {/* Static text, not a disabled input — a greyed box invites clicking. */}
-        <div className="field">
-          <p className="field-plain-label">Slug</p>
-          <p className="item-title">{data.slug}</p>
-          <p className="field-note">
-            This publisher’s address in the CMS, and how stories reference them. It cannot be
-            changed — rename the display name instead.
-          </p>
+        <div className="grid">
+          {/* Static text, not a disabled input — a greyed box invites clicking. */}
+          <div className="col-6">
+            <div className="field">
+              <p className="field-plain-label">Slug</p>
+              <p className="item-title">{data.slug}</p>
+              <p className="field-note">
+                This publisher’s address in the CMS, and how stories reference them. It cannot be
+                changed — rename the display name instead.
+              </p>
+            </div>
+          </div>
+
+          <div className="col-6">
+            <Field
+              label="Display name"
+              note="Exactly as the publisher writes it on their own masthead, not as their domain spells it."
+            >
+              {(f) => (
+                <input
+                  {...f}
+                  className="input"
+                  lang={language}
+                  value={displayName}
+                  disabled={!isAdmin}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                />
+              )}
+            </Field>
+          </div>
+
+          {/* The two URLs pair with each other: same kind of value, same kind
+              of mistake, and checking one usually means checking the other. */}
+          <div className="col-6">
+            <Field label="Homepage URL">
+              {(f) => (
+                <input
+                  {...f}
+                  className="input"
+                  type="url"
+                  value={homepageUrl}
+                  disabled={!isAdmin}
+                  onChange={(e) => setHomepageUrl(e.target.value)}
+                />
+              )}
+            </Field>
+          </div>
+
+          <div className="col-6">
+            <Field label="Logo URL" optional="optional">
+              {(f) => (
+                <input
+                  {...f}
+                  className="input"
+                  type="url"
+                  value={logoUrl}
+                  disabled={!isAdmin}
+                  onChange={(e) => setLogoUrl(e.target.value)}
+                />
+              )}
+            </Field>
+          </div>
+
+          <div className="col-6">
+            <Fieldset legend="Language">
+              {(g) => (
+                <Segmented
+                  {...g}
+                  aria-label="Language"
+                  disabled={!isAdmin}
+                  value={language}
+                  onChange={setLanguage}
+                  options={[
+                    { value: 'ne', label: 'नेपाली', lang: 'ne' },
+                    { value: 'en', label: 'English', lang: 'en' },
+                  ]}
+                />
+              )}
+            </Fieldset>
+          </div>
+
+          <div className="col-6">
+            <Field
+              label="Priority"
+              note="Lower numbers are preferred. Used only as a tiebreaker when several publishers carry the same story."
+            >
+              {(f) => (
+                <input
+                  {...f}
+                  className="input"
+                  type="number"
+                  min={0}
+                  max={999}
+                  value={priority}
+                  disabled={!isAdmin}
+                  onChange={(e) => setPriority(Number(e.target.value))}
+                />
+              )}
+            </Field>
+          </div>
+
+          <div className="col-12">
+            <Fieldset
+              legend="Status"
+              note="Deactivating stops new stories being filed and blocks publication of existing drafts. Published stories stay live."
+            >
+              {(g) => (
+                <Segmented
+                  {...g}
+                  aria-label="Active"
+                  disabled={!isAdmin}
+                  value={active}
+                  onChange={setActive}
+                  options={[
+                    { value: 'active', label: 'Active' },
+                    { value: 'inactive', label: 'Inactive' },
+                  ]}
+                />
+              )}
+            </Fieldset>
+          </div>
         </div>
-
-        <Field
-          label="Display name"
-          note="Exactly as the publisher writes it on their own masthead, not as their domain spells it."
-        >
-          {(f) => (
-            <input
-              {...f}
-              className="input"
-              lang={language}
-              value={displayName}
-              disabled={!isAdmin}
-              onChange={(e) => setDisplayName(e.target.value)}
-            />
-          )}
-        </Field>
-
-        <Field label="Homepage URL">
-          {(f) => (
-            <input
-              {...f}
-              className="input"
-              type="url"
-              value={homepageUrl}
-              disabled={!isAdmin}
-              onChange={(e) => setHomepageUrl(e.target.value)}
-            />
-          )}
-        </Field>
-
-        <Field label="Logo URL" optional="optional">
-          {(f) => (
-            <input
-              {...f}
-              className="input"
-              type="url"
-              value={logoUrl}
-              disabled={!isAdmin}
-              onChange={(e) => setLogoUrl(e.target.value)}
-            />
-          )}
-        </Field>
-
-        <Fieldset legend="Language">
-          {(g) => (
-            <Segmented
-              {...g}
-              aria-label="Language"
-              disabled={!isAdmin}
-              value={language}
-              onChange={setLanguage}
-              options={[
-                { value: 'ne', label: 'नेपाली', lang: 'ne' },
-                { value: 'en', label: 'English', lang: 'en' },
-              ]}
-            />
-          )}
-        </Fieldset>
-
-        <Field
-          label="Priority"
-          note="Lower numbers are preferred. Used only as a tiebreaker when several publishers carry the same story."
-        >
-          {(f) => (
-            <input
-              {...f}
-              className="input"
-              type="number"
-              min={0}
-              max={999}
-              value={priority}
-              disabled={!isAdmin}
-              onChange={(e) => setPriority(Number(e.target.value))}
-            />
-          )}
-        </Field>
-
-        <Fieldset
-          legend="Status"
-          note="Deactivating stops new stories being filed and blocks publication of existing drafts. Published stories stay live."
-        >
-          {(g) => (
-            <Segmented
-              {...g}
-              aria-label="Active"
-              disabled={!isAdmin}
-              value={active}
-              onChange={setActive}
-              options={[
-                { value: 'active', label: 'Active' },
-                { value: 'inactive', label: 'Inactive' },
-              ]}
-            />
-          )}
-        </Fieldset>
       </Panel>
 
       {/* ----------------------------------------------------- ingestion */}
 
       <Panel title="Ingestion">
-        <Fieldset legend="Method">
-          {(g) => (
-            <Segmented
-              {...g}
-              aria-label="Ingest method"
-              disabled={!isAdmin}
-              value={method}
-              onChange={setMethod}
-              options={[
-                { value: 'manual', label: 'Manual' },
-                { value: 'rss', label: 'RSS' },
-                { value: 'api', label: 'API' },
-              ]}
-            />
-          )}
-        </Fieldset>
+        <div className="grid">
+          <div className="col-6">
+            <Fieldset legend="Method">
+              {(g) => (
+                <Segmented
+                  {...g}
+                  aria-label="Ingest method"
+                  disabled={!isAdmin}
+                  value={method}
+                  onChange={setMethod}
+                  options={[
+                    { value: 'manual', label: 'Manual' },
+                    { value: 'rss', label: 'RSS' },
+                    { value: 'api', label: 'API' },
+                  ]}
+                />
+              )}
+            </Fieldset>
+          </div>
 
-        {/* Absent from the DOM entirely when it does not apply. A field that is
-            permanently visible and only sometimes required teaches people to
-            ignore its validation. */}
-        {method !== 'manual' && (
-          <Field
-            label="Feed URL"
-            invalid={feedMissing}
-            note={feedMissing ? 'An RSS publisher needs a feed to poll.' : undefined}
-            noteTone="bad"
-          >
-            {(f) => (
-              <input
-                {...f}
-                className="input"
-                type="url"
-                placeholder="https://publisher.example.invalid/feed"
-                value={feedUrl}
-                disabled={!isAdmin}
-                onChange={(e) => setFeedUrl(e.target.value)}
-              />
-            )}
-          </Field>
-        )}
-
-        {method !== 'manual' && (
-          <Field
-            label="Poll every"
-            note="Never below five minutes — a courtesy to the publisher’s servers, enforced in the database as well as here."
-          >
-            {(f) => (
-              <Select
-                {...f}
-                value={String(pollIntervalMin)}
-                disabled={!isAdmin}
-                onChange={(e) => setPollIntervalMin(Number(e.target.value))}
+          {/* Absent from the DOM entirely when it does not apply. A field that
+              is permanently visible and only sometimes required teaches people
+              to ignore its validation. */}
+          {method !== 'manual' && (
+            <div className="col-6">
+              <Field
+                label="Poll every"
+                note="Never below five minutes — a courtesy to the publisher’s servers, enforced in the database as well as here."
               >
-                {POLL_INTERVALS.map((m) => (
-                  <option key={m} value={m}>
-                    {m} minutes
-                  </option>
-                ))}
-              </Select>
-            )}
-          </Field>
-        )}
+                {(f) => (
+                  <Listbox
+                    {...f}
+                    value={String(pollIntervalMin)}
+                    disabled={!isAdmin}
+                    onChange={(v) => setPollIntervalMin(Number(v))}
+                    options={POLL_INTERVALS.map((m) => ({
+                      value: String(m),
+                      label: m + ' minutes',
+                    }))}
+                  />
+                )}
+              </Field>
+            </div>
+          )}
+
+          {method !== 'manual' && (
+            <div className="col-12">
+              <Field
+                label="Feed URL"
+                invalid={feedMissing}
+                note={feedMissing ? 'An RSS publisher needs a feed to poll.' : undefined}
+                noteTone="bad"
+              >
+                {(f) => (
+                  <input
+                    {...f}
+                    className="input"
+                    type="url"
+                    placeholder="https://publisher.example.invalid/feed"
+                    value={feedUrl}
+                    disabled={!isAdmin}
+                    onChange={(e) => setFeedUrl(e.target.value)}
+                  />
+                )}
+              </Field>
+            </div>
+          )}
+        </div>
 
         <div className="actions actions-plain">
           <p className="meta-line">

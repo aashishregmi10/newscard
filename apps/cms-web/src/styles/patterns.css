@@ -681,3 +681,332 @@
   gap: var(--s3);
   margin-left: auto;
 }
+
+/* ========================================================================
+ * The form grid
+ *
+ * Twelve columns, because that is the number that divides usefully: halves,
+ * thirds and quarters all land on whole tracks. A field declares how many it
+ * spans and nothing else — no wrappers, no nesting, no row elements.
+ *
+ *     <div class="grid">
+ *       <div class="col-6"><Field .../></div>
+ *       <div class="col-6"><Field .../></div>
+ *     </div>
+ *
+ * -- Why the gap replaces the field's own margin ----------------------------
+ *
+ * `.field + .field` sets a top margin, which is right for a stack and wrong
+ * inside a grid: the gap already spaces the rows, and the margin adds to it on
+ * the second and later items only, so a two-column row sits lower than the one
+ * beside it by exactly one margin. The reset below is why this file loads
+ * after components.css.
+ *
+ * -- Why it collapses at 900px rather than at a device width ----------------
+ *
+ * The number is the point at which a 6-column field stops being wide enough to
+ * read a publisher's name in, not the width of any particular phone. Below it
+ * every span becomes the full twelve, which is the only arrangement that is
+ * never cramped.
+ * ====================================================================== */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: var(--s5) var(--s4);
+  align-items: start;
+}
+
+.grid > .field + .field,
+.grid .field + .field {
+  margin-top: 0;
+}
+
+.col-3 { grid-column: span 3; }
+.col-4 { grid-column: span 4; }
+.col-5 { grid-column: span 5; }
+.col-6 { grid-column: span 6; }
+.col-7 { grid-column: span 7; }
+.col-8 { grid-column: span 8; }
+.col-9 { grid-column: span 9; }
+.col-12 { grid-column: span 12; }
+
+/* A cell that must start a new row even when the one before it left space. */
+.col-break { grid-column: 1 / -1; }
+
+@media (max-width: 900px) {
+  .col-3,
+  .col-4,
+  .col-5,
+  .col-6,
+  .col-7,
+  .col-8,
+  .col-9 {
+    grid-column: span 12;
+  }
+}
+
+/* ========================================================================
+ * The image block
+ *
+ * A picture beside its metadata rather than above it. The preview is the thing
+ * the editor is actually judging — "is this the right photograph, and is it
+ * sharp enough" — so it is never smaller than a card on a phone, and it sits
+ * next to the credit so both are in view while either is being decided.
+ *
+ * The figure is a fixed track rather than a fraction: a preview that grows with
+ * the window ends up 700px wide on a desktop, which is far larger than the card
+ * it is standing in for and flatters a photograph that will not look that good
+ * in the app.
+ * ====================================================================== */
+
+.media-edit {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: var(--s5);
+  align-items: start;
+  padding: var(--s4);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-sunk);
+}
+
+.media-edit-figure {
+  margin: 0;
+  min-width: 0;
+}
+
+.media-edit-figure .meta-line {
+  margin-top: var(--s2);
+}
+
+.media-edit-form {
+  min-width: 0;
+}
+
+/*
+ * A banner in here answers something the editor has just done — picked a file
+ * that is too small, or an upload that failed — so it sits above the fields it
+ * is about and has to be separated from them.
+ *
+ * `.banner` carries no margin of its own: it gets one only from a sibling it
+ * follows, and in this block it is first. So the margin has to be stated here
+ * rather than inherited from the stack rules.
+ */
+.media-edit-form > .banner {
+  margin-bottom: var(--s4);
+}
+
+.media-attached {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--ok);
+  font-weight: 500;
+}
+
+.media-attached svg {
+  width: 14px;
+  height: 14px;
+}
+
+/*
+ * Below this the two columns are narrower than either of them needs: the
+ * preview stops being a fair likeness of a card and the credit field stops
+ * fitting a wire agency's name. Stacked, both are full width.
+ */
+@media (max-width: 820px) {
+  .media-edit {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* ========================================================================
+ * A numbered sequence
+ *
+ * For the three or four stages of something the reader is about to begin. The
+ * marker is drawn rather than left to the browser's default, because the
+ * default sits outside the content box and is the first thing to be clipped
+ * when the list is inside a panel with its own padding.
+ * ====================================================================== */
+
+.steps {
+  margin: var(--s3) 0 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.steps li {
+  position: relative;
+  counter-increment: step;
+  padding-left: var(--s6);
+  color: var(--ink-faint);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.steps li + li {
+  margin-top: var(--s3);
+}
+
+.steps li::before {
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 1px;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.steps strong {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* ========================================================================
+ * The clip summary
+ *
+ * What a transcode produced, shown beside the form rather than above it. The
+ * 92px `.media-poster` is right for a row in a library list and far too small
+ * here, where the poster is the only evidence the editor has that the right
+ * few seconds were captured — so this one is big enough to recognise a face in.
+ *
+ * The renditions are a real list rather than a sentence because the useful
+ * reading is vertical: three sizes, and whether the largest is a sane number of
+ * megabytes for a reader on a metered connection.
+ * ====================================================================== */
+
+.clip-summary {
+  display: grid;
+  gap: var(--s4);
+}
+
+.clip-poster {
+  display: block;
+  width: 100%;
+  max-width: 180px;
+  margin-inline: auto;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  /* The average colour of a seeded frame, so the box does not flash white
+     before the poster arrives — and stays a sensible shape if it never does. */
+  background: #e8ebe6;
+}
+
+.clip-renditions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+}
+
+.clip-renditions li {
+  display: grid;
+  grid-template-columns: 4.5em 1fr auto;
+  gap: var(--s2);
+  align-items: baseline;
+  padding: 5px 0;
+  border-top: 1px solid var(--line);
+  color: var(--ink-faint);
+}
+
+.clip-quality {
+  color: var(--ink);
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+/* ========================================================================
+ * Listbox — Material's Select, with MenuItem rows
+ *
+ * The popup is the combo box's: `.combo-list`, `.combo-option`, `.combo-tick`
+ * and the rest are shared deliberately, so two dropdowns on adjacent screens
+ * cannot drift into different row heights and different tints. Only the closed
+ * control differs, and that is what is defined here.
+ * ====================================================================== */
+
+/*
+ * The trigger is a button drawn to look exactly like the other controls:
+ * transparent and borderless, because the Field's notched outline behind it is
+ * what draws the box. Matching `.combo-input`'s padding is what keeps a listbox
+ * and a combo box the same height when they sit side by side in a grid row.
+ */
+.listbox-trigger {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  padding: 8.5px 40px 8.5px 14px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: var(--text-base);
+  line-height: 1.4375em;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* The Field's outline already thickens and turns accent on focus-within, so a
+   second ring here would draw a box inside a box. */
+.listbox-trigger:focus {
+  outline: none;
+}
+
+.listbox-trigger:focus-visible .listbox-value {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.listbox-value {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  /* Holds the line when nothing is selected, so an empty control is the same
+     height as a full one and the row does not jump as the form is filled. */
+  min-height: 1.4375em;
+}
+
+.listbox-disabled .listbox-trigger {
+  color: var(--ink-disabled);
+  cursor: not-allowed;
+}
+
+/*
+ * Opening upwards is not handled, and that is a decision rather than an
+ * oversight: every listbox in this application sits in a form inside a
+ * scrolling page, so a list that would fall off the bottom scrolls into view
+ * instead. Revisit it the moment one of these appears in a fixed bar.
+ */
+
+/*
+ * A poster in a list row.
+ *
+ * Cropped to 3:4 rather than the clip’s true 9:16. The honest shape at a
+ * useful width is 71px tall, which would add half again to every row in a
+ * list whose whole job is being scanned — and the thing that makes a clip
+ * recognisable is the subject in the middle of the frame, which a centre crop
+ * keeps. It still reads as portrait, which is the part of the shape that
+ * carries information.
+ */
+.item-poster {
+  flex: none;
+  width: 44px;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  /* The average colour of a seeded frame, so a row does not flash white before
+     the poster arrives — and keeps its shape if the media host is down. */
+  background: #e8ebe6;
+}

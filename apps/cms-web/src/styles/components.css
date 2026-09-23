@@ -1451,16 +1451,49 @@
  * Composer
  * ====================================================================== */
 
+/*
+ * Two columns: what you are writing, and what you are writing it from.
+ *
+ * The reference column is a bounded track rather than a fraction. As a
+ * fraction it grew with the window, so on a wide screen a publisher headline
+ * and a link sat in 600px of panel with the rest of it empty, while the
+ * summary box — the thing being worked in — stayed the same size. Capping it
+ * gives the extra width to the column that can use it.
+ */
 .composer {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
   gap: var(--s4);
   align-items: start;
+}
+
+/*
+ * The reference column follows the editor down the page.
+ *
+ * The summary box is nine rows tall and the guidance under it runs further,
+ * so by the time someone is typing, the source article they are summarising
+ * has scrolled off the top — which is the one thing Ch. 5.4 says must stay
+ * beside the summary. Sticky costs nothing and keeps that promise at any
+ * window height.
+ *
+ * `align-items: start` above is load-bearing: a stretched grid item is
+ * exactly as tall as the row, so there is nothing for it to slide within and
+ * sticky silently does nothing.
+ */
+.sticky-aside {
+  position: sticky;
+  top: var(--s5);
 }
 
 @media (max-width: 1000px) {
   .composer {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Stacked, it is above the summary rather than beside it, and pinning it
+     would cover the thing it is meant to support. */
+  .sticky-aside {
+    position: static;
   }
 }
 

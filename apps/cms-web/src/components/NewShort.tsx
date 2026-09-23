@@ -22,9 +22,9 @@ import {
   Field,
   Fieldset,
   FileDrop,
+  Listbox,
   Panel,
   Segmented,
-  Select,
   Skeleton,
 } from '../ui';
 
@@ -50,6 +50,18 @@ import {
  * deliberate: the wait overlaps with the typing instead of following it, and a
  * clip that is too long or unreadable is rejected while the editor still has
  * the file in mind rather than after they have written the caption.
+ *
+ * -- Why the layout changes once there is a clip -----------------------------
+ *
+ * Before the upload there is one question, so the drop zone has the whole
+ * width. After it there are seven fields AND a poster, and the poster is the
+ * only evidence the editor has that the right few seconds were captured — so
+ * it moves beside the form and stays there while they write, rather than
+ * scrolling away above it.
+ *
+ * The fields themselves are a 12-column grid, six each. Seven controls stacked
+ * one per row made a column down the middle of the screen that was four screens
+ * tall on a laptop, with the poster off the top for most of it.
  */
 
 const TITLE_MAX = 80;
@@ -144,8 +156,69 @@ export function NewShort() {
     if (ok) goToList();
   };
 
+  const clipPanel = (
+    <Panel title="The clip">
+      {uploaded === null ? (
+        <Field
+          label="Video file"
+          /* Plain: the drop zone draws its own dashed box, and a label
+             floating on a dashed border is nonsense. */
+          variant="plain"
+          note="Transcoded to three sizes the player chooses between, plus a cover frame. Capped at 90 seconds — past that the data cost stops being something a reader can absorb without noticing."
+        >
+          {(f) => (
+            <>
+              <FileDrop
+                {...f}
+                accept="video/*"
+                disabled={uploading || action.busy}
+                icon="video"
+                title="Choose a clip, or drop one here"
+                hint="Up to 90 seconds"
+                onSelect={(file) => void onFile(file)}
+                onReject={setUploadError}
+              />
+              {uploading && (
+                <p className="field-note" role="status">
+                  <span className="spinner" aria-hidden="true" /> Transcoding — this takes a few
+                  seconds.
+                </p>
+              )}
+            </>
+          )}
+        </Field>
+      ) : (
+        <div className="clip-summary">
+          <img className="clip-poster" src={mediaUrl(uploaded.posterUrl)} alt="" />
+
+          <div>
+            <p className="meta-line">
+              <span>{uploaded.durationSeconds}s</span>
+              <span>{uploaded.renditions.length} renditions</span>
+            </p>
+            <ul className="clip-renditions" style={{ marginTop: 'var(--s2)' }}>
+              {uploaded.renditions.map((r) => (
+                <li key={r.quality}>
+                  <span className="clip-quality">{r.quality}</span>
+                  <span>
+                    {r.width}×{r.height}
+                  </span>
+                  <span>{fileSize(r.bytes)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <Button size="sm" icon="x" block disabled={action.busy} onClick={discard}>
+            Choose a different clip
+          </Button>
+        </div>
+      )}
+    </Panel>
+  );
+
   return (
-    <div className="page page-narrow">
+    <div className="page page-form">
       <h1 className="sr-only">New short</h1>
       <div className="detail-bar">
         <Breadcrumbs
@@ -169,221 +242,198 @@ export function NewShort() {
       {uploadError !== null && <Banner tone="error">{uploadError}</Banner>}
       {action.error !== null && <Banner tone="error">{action.error}</Banner>}
 
-      <Panel title="The clip">
-        {uploaded === null ? (
-          <Field
-            label="Video file"
-            /* Plain: the drop zone draws its own dashed box, and a label
-               floating on a dashed border is nonsense. */
-            variant="plain"
-            note="Transcoded to three sizes the player chooses between, plus a cover frame. Capped at 90 seconds — past that the data cost stops being something a reader can absorb without noticing."
-          >
-            {(f) => (
-              <>
-                <FileDrop
-                  {...f}
-                  accept="video/*"
-                  disabled={uploading || action.busy}
-                  icon="video"
-                  title="Choose a clip, or drop one here"
-                  hint="Up to 90 seconds"
-                  onSelect={(file) => void onFile(file)}
-                  onReject={setUploadError}
-                />
-                {uploading && (
-                  <p className="field-note" role="status">
-                    <span className="spinner" aria-hidden="true" /> Transcoding — this takes a few
-                    seconds.
-                  </p>
-                )}
-              </>
-            )}
-          </Field>
-        ) : (
-          <div className="media-row">
-            <img className="media-poster" src={mediaUrl(uploaded.posterUrl)} alt="" />
-            <div>
-              <p className="meta-line">
-                <span>{uploaded.durationSeconds}s</span>
-                <span>{uploaded.renditions.length} renditions</span>
-              </p>
-              <ul className="stack-tight" style={{ marginTop: 'var(--s2)', listStyle: 'none' }}>
-                {uploaded.renditions.map((r) => (
-                  <li className="meta-line" key={r.quality}>
-                    <span>{r.quality}</span>
-                    <span>
-                      {r.width}×{r.height}
-                    </span>
-                    <span>{fileSize(r.bytes)}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="actions actions-plain">
-                <Button size="sm" icon="x" disabled={action.busy} onClick={discard}>
-                  Choose a different clip
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-      </Panel>
-
       {/*
-        * The words only appear once there is a clip to attach them to.
-        *
-        * Seven fields that cannot be submitted yet are seven fields in the way.
-        * They arrive when the transcode finishes, which is also the moment the
-        * editor's attention comes back from the file picker.
+        * Before there is a clip there is one question, so it gets the width.
+        * Afterwards the poster is reference material for the writing, and
+        * belongs beside it.
         */}
-      {uploaded !== null && (
-        <Panel title="The words">
-          {loading || options === null ? (
-            <div aria-busy="true">
-              <Skeleton height={40} style={{ marginBottom: 20 }} />
-              <Skeleton height={40} style={{ marginBottom: 20 }} />
-              <Skeleton height={40} />
-            </div>
-          ) : (
-            <>
-              <Fieldset legend="Language">
-                {(g) => (
-                  <Segmented
-                    {...g}
-                    aria-label="Language"
-                    value={language}
-                    onChange={setLanguage}
-                    options={[
-                      { value: 'ne', label: 'नेपाली', lang: 'ne' },
-                      { value: 'en', label: 'English', lang: 'en' },
-                    ]}
-                  />
-                )}
-              </Fieldset>
+      {uploaded === null ? (
+        clipPanel
+      ) : (
+        <div className="grid">
+          <aside className="col-4 sticky-aside">{clipPanel}</aside>
 
-              <Field label="Section">
-                {(f) => (
-                  <Select
-                    {...f}
-                    value={category?.slug ?? ''}
-                    onChange={(e) => setCategoryChoice(e.target.value)}
-                  >
-                    {categories.map((c) => (
-                      <option key={c.slug} value={c.slug}>
-                        {language === 'ne' ? c.label.ne : c.label.en}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
+          <div className="col-8">
+            <Panel title="The words">
+              {loading || options === null ? (
+                <div className="grid" aria-busy="true">
+                  <div className="col-6">
+                    <Skeleton height={40} />
+                  </div>
+                  <div className="col-6">
+                    <Skeleton height={40} />
+                  </div>
+                  <div className="col-6">
+                    <Skeleton height={40} />
+                  </div>
+                  <div className="col-6">
+                    <Skeleton height={40} />
+                  </div>
+                  <div className="col-12">
+                    <Skeleton height={80} />
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="grid">
+                    <div className="col-6">
+                      <Fieldset legend="Language">
+                        {(g) => (
+                          <Segmented
+                            {...g}
+                            aria-label="Language"
+                            value={language}
+                            onChange={setLanguage}
+                            options={[
+                              { value: 'ne', label: 'नेपाली', lang: 'ne' },
+                              { value: 'en', label: 'English', lang: 'en' },
+                            ]}
+                          />
+                        )}
+                      </Fieldset>
+                    </div>
 
-              <Field label="Publisher">
-                {(f) => (
-                  <Select
-                    {...f}
-                    value={source?.slug ?? ''}
-                    onChange={(e) => setSourceChoice(e.target.value)}
-                  >
-                    {sources.map((s) => (
-                      <option key={s.slug} value={s.slug} disabled={!s.licensed}>
-                        {s.displayName}
-                        {s.licensed ? '' : ' — no agreed licence'}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
+                    <div className="col-6">
+                      <Field label="Section">
+                        {(f) => (
+                          <Listbox
+                            {...f}
+                            value={category?.slug ?? ''}
+                            onChange={(v) => setCategoryChoice(v)}
+                            options={categories.map((c) => ({
+                              value: c.slug,
+                              label: language === 'ne' ? c.label.ne : c.label.en,
+                              lang: language,
+                            }))}
+                          />
+                        )}
+                      </Field>
+                    </div>
 
-              <Field
-                label="Title"
-                counter={
-                  <Counter state={title.length > TITLE_MAX ? 'over' : 'ok'}>
-                    {title.length} / {TITLE_MAX}
-                  </Counter>
-                }
-                note="Shown over the poster, so it competes with the picture rather than sitting above it."
-              >
-                {(f) => (
-                  <input
-                    {...f}
-                    className="input"
-                    lang={language}
-                    maxLength={TITLE_MAX}
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                  />
-                )}
-              </Field>
+                    <div className="col-6">
+                      <Field label="Publisher">
+                        {(f) => (
+                          <Listbox
+                            {...f}
+                            value={source?.slug ?? ''}
+                            onChange={(v) => setSourceChoice(v)}
+                            options={sources.map((s) => ({
+                              value: s.slug,
+                              label: s.displayName,
+                              disabled: !s.licensed,
+                              disabledReason: 'No agreed licence',
+                            }))}
+                          />
+                        )}
+                      </Field>
+                    </div>
 
-              <Field
-                label="Caption"
-                counter={
-                  <Counter state={caption.length > CAPTION_MAX ? 'over' : 'ok'}>
-                    {caption.length} / {CAPTION_MAX}
-                  </Counter>
-                }
-                note="A short without words is a clip; with them it is journalism."
-              >
-                {(f) => (
-                  <textarea
-                    {...f}
-                    className="textarea"
-                    lang={language}
-                    rows={3}
-                    maxLength={CAPTION_MAX}
-                    value={caption}
-                    onChange={(e) => setCaption(e.target.value)}
-                  />
-                )}
-              </Field>
+                    <div className="col-6">
+                      <Field
+                        label="Title"
+                        counter={
+                          <Counter state={title.length > TITLE_MAX ? 'over' : 'ok'}>
+                            {title.length} / {TITLE_MAX}
+                          </Counter>
+                        }
+                        note="Shown over the poster, so it competes with the picture rather than sitting above it."
+                      >
+                        {(f) => (
+                          <input
+                            {...f}
+                            className="input"
+                            lang={language}
+                            maxLength={TITLE_MAX}
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                          />
+                        )}
+                      </Field>
+                    </div>
 
-              <Field label="Credit">
-                {(f) => (
-                  <input
-                    {...f}
-                    className="input"
-                    placeholder="Who shot it"
-                    value={credit}
-                    onChange={(e) => setCredit(e.target.value)}
-                  />
-                )}
-              </Field>
+                    {/* The one field that genuinely uses the full measure: it is
+                        the only prose on the screen. */}
+                    <div className="col-12">
+                      <Field
+                        label="Caption"
+                        counter={
+                          <Counter state={caption.length > CAPTION_MAX ? 'over' : 'ok'}>
+                            {caption.length} / {CAPTION_MAX}
+                          </Counter>
+                        }
+                        note="A short without words is a clip; with them it is journalism."
+                      >
+                        {(f) => (
+                          <textarea
+                            {...f}
+                            className="textarea"
+                            lang={language}
+                            rows={3}
+                            maxLength={CAPTION_MAX}
+                            value={caption}
+                            onChange={(e) => setCaption(e.target.value)}
+                          />
+                        )}
+                      </Field>
+                    </div>
 
-              <Field
-                label="Licence"
-                note="Same discipline as a photograph. Publication is blocked without a recognised licence and a credit."
-              >
-                {(f) => (
-                  <Select
-                    {...f}
-                    value={licence}
-                    onChange={(e) => setLicence(e.target.value as ImageLicence)}
-                  >
-                    {LICENCES.map((l) => (
-                      <option key={l.value} value={l.value}>
-                        {l.label} — {l.hint}
-                      </option>
-                    ))}
-                  </Select>
-                )}
-              </Field>
+                    {/* Credit beside licence, as on a photograph: they are one
+                        question asked twice, and answering either without the
+                        other is what blocks publication later. */}
+                    <div className="col-6">
+                      <Field label="Credit">
+                        {(f) => (
+                          <input
+                            {...f}
+                            className="input"
+                            placeholder="Who shot it"
+                            value={credit}
+                            onChange={(e) => setCredit(e.target.value)}
+                          />
+                        )}
+                      </Field>
+                    </div>
 
-              <div className="actions">
-                <Button
-                  variant="primary"
-                  icon="check"
-                  busy={action.busy}
-                  disabled={!complete}
-                  onClick={() => void save()}
-                >
-                  Save as a draft
-                </Button>
-                <Button disabled={action.busy} onClick={goToList}>
-                  Cancel
-                </Button>
-              </div>
-            </>
-          )}
-        </Panel>
+                    <div className="col-6">
+                      <Field
+                        label="Licence"
+                        note="Same discipline as a photograph. Publication is blocked without a recognised licence and a credit."
+                      >
+                        {(f) => (
+                          <Listbox
+                            {...f}
+                            value={licence}
+                            onChange={(v) => setLicence(v as ImageLicence)}
+                            options={LICENCES.map((l) => ({
+                              value: l.value,
+                              label: l.label,
+                              hint: l.hint,
+                            }))}
+                          />
+                        )}
+                      </Field>
+                    </div>
+                  </div>
+
+                  <div className="actions">
+                    <Button
+                      variant="primary"
+                      icon="check"
+                      busy={action.busy}
+                      disabled={!complete}
+                      onClick={() => void save()}
+                    >
+                      Save as a draft
+                    </Button>
+                    <Button disabled={action.busy} onClick={goToList}>
+                      Cancel
+                    </Button>
+                  </div>
+                </>
+              )}
+            </Panel>
+          </div>
+        </div>
       )}
     </div>
   );
