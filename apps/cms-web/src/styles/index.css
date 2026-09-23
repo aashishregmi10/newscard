@@ -1,0 +1,30 @@
+/*
+ * The stylesheet, in dependency order.
+ *
+ * Tokens define the vocabulary, base applies it to bare elements, layout builds
+ * the shell, components fill it and patterns assemble those into the compound
+ * pieces. The order is also the specificity order, so a later rule beats an
+ * earlier one without either needing `!important`.
+ *
+ * Imported once, from main.tsx. Vite inlines these at build time, so the five
+ * files are an organising decision here and a single stylesheet in the browser.
+ */
+
+/*
+ * Montserrat, which is what can-logistic loads and forces onto every element.
+ *
+ * Only the weights actually used: 400 body, 500 buttons and labels, 600
+ * headings, 700 the brand mark. Requesting the full variable range costs a
+ * noticeably larger file for five weights nobody asks for.
+ *
+ * `display=swap` so text paints in the fallback immediately rather than being
+ * invisible while the font downloads — on a newsroom tool that opens all day,
+ * a blank headline for 200ms is worse than one that reflows.
+ */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap');
+
+@import './tokens.css';
+@import './base.css';
+@import './layout.css';
+@import './components.css';
+@import './patterns.css';

@@ -19,6 +19,26 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * Was this rejection a cancelled request rather than a failed one?
+ *
+ * A component that navigates away aborts what it had in flight, and fetch
+ * rejects with an AbortError. That is this application tidying up, not the
+ * server refusing — reporting it as "cannot reach the CMS server" would put a
+ * red banner on screen every time an editor changed their mind quickly.
+ *
+ * Checked by name rather than `instanceof DOMException`, because not every
+ * runtime that implements AbortController throws a DOMException.
+ */
+export function isAbort(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error as { name?: unknown }).name === 'AbortError'
+  );
+}
+
 async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   let res: Response;
   try {
@@ -34,7 +54,10 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
         ...(init.headers ?? {}),
       },
     });
-  } catch {
+  } catch (e) {
+    // A cancellation is passed through untouched so the caller can recognise
+    // and ignore it; see isAbort above.
+    if (isAbort(e)) throw e;
     // Distinguish "server unreachable" from "server said no" — the fixes are
     // completely different and the message should say which.
     throw new ApiError('Cannot reach the CMS server. Is it running?', 'NETWORK', 0, null);
@@ -73,7 +96,8 @@ async function upload<T>(path: string, form: FormData): Promise<T> {
       credentials: 'include',
       headers: { 'X-Requested-With': 'newscard-cms' },
     });
-  } catch {
+  } catch (e) {
+    if (isAbort(e)) throw e;
     throw new ApiError('Cannot reach the CMS server. Is it running?', 'NETWORK', 0, null);
   }
   const body = await res.json().catch(() => null);
@@ -239,11 +263,89 @@ export interface Localised {
   en: string;
 }
 
+export type LicenceStatus = 'agreed' | 'pending' | 'refused' | 'unknown';
+export type IngestMethod = 'rss' | 'api' | 'manual';
+
+export interface SourceLicenceData {
+  status: LicenceStatus;
+  agreementRef: string | null;
+  /** ISO-8601. The date we held an agreement is kept even after it lapses. */
+  agreedAt: string | null;
+  /** Where a takedown demand goes. Required once the status is `agreed`. */
+  contactEmail: string | null;
+}
+
+export interface SourceIngestData {
+  method: IngestMethod;
+  feedUrl: string | null;
+  pollIntervalMin: number;
+  /** Written by the poller, which does not exist yet — null on every row today. */
+  lastPolledAt: string | null;
+  lastSuccessAt: string | null;
+  consecutiveFailures: number;
+}
+
+export interface SourceRow {
+  slug: string;
+  displayName: string;
+  homepageUrl: string;
+  logoUrl: string | null;
+  language: 'ne' | 'en';
+  priority: number;
+  isActive: boolean;
+  licence: SourceLicenceData;
+  ingest: SourceIngestData;
+  /** The server's own `isPollable()` answer, so the UI does not restate it. */
+  pollable: boolean;
+}
+
+export interface SourceDetail extends SourceRow {
+  /** What is filed against this publisher. Read before withdrawing a licence. */
+  articles: { published: number; total: number };
+}
+
+export interface SourceInput {
+  slug: string;
+  displayName: string;
+  homepageUrl: string;
+  logoUrl?: string | null;
+  language: 'ne' | 'en';
+  ingest: { method: IngestMethod; feedUrl?: string | null; pollIntervalMin: number };
+  priority: number;
+  isActive: boolean;
+}
+
+export interface SourcePatch {
+  displayName?: string;
+  homepageUrl?: string;
+  logoUrl?: string | null;
+  language?: 'ne' | 'en';
+  ingest?: { method?: IngestMethod; feedUrl?: string | null; pollIntervalMin?: number };
+  priority?: number;
+  isActive?: boolean;
+}
+
+export interface LicenceResult {
+  licence: SourceLicenceData;
+  publishedArticles: number;
+  wasDowngraded: boolean;
+}
+
+/*
+ * The read methods take an optional AbortSignal; the write methods do not.
+ *
+ * That asymmetry is the point rather than an omission. A read is worth
+ * cancelling — leaving a screen makes its data irrelevant, and a stale response
+ * landing after a newer one is an actual defect. A write is not: aborting a
+ * PATCH cancels the browser's wait, not the server's work, so the save may well
+ * have happened and the application would have no idea. The right thing for an
+ * in-flight write is to let it finish and ignore the result.
+ */
 export const api = {
-  me: () => req<{ staff: Staff }>('/auth/me'),
+  me: (signal?: AbortSignal) => req<{ staff: Staff }>('/auth/me', { signal }),
 
   /** Sections and publishers a new story can be filed against. */
-  options: () => req<NewStoryOptions>('/cms/options'),
+  options: (signal?: AbortSignal) => req<NewStoryOptions>('/cms/options', { signal }),
 
   /** Create a draft. Returns its id so the composer can open it immediately. */
   create: (body: {
@@ -259,11 +361,13 @@ export const api = {
     }),
   logout: () => req<{ ok: true }>('/auth/logout', { method: 'POST' }),
 
-  queue: () => req<{ limits: Limits; items: QueueItem[] }>('/cms/queue'),
+  queue: (signal?: AbortSignal) =>
+    req<{ limits: Limits; items: QueueItem[] }>('/cms/queue', { signal }),
 
-  article: (id: string) =>
+  article: (id: string, signal?: AbortSignal) =>
     req<{ limits: Limits; article: ArticleDetail; cluster: ClusterSibling[] }>(
-      `/cms/articles/${id}`,
+      `/cms/articles/${encodeURIComponent(id)}`,
+      { signal },
     ),
 
   save: (
@@ -315,7 +419,7 @@ export const api = {
     return upload<{ video: UploadedVideo }>('/cms/media/video', form);
   },
 
-  shorts: () => req<{ items: ShortItem[] }>('/cms/shorts'),
+  shorts: (signal?: AbortSignal) => req<{ items: ShortItem[] }>('/cms/shorts', { signal }),
 
   createShort: (body: {
     language: 'ne' | 'en';
@@ -343,9 +447,50 @@ export const api = {
       body: JSON.stringify({}),
     }),
 
-  notifyTargets: () => req<NotifyTargets>('/cms/notifications/targets'),
+  /* ---------------------------------------------------------- publishers */
 
-  notifyHistory: () => req<{ items: NotificationRow[] }>('/cms/notifications'),
+  sources: (signal?: AbortSignal) => req<{ items: SourceRow[] }>('/cms/sources', { signal }),
+
+  source: (slug: string, signal?: AbortSignal) =>
+    req<{ source: SourceDetail }>(`/cms/sources/${encodeURIComponent(slug)}`, { signal }),
+
+  /** Creates a publisher. The licence is NOT settable here — see the route. */
+  createSource: (body: SourceInput) =>
+    req<{ slug: string }>('/cms/sources', { method: 'POST', body: JSON.stringify(body) }),
+
+  saveSource: (slug: string, patch: SourcePatch) =>
+    req<{ ok: true }>(`/cms/sources/${encodeURIComponent(slug)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch),
+    }),
+
+  /**
+   * The legal gate, on its own endpoint under its own permission.
+   *
+   * `note` is required by the server when the licence LEAVES `agreed`: granting
+   * one is evidenced by the agreement reference, withdrawing one is evidenced
+   * by nothing unless we ask.
+   */
+  setSourceLicence: (
+    slug: string,
+    body: {
+      status: LicenceStatus;
+      agreementRef?: string | null;
+      agreedAt?: string | null;
+      contactEmail?: string | null;
+      note?: string;
+    },
+  ) =>
+    req<LicenceResult>(`/cms/sources/${encodeURIComponent(slug)}/licence`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  notifyTargets: (signal?: AbortSignal) =>
+    req<NotifyTargets>('/cms/notifications/targets', { signal }),
+
+  notifyHistory: (signal?: AbortSignal) =>
+    req<{ items: NotificationRow[] }>('/cms/notifications', { signal }),
 
   notifySend: (body: {
     type: string;

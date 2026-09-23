@@ -1,0 +1,1539 @@
+/*
+ * Components, in Material's idiom.
+ *
+ * Everything here spends tokens and mints none. Where a number looks arbitrary
+ * it is Material's — 6px/16px button padding, a 0.02857em tracking, a 40px
+ * dense input — and is reproduced rather than rounded off, because those
+ * numbers are most of why a Material screen looks like one.
+ */
+
+/* ========================================================================
+ * Buttons
+ * ====================================================================== */
+
+/*
+ * Material's three button variants, mapped onto this application's four
+ * intents: `primary` is contained, `default` is outlined, `ghost` is text and
+ * `danger` is outlined in the error colour.
+ *
+ * -- On the uppercase --------------------------------------------------------
+ *
+ * Material sets `textTransform: uppercase` on every button and can-logistic
+ * does not override it, so its buttons read SAVE, CANCEL, EDIT. It is
+ * reproduced here because it is one of the two or three things that make a
+ * screen legible as Material at a glance. It is also why the tracking below
+ * matters: uppercase at 14px without letter-spacing sets solid.
+ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  min-width: 64px;
+  padding: 5px 15px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-base);
+  font-weight: 500;
+  line-height: 1.75;
+  letter-spacing: var(--track-button);
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease),
+    box-shadow var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+/* Material tints on hover rather than repainting: a translucent black or
+   primary laid over whatever is beneath, so one value works everywhere. */
+.btn:hover:not(:disabled) {
+  background: var(--action-hover);
+  border-color: var(--ink-faint);
+}
+
+/*
+ * Disabled.
+ *
+ * Material's exact treatment: a flat grey fill with grey text, not reduced
+ * opacity. A control you cannot use still has to be readable, because its
+ * label is usually the explanation for why it is unavailable.
+ */
+.btn:disabled {
+  cursor: not-allowed;
+  background: var(--action-selected);
+  border-color: transparent;
+  color: var(--ink-disabled);
+  box-shadow: none;
+}
+
+.btn-primary {
+  background: var(--accent);
+  border-color: transparent;
+  color: var(--accent-ink);
+  /* Material's contained button rests at elevation 2 and lifts to 4. */
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+  border-color: transparent;
+  color: var(--accent-ink);
+  box-shadow: var(--shadow-md);
+}
+
+.btn-primary:active:not(:disabled) {
+  box-shadow: var(--shadow-xs);
+}
+
+.btn-ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--accent);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+.btn-ghost:disabled {
+  background: transparent;
+  border-color: transparent;
+}
+
+.btn-danger {
+  color: var(--bad);
+  border-color: var(--bad-line);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: var(--bad-soft);
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+/* Material's `size="small"`, which is what a dense screen uses throughout. */
+.btn-sm {
+  padding: 3px 9px;
+  font-size: var(--text-sm);
+  line-height: 1.75;
+}
+
+/*
+ * An icon on its own — Material's IconButton, which is round and has no border.
+ * can-logistic adds its own square variant with a tinted background
+ * (`.c-icon-button`); the round one is the default and is what is used here.
+ */
+.btn-icon {
+  min-width: 0;
+  padding: 8px;
+  border-color: transparent;
+  border-radius: var(--r-pill);
+  color: var(--ink-faint);
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: var(--action-hover);
+  border-color: transparent;
+  color: var(--ink);
+}
+
+.btn-sm.btn-icon {
+  padding: 5px;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-icon-glyph {
+  flex: none;
+  /* Material's `fontSize="small"`, which is 20px. */
+  width: 20px;
+  height: 20px;
+}
+
+.btn-sm .btn-icon-glyph {
+  width: 18px;
+  height: 18px;
+}
+
+/* ========================================================================
+ * Panels — Material's Paper, variant="outlined"
+ * ====================================================================== */
+
+/*
+ * Outlined rather than elevated, which is can-logistic's near-universal
+ * choice: `<Paper variant="outlined">` for the breadcrumb bar, for content
+ * panels, for everything that is not a menu. A 1px divider and no shadow.
+ * Cards float; outlined panels sit on the page, and a screen of a dozen
+ * floating cards has no hierarchy left to spend.
+ */
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.panel + .panel {
+  margin-top: var(--s4);
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s4) var(--s5);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Material's h6: 20px, weight 500. The heading size a card title actually is. */
+.panel-title {
+  font-size: var(--text-md);
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.panel-head-note {
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+}
+
+.panel-head-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+.panel-body {
+  padding: var(--s5);
+}
+
+/* A body that hosts only a list wants no padding of its own — the list's own
+   rows already carry it, and doubling up makes a panel of rows look inset. */
+.panel-body-flush {
+  padding: 0;
+}
+
+.panel-sunk {
+  background: var(--surface-sunk);
+  box-shadow: none;
+}
+
+/* ========================================================================
+ * Fields — Material's outlined TextField
+ * ====================================================================== */
+
+/*
+ * The notched outline.
+ *
+ * This is the most recognisable control Material has, and it is genuinely
+ * fiddly: the label sits ON the border, and the border has a gap cut in it
+ * exactly as wide as the label. Material builds it from a `<fieldset>` with a
+ * `<legend>`, because a legend natively interrupts a fieldset's top border —
+ * the same trick is used here rather than a hand-computed background gradient,
+ * which would need the label's rendered width in JavaScript.
+ *
+ * The state that drives it is `:placeholder-shown`, which is true only while
+ * the control is empty. Every control inside a Field therefore receives a
+ * placeholder of a single space, so that "empty" is expressible in CSS at all;
+ * see Field.tsx. A control with a REAL placeholder keeps it, and the rule
+ * further down hides it until focus so it cannot show through an unfloated
+ * label.
+ */
+.field + .field {
+  margin-top: var(--s5);
+}
+
+.field-shell {
+  position: relative;
+  display: block;
+}
+
+.field-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--s3);
+}
+
+/*
+ * The label itself.
+ *
+ * Resting, it sits inside the control, vertically centred, at the input's own
+ * size. Floated, it rises onto the border and shrinks to 0.75 — Material
+ * animates the transform rather than the font-size because transforms do not
+ * cause layout, so the label does not shudder as it moves.
+ */
+.field-label-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+  max-width: calc(100% - 24px);
+  padding: 0 4px;
+  transform: translate(10px, 12px) scale(1);
+  transform-origin: top left;
+  color: var(--ink-faint);
+  font-size: var(--text-base);
+  line-height: 1.15;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+  transition: transform var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+/*
+ * Floated: focused, or holding a value.
+ *
+ * -- Why these are sibling selectors and not `:has()` ------------------------
+ *
+ * Field renders the control, then the label, then the outline, all as children
+ * of the shell. So every piece of state the label needs — is the input empty,
+ * does the combo box hold a selection — is on a PRECEDING SIBLING, and `~`
+ * expresses that directly. `:has()` would work too, but it asks the engine to
+ * look downwards from the shell for something that is sitting immediately to
+ * the left, which is a harder question for no benefit.
+ *
+ * Focus is the exception and stays on the shell: it can be inside a wrapper the
+ * sibling combinator cannot see into, and `:focus-within` is made for exactly
+ * that.
+ *
+ * `[data-filled]` is the escape hatch for a control that wraps its input — the
+ * combo box — where "has a value" is a fact only the component knows. It sets
+ * the attribute; see Combobox.tsx.
+ */
+.field-shell:focus-within .field-label-text,
+.input:not(:placeholder-shown) ~ .field-label-text,
+.textarea:not(:placeholder-shown) ~ .field-label-text,
+.select-wrap ~ .field-label-text,
+/*
+ * A date input can never satisfy `:placeholder-shown` — it always renders its
+ * own dd/mm/yyyy shell, so it is never "empty" in the sense the selector means.
+ * Its label therefore floats permanently, exactly as a select's does, rather
+ * than resting on top of the placeholder the browser drew.
+ */
+.input[type='date'] ~ .field-label-text,
+[data-filled='true'] ~ .field-label-text {
+  transform: translate(10px, -8px) scale(0.75);
+}
+
+.field-shell:focus-within .field-label-text {
+  color: var(--accent);
+}
+
+/*
+ * The outline, and the notch in it.
+ *
+ * The fieldset is purely decorative and sits behind the control; the legend is
+ * what cuts the gap. Collapsed, the legend has effectively no width and the
+ * border is continuous; expanded, it takes the label's width and the border
+ * runs around it.
+ */
+.field-outline {
+  position: absolute;
+  inset: -5px 0 0 0;
+  margin: 0;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  pointer-events: none;
+  transition: border-color var(--fast) var(--ease);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.field-legend {
+  display: block;
+  width: auto;
+  max-width: 0.01px;
+  height: 11px;
+  padding: 0;
+  font-size: 0.75em;
+  visibility: hidden;
+  white-space: nowrap;
+  transition: max-width var(--fast) var(--ease);
+}
+
+.field-legend span {
+  padding: 0 5px;
+  display: inline-block;
+  opacity: 0;
+  visibility: visible;
+}
+
+/* The notch opens on the same conditions, reached through the outline the
+   legend lives in — which is itself a later sibling of the control. */
+.field-shell:focus-within .field-legend,
+.input:not(:placeholder-shown) ~ .field-outline .field-legend,
+.textarea:not(:placeholder-shown) ~ .field-outline .field-legend,
+.select-wrap ~ .field-outline .field-legend,
+.input[type='date'] ~ .field-outline .field-legend,
+[data-filled='true'] ~ .field-outline .field-legend {
+  max-width: 100%;
+}
+
+.field-shell:hover .field-outline {
+  border-color: var(--ink);
+}
+
+/* Material thickens the outline to 2px on focus rather than adding a ring. */
+.field-shell:focus-within .field-outline {
+  border-color: var(--accent);
+  border-width: 2px;
+}
+
+.field-invalid .field-outline,
+.field-shell:focus-within.field-invalid .field-outline {
+  border-color: var(--bad);
+}
+
+.field-invalid .field-label-text {
+  color: var(--bad);
+}
+
+/*
+ * The helper row: the note on the left, the counter on the right.
+ *
+ * Material puts a character count here rather than beside the label, and that
+ * is the right place for it now that the label lives on the border — a counter
+ * up there would sit inside the notch and be cut in half by it.
+ */
+.field-help {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+}
+
+/* Material's helper text: 12px, indented to the control's text, 3px below. */
+.field-note {
+  display: block;
+  margin: 3px 14px 0;
+  font-size: var(--text-xs);
+  line-height: 1.66;
+  color: var(--ink-faint);
+}
+
+/* The label for a `plain` field, which draws no outline for one to sit on. */
+.field-plain-label {
+  display: block;
+  margin-bottom: var(--s2);
+  font-size: var(--text-xs);
+  letter-spacing: 0.03333em;
+  color: var(--ink-faint);
+}
+
+.field-note-warn {
+  color: var(--warn);
+}
+
+.field-note-bad {
+  color: var(--bad);
+}
+
+/* "optional" should not shout in the same voice as the field name. */
+.field-optional {
+  margin-left: 5px;
+  color: var(--ink-disabled);
+}
+
+/*
+ * A field whose control is a group — a segmented control, a set of toggles.
+ *
+ * `min-width: 0` is not cosmetic: a fieldset has a default minimum width set by
+ * its content and ignores flex and grid shrinking without it, so one inside the
+ * composer pushes the whole column wider than its track.
+ */
+.field-set {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+/* Material's `FormLabel` above a group: 12px, the same size a floated label
+   shrinks to, so a group label and a field label sit at one size. */
+.field-group-legend {
+  display: block;
+  margin-bottom: var(--s2);
+  padding: 0;
+  font-size: var(--text-xs);
+  font-weight: 400;
+  letter-spacing: 0.03333em;
+  color: var(--ink-faint);
+}
+
+/* Two controls that belong to one label stack with a smaller gap than two
+   separate fields would. */
+.field-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+
+/*
+ * The control.
+ *
+ * Transparent, with no border of its own — the outline behind it draws the
+ * box. Material's dense padding is 8.5px/14px, giving the 40px height that
+ * makes `size="small"` fit a CRM row.
+ */
+.input,
+.textarea,
+.select {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: 8.5px 14px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 1.4375em;
+}
+
+.input:focus,
+.textarea:focus,
+.select:focus {
+  outline: none;
+}
+
+/*
+ * A real placeholder is hidden until the control has focus.
+ *
+ * Otherwise it shows through beneath the resting label and the field carries
+ * two competing pieces of grey text. Material does exactly this.
+ */
+.input:not(:focus)::placeholder,
+.textarea:not(:focus)::placeholder,
+.combo-input:not(:focus)::placeholder {
+  color: transparent;
+}
+
+.input:focus::placeholder,
+.textarea:focus::placeholder,
+.combo-input:focus::placeholder {
+  color: var(--ink-disabled);
+  opacity: 1;
+}
+
+.input:disabled,
+.textarea:disabled,
+.select:disabled {
+  color: var(--ink-disabled);
+  cursor: not-allowed;
+  -webkit-text-fill-color: var(--ink-disabled);
+}
+
+.textarea {
+  display: block;
+  resize: vertical;
+  min-height: 140px;
+  line-height: 1.6;
+}
+
+/*
+ * Devanagari needs more room between lines than Latin: the vowel marks above
+ * one line collide with the marks below the line above at Latin spacing.
+ * Keyed off the lang attribute so it follows the content, not the component.
+ */
+[lang='ne'].textarea,
+[lang='ne'].input {
+  line-height: 1.9;
+}
+
+/* A summary field is the thing on the screen being written, so it gets reading
+   type rather than interface type. */
+.textarea-prose {
+  font-size: var(--text-md);
+}
+
+/*
+ * Select.
+ *
+ * The native control is stripped and re-drawn because its appearance is set by
+ * the operating system, so the one control on the page that the design system
+ * does not reach is the one that looks out of place on every machine. The
+ * chevron is a real element rather than a background image, because a data URI
+ * cannot take `currentColor` and would need a second copy for the dark theme.
+ *
+ * A select always holds a value, so its label is permanently floated — hence
+ * the `:has(.select)` rules above rather than a `:placeholder-shown` test,
+ * which a select can never satisfy.
+ */
+.select-wrap {
+  position: relative;
+  display: block;
+}
+
+.select {
+  appearance: none;
+  padding-right: 32px;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+.select-chevron {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  margin-top: -12px;
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+
+/* ========================================================================
+ * File input
+ * ====================================================================== */
+
+/*
+ * A drop zone, not a native file input.
+ *
+ * `<input type="file">` renders an unstyleable OS button reading "Choose File /
+ * No file chosen" — different on every platform, immune to every token here,
+ * and the single most obviously unfinished-looking element a web application
+ * can put on a page.
+ *
+ * The input is still here. It is what actually opens the picker, what carries
+ * `accept` to the OS dialog, and what a screen reader announces as a file
+ * control. It is hidden inside a `<label>`, so the whole zone is the control and
+ * a click anywhere on it works without a line of JavaScript — and, crucially,
+ * without the security restriction that stops a synthetic click opening a file
+ * dialog in some browsers.
+ *
+ * Three things this handles that a bare input does not: a dropped file; the
+ * `accept` filter on a drop, which the attribute does not apply; and choosing
+ * the same file twice, which fires no `change` event. See FileDrop.tsx.
+ */
+.filedrop {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  width: 100%;
+  padding: var(--s4);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color var(--fast) var(--ease), background var(--fast) var(--ease);
+}
+
+.filedrop:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+/* The ring goes on the label, because the input inside it has no painted box to
+   put a ring around. */
+.filedrop:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-style: solid;
+}
+
+.filedrop-dragging {
+  border-color: var(--accent);
+  border-style: solid;
+  background: var(--accent-soft);
+}
+
+.filedrop-disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.filedrop-disabled:hover {
+  border-color: var(--line-strong);
+  background: transparent;
+}
+
+.filedrop-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: var(--r-pill);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.filedrop-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.filedrop-text {
+  min-width: 0;
+}
+
+.filedrop-title {
+  display: block;
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.filedrop-hint {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+/* The input is present and focusable, just not painted. `display: none` would
+   take it out of the tab order and out of the accessibility tree. */
+.filedrop-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ========================================================================
+ * Segmented control and toggles
+ * ====================================================================== */
+
+/*
+ * Two shapes, deliberately different.
+ *
+ * `.segmented` is Material's ToggleButtonGroup: a joined strip, one of which is
+ * always selected. `.toggle-group` below is separated chips: any number,
+ * including none. They were previously drawn identically, which is why a
+ * notification going to readers of both languages looked like a single wide
+ * selection spanning two labels — with no way to tell that clicking the lit
+ * half would switch it off.
+ */
+.segmented {
+  display: inline-flex;
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.seg {
+  padding: 7px 15px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  letter-spacing: var(--track-button);
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.seg:first-child {
+  border-radius: var(--r-sm) 0 0 var(--r-sm);
+}
+
+.seg:last-child {
+  border-radius: 0 var(--r-sm) var(--r-sm) 0;
+}
+
+/* The shared edge is drawn once, not twice — two 1px borders against each
+   other read as 2px and make the strip look assembled rather than single. */
+.seg + .seg {
+  border-left: 0;
+}
+
+.seg:hover:not([aria-checked='true']):not(:disabled) {
+  background: var(--action-hover);
+  color: var(--ink);
+}
+
+/* Material's selected ToggleButton is a primary TINT, not a fill. */
+.seg[aria-checked='true'] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-color: var(--accent-line);
+}
+
+.seg:disabled {
+  color: var(--ink-disabled);
+  cursor: not-allowed;
+}
+
+/* Material's outlined Chip, made clickable. */
+.toggle-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+}
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease),
+    color var(--fast) var(--ease);
+}
+
+.toggle:hover:not(:disabled) {
+  background: var(--action-hover);
+}
+
+.toggle[aria-pressed='true'] {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+/* A tick box that is drawn, not a real checkbox: the button already carries
+   `aria-pressed`, so a second control here would announce the state twice. */
+.toggle-box {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--line-strong);
+  border-radius: 2px;
+  background: transparent;
+  color: transparent;
+  transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease),
+    color var(--fast) var(--ease);
+}
+
+.toggle[aria-pressed='true'] .toggle-box {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.toggle-box svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ========================================================================
+ * Chips and badges — Material's Chip, size="small"
+ * ====================================================================== */
+
+/*
+ * A badge is an icon, a word and a colour together.
+ *
+ * Never colour alone: roughly one man in twelve cannot reliably separate the
+ * green from the amber these use, and a queue where status is only a hue is one
+ * they have to read word by word. The icon is the redundant channel, and it is
+ * the reason these are worth the width they take.
+ */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--r-pill);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.badge svg {
+  flex: none;
+  width: 14px;
+  height: 14px;
+}
+
+.badge-neutral {
+  background: var(--action-selected);
+  color: var(--ink-faint);
+}
+
+.badge-accent {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+  color: var(--accent);
+}
+
+.badge-ok {
+  background: var(--ok-soft);
+  border-color: var(--ok-line);
+  color: var(--ok);
+}
+
+.badge-warn {
+  background: var(--warn-soft);
+  border-color: var(--warn-line);
+  color: var(--warn);
+}
+
+.badge-bad {
+  background: var(--bad-soft);
+  border-color: var(--bad-line);
+  color: var(--bad);
+}
+
+/*
+ * The language tag.
+ *
+ * Material's outlined Chip in its quietest form. It appears on every single
+ * row, which makes it the least informative thing in the list — and a colour
+ * spent on something always present is a colour that cannot be spent on the
+ * thing that is unusual.
+ */
+.tag-lang {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/*
+ * A flag: an icon on its own, carrying a warning.
+ *
+ * These were text pills reading "dup?" and "lang?" — debug output, on a
+ * newsroom screen. As icons they take a fifth of the width, stop competing with
+ * the headline, and say what they actually mean on hover and to a screen reader
+ * instead of abbreviating it into a guess.
+ */
+.flag {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--r-pill);
+}
+
+.flag svg {
+  width: 16px;
+  height: 16px;
+}
+
+.flag-accent {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.flag-warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.flag-bad {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+/* ========================================================================
+ * Lists — Material's Table / List rows
+ * ====================================================================== */
+
+/*
+ * Rows in a bordered container with dividers between them, which is how
+ * can-logistic's DataTable reads: one outline around the set, a rule between
+ * each, and a tint on hover. Detached cards with gaps between them are a
+ * different pattern and a less dense one.
+ */
+.list {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+}
+
+.list-flush {
+  border: 0;
+  border-radius: 0;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s4);
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--line);
+  /* The selected row grows a 3px primary bar on its left edge. Reserving the
+     space here rather than adding it there means selecting a row does not shift
+     its text sideways by 3px. */
+  border-left: 3px solid transparent;
+  background: var(--surface);
+  transition: background var(--fast) var(--ease), border-color var(--fast) var(--ease);
+}
+
+.item:last-child {
+  border-bottom: 0;
+}
+
+.item-selectable {
+  cursor: pointer;
+}
+
+.item-selectable:hover {
+  background: var(--action-hover);
+}
+
+/*
+ * The keyboard cursor.
+ *
+ * Driven by `aria-selected`, which is also what the listbox reports, so the
+ * highlight and the announcement are the same fact. It has to be stronger than
+ * hover: hover says "the pointer is here", this says "Enter will open this".
+ */
+.item[aria-selected='true'] {
+  background: var(--accent-soft);
+  border-left-color: var(--accent);
+}
+
+.item-lead {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  color: var(--ink-faint);
+}
+
+.item-lead svg {
+  width: 20px;
+  height: 20px;
+}
+
+.item-lead-draft {
+  color: var(--ink-faint);
+}
+
+.item-lead-review {
+  color: var(--warn);
+}
+
+.item-lead-ok {
+  color: var(--ok);
+}
+
+.item-lead-bad {
+  color: var(--bad);
+}
+
+.item-body {
+  min-width: 0;
+}
+
+.item-title {
+  font-size: var(--text-base);
+  font-weight: 500;
+  color: var(--ink);
+  /* Two lines, then clipped. One line loses the end of most Nepali headlines;
+     unbounded lets a single bad row set the height of the whole list. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.item-title[lang='ne'] {
+  line-height: 1.5;
+}
+
+.item-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  margin-top: 2px;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+/* Separators drawn by CSS rather than typed into the JSX as " · " — a literal
+   separator between optional values leaves a stray dot when one is absent. */
+.item-meta > * + *::before {
+  content: '·';
+  margin-right: 6px;
+  color: var(--line-strong);
+}
+
+.item-meta-status {
+  font-weight: 500;
+  color: var(--ink-soft);
+}
+
+.item-tail {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+
+/*
+ * Age, as a column.
+ *
+ * A fixed minimum width and right alignment, so ages line up down the list
+ * instead of each starting wherever the publisher's name happened to end. It
+ * also gives the right-hand side of a wide row something to anchor to — three
+ * small chips alone out there read as stray marks rather than as a column.
+ */
+.item-when {
+  min-width: 64px;
+  text-align: right;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  /*
+   * Narrow: it keeps its place but stops reserving a column.
+   *
+   * NOT hidden. The age is only in this one element now — it was taken out of
+   * the meta line when it moved here — so hiding it would simply lose the
+   * information on a phone rather than relocating it.
+   */
+  .item-when {
+    min-width: 0;
+  }
+}
+
+/* ========================================================================
+ * Banners — Material's Alert
+ * ====================================================================== */
+
+.banner {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: 6px var(--s4);
+  border: 1px solid transparent;
+  border-radius: var(--r-md);
+  background: var(--action-hover);
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 1.43;
+}
+
+.banner + .banner,
+.banner + .panel,
+.panel + .banner {
+  margin-top: var(--s4);
+}
+
+/* Material pads an Alert's icon 7px vertically and 9px to the right, which is
+   what lines its centre up with the first line of text rather than the block. */
+.banner-icon {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  margin: 7px 0;
+}
+
+.banner-body {
+  min-width: 0;
+  flex: 1;
+  padding: 8px 0;
+}
+
+.banner-body strong {
+  font-weight: 500;
+}
+
+/*
+ * Material's standard Alert: a tinted background with a much darker text and
+ * icon of the same hue. Not a coloured block with white text, which is what a
+ * toast is.
+ */
+.banner-error {
+  background: var(--bad-soft);
+  color: var(--bad);
+}
+
+.banner-ok {
+  background: var(--ok-soft);
+  color: var(--ok);
+}
+
+.banner-warn {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+
+.banner-info {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.banner-dismiss {
+  flex: none;
+  margin: 2px -6px 0 0;
+  color: inherit;
+  opacity: 0.75;
+}
+
+.banner-dismiss:hover:not(:disabled) {
+  opacity: 1;
+  background: rgba(127, 127, 127, 0.14);
+  color: inherit;
+}
+
+/* ========================================================================
+ * Empty and loading states
+ * ====================================================================== */
+
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: var(--s9) var(--s5);
+  color: var(--ink-faint);
+}
+
+.empty-icon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: var(--s4);
+  border-radius: var(--r-pill);
+  background: var(--action-hover);
+  color: var(--ink-faint);
+}
+
+.empty-icon svg {
+  width: 26px;
+  height: 26px;
+}
+
+.empty-title {
+  font-size: var(--text-md);
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.empty-body {
+  max-width: 44ch;
+  margin-top: 5px;
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+
+.empty-action {
+  margin-top: var(--s5);
+}
+
+/* A compact version for an empty region inside a panel, where the generous one
+   would be a screenful of nothing. */
+.empty-inline {
+  padding: var(--s7) var(--s5);
+}
+
+/*
+ * Skeletons.
+ *
+ * Shaped like the content they stand in for, so nothing moves when the data
+ * lands. Material's Skeleton is a flat tint with a travelling highlight, which
+ * is what this is — a pulsing block at the same rhythm as a spinner reads as
+ * two loading indicators.
+ */
+.skel {
+  background: linear-gradient(
+    90deg,
+    var(--action-hover) 25%,
+    var(--action-selected) 50%,
+    var(--action-hover) 75%
+  );
+  background-size: 400% 100%;
+  border-radius: var(--r-sm);
+  animation: skel-sweep 1.6s var(--ease) infinite;
+}
+
+@keyframes skel-sweep {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skel {
+    animation: none;
+    background: var(--action-hover);
+  }
+}
+
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  vertical-align: -3px;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ========================================================================
+ * Odds and ends
+ * ====================================================================== */
+
+/*
+ * A counter beside a field label.
+ *
+ * Three states rather than "red when wrong": under, ok and over each read
+ * differently, because "you have not written enough yet" and "you have written
+ * too much" are different instructions and an editor acts on them differently.
+ */
+.counter {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.counter[data-state='under'] {
+  color: var(--warn);
+}
+
+.counter[data-state='ok'] {
+  color: var(--ok);
+}
+
+.counter[data-state='over'] {
+  color: var(--bad);
+}
+
+.kbd {
+  display: inline-block;
+  min-width: 20px;
+  padding: 1px 5px;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 3px;
+  background: var(--surface);
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 16px;
+  text-align: center;
+}
+
+/* The keyboard legend in a page header. Hidden on touch widths, where there is
+   no keyboard to hint about and the room is better spent. */
+.hints {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.hints-sep {
+  color: var(--line-strong);
+}
+
+@media (max-width: 900px) {
+  .hints {
+    display: none;
+  }
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  margin-top: var(--s5);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+
+.actions-plain {
+  margin-top: var(--s3);
+  padding-top: 0;
+  border-top: 0;
+}
+
+.actions-spacer {
+  flex: 1;
+}
+
+/*
+ * The save indicator.
+ *
+ * A fixed minimum height so that "saving..." appearing and disappearing does
+ * not move the header it sits in. Autosave that jostles the page every 1.5
+ * seconds is worse than autosave you cannot see.
+ */
+.savehint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.savehint-error {
+  color: var(--bad);
+}
+
+.savehint svg {
+  width: 16px;
+  height: 16px;
+}
+
+.meta-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 6px;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.meta-line > * + *::before {
+  content: '·';
+  margin-right: 6px;
+  color: var(--line-strong);
+}
+
+.prose {
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--ink-faint);
+}
+
+.prose-scroll {
+  max-height: 340px;
+  overflow: auto;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+
+.stack-tight {
+  gap: var(--s2);
+}
+
+/* ========================================================================
+ * Composer
+ * ====================================================================== */
+
+.composer {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 0.8fr);
+  gap: var(--s4);
+  align-items: start;
+}
+
+@media (max-width: 1000px) {
+  .composer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.cluster-note ul {
+  margin-top: 6px;
+  padding-left: var(--s4);
+  list-style: disc;
+}
+
+.cluster-note li {
+  margin-top: 2px;
+}
+
+/* ========================================================================
+ * Media previews
+ * ====================================================================== */
+
+.media-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  /* The average colour of a seeded photograph, so the box does not flash white
+     before the file arrives. The same placeholder the reader app uses. */
+  background: #e8ebe6;
+}
+
+.media-poster {
+  flex: none;
+  width: 92px;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  background: #e8ebe6;
+}
+
+.media-row {
+  display: flex;
+  gap: var(--s4);
+}
+
+/* ========================================================================
+ * Login
+ * ====================================================================== */
+
+.login {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: var(--s6);
+}
+
+/* The one place an elevated Card is right: it is the only thing on the page,
+   so there is no hierarchy for it to flatten. */
+.login-card {
+  width: 100%;
+  max-width: 400px;
+  padding: var(--s7);
+  background: var(--surface);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+}
+
+.login-mark {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.login-sub {
+  margin-bottom: var(--s6);
+  font-size: var(--text-base);
+  color: var(--ink-faint);
+}

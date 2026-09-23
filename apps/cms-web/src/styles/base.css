@@ -1,0 +1,182 @@
+/*
+ * Element defaults.
+ *
+ * Only things that apply to bare elements live here. Anything with a class name
+ * belongs in components.css — the split is what stops this file growing into a
+ * second, invisible component layer.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/*
+ * 16px base, as can-logistic sets.
+ *
+ * Its rule is `html * { font-size: 16px }`, which forces every element to 16
+ * and then lets each Material class override it. The same result is reached
+ * here by setting it once on the root and letting components state their own
+ * size — without a declaration on every element in the document, and without
+ * the `!important` that one needs to stay ahead of what it is fighting.
+ */
+html {
+  font-size: 16px;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font);
+  /* Material's body2: the size almost every dense screen is actually set in. */
+  font-size: var(--text-base);
+  font-weight: 400;
+  line-height: 1.43;
+  letter-spacing: 0.01071em;
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Latin numerals line up in a column of counts and timestamps. Without this
+     a queue of "3h ago" / "11h ago" ripples as the digits change width. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Form controls do not inherit type from the page, in any browser. */
+button,
+input,
+textarea,
+select {
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+}
+
+button {
+  margin: 0;
+}
+
+/* Material's h5 and h6, which is as large as this application goes. */
+h1,
+h2,
+h3,
+h4 {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.334;
+  letter-spacing: var(--track-tight);
+}
+
+p {
+  margin: 0;
+}
+
+ul,
+ol {
+  margin: 0;
+  padding: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+/*
+ * Focus.
+ *
+ * `:focus-visible` rather than `:focus`, so a mouse click on a button does not
+ * leave a ring behind while the keyboard path still shows one. The ring is
+ * drawn outside the element with an offset, so it never covers the border it
+ * is announcing, and it uses the primary so it reads as deliberate.
+ */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* An element that takes focus only to host a roving cursor — the queue listbox —
+   should not also draw a ring around its entire height. It marks the active row
+   instead. */
+[data-focus-ring='none']:focus-visible {
+  outline: none;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+
+/*
+ * Motion.
+ *
+ * Honoured globally rather than per-component, because a component added later
+ * would have to remember, and one day would not. Transitions are collapsed to
+ * 1ms rather than 0 so that `transitionend` handlers still fire — a handler that
+ * never runs is a stuck interface, which is a worse outcome than the animation
+ * the reader asked to avoid.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Firefox takes these two; WebKit and Blink take the ::-webkit- rules below. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 11px;
+  height: 11px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: var(--r-pill);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--ink-faint);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/*
+ * Visually hidden, but present for a screen reader.
+ *
+ * `display: none` and `visibility: hidden` both remove the element from the
+ * accessibility tree, which is the opposite of what a label like this is for.
+ * Clipping a 1px box is the technique that survives every engine.
+ */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

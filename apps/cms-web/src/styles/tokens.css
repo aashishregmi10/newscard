@@ -1,0 +1,221 @@
+/*
+ * Design tokens — matched to can-logistic.
+ *
+ * -- What "matched" means here -----------------------------------------------
+ *
+ * can-logistic is Material UI running `createTheme({ palette: { mode } })`,
+ * which is to say MUI's DEFAULT light theme, with three things layered on top
+ * in its own index.css: Montserrat forced onto every element at a 16px base, a
+ * primary of #1976d3, and a slate-blue (#435883) used for secondary text and
+ * icons. Everything else — the greys, the dividers, the shadows, the 4px
+ * corner — is stock Material.
+ *
+ * So these tokens ARE the Material palette, written out. They are not an
+ * interpretation of it. Where can-logistic overrides Material, its value wins;
+ * where it does not, Material's default is reproduced exactly.
+ *
+ * -- Why this is not @mui/material -------------------------------------------
+ *
+ * This application has two dependencies, react and react-dom, and the
+ * repository runs a forbidden-dependency check on every commit. Pulling in MUI,
+ * Emotion and the icon set to obtain a look that is a hundred lines of CSS
+ * would be a large, permanent cost for a visual result — and it would bring its
+ * own router, form and theming opinions along with it. The appearance is
+ * reproduced; the library is not adopted.
+ *
+ * Material's greys are expressed as black at an alpha rather than as solid
+ * hexes, which is deliberate on their part and is kept: it means a divider over
+ * a white card and the same divider over the #fafafa page are subtly different,
+ * which is what stops a table's rules looking heavier than its border.
+ */
+
+:root {
+  color-scheme: light dark;
+
+  /* ── Surfaces ───────────────────────────────────────────────────────────
+     background.default #fafafa, background.paper #ffffff. The page is the
+     darker of the two, so a card reads as lifted without needing a shadow —
+     which is why `variant="outlined"` is used almost everywhere over there. */
+  --bg: #fafafa;
+  /* The scrolling content area is Material's grey[100], a step darker than the
+     toolbar and drawer above it — which is what makes a white panel read as
+     sitting ON the page rather than being part of it. can-logistic sets this on
+     its MainContent and it is most of why its screens look layered. */
+  --bg-content: #f5f5f5;
+  --surface: #ffffff;
+  --surface-sunk: #f5f7f9;
+  --surface-raised: #ffffff;
+
+  /* ── Ink ────────────────────────────────────────────────────────────────
+     text.primary and text.secondary are Material's; --ink-soft is
+     can-logistic's own slate-blue, which it uses for section labels, icon
+     buttons and the secondary half of a two-line row. */
+  --ink: rgba(0, 0, 0, 0.87);
+  --ink-soft: #435883;
+  --ink-faint: rgba(0, 0, 0, 0.6);
+  --ink-disabled: rgba(0, 0, 0, 0.38);
+
+  /* ── Lines ──────────────────────────────────────────────────────────────
+     --line is Material's `divider`; --line-strong is the resting border of an
+     outlined input, which is deliberately stronger than a divider so the edge
+     of a target is findable without hovering it. */
+  --line: rgba(0, 0, 0, 0.12);
+  --line-strong: rgba(0, 0, 0, 0.23);
+
+  /* ── Primary ────────────────────────────────────────────────────────────── */
+  --accent: #1976d2;
+  --accent-hover: #1565c0;
+  --accent-light: #42a5f5;
+  --accent-ink: #ffffff;
+  /* can-logistic's --primary-accent, used for selected rows and soft chips. */
+  --accent-soft: #edf5ff;
+  --accent-line: rgba(25, 118, 210, 0.5);
+
+  /* ── Status ─────────────────────────────────────────────────────────────
+     Material's semantic colours, with can-logistic's softer success wash. */
+  --ok: #2e7d32;
+  --ok-soft: #defbe6;
+  --ok-line: rgba(46, 125, 50, 0.3);
+
+  --warn: #ed6c02;
+  --warn-soft: #fff4e5;
+  --warn-line: rgba(237, 108, 2, 0.3);
+
+  --bad: #d32f2f;
+  --bad-soft: #fdeded;
+  --bad-line: rgba(211, 47, 47, 0.3);
+
+  /* ── Action states ──────────────────────────────────────────────────────
+     Material tints rather than repaints on hover: a translucent black over
+     whatever is beneath, so one value works on a white card and a grey page. */
+  --action-hover: rgba(0, 0, 0, 0.04);
+  --action-selected: rgba(0, 0, 0, 0.08);
+  --action-focus: rgba(0, 0, 0, 0.12);
+
+  /* ── Space ──────────────────────────────────────────────────────────────
+     Material's 8px unit and its halves. can-logistic's BASE_CONSTANTS are
+     expressed in the same unit: SPACING_SM 1.5 is 12px, MD 3 is 24px. */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 20px;
+  --s6: 24px;
+  --s7: 32px;
+  --s8: 40px;
+  --s9: 48px;
+  --s10: 64px;
+
+  /* ── Type ───────────────────────────────────────────────────────────────
+     Montserrat, as can-logistic loads it. Noto Sans Devanagari follows it in
+     the stack because Montserrat has no Devanagari coverage at all — without a
+     fallback named explicitly, every Nepali headline would be rendered by
+     whatever the operating system happened to substitute, which is how a
+     bilingual list ends up in two different typefaces. */
+  --font: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+    'Noto Sans Devanagari', 'Noto Sans', Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, monospace;
+
+  /* Material's type scale, at the sizes a dense screen actually uses:
+     caption 12, body2 14, body1/subtitle1 16, h6 20, h5 24. */
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 14px;
+  --text-md: 16px;
+  --text-lg: 20px;
+  --text-xl: 24px;
+  --text-2xl: 34px;
+
+  /* Material's button tracking. Small uppercase without it sets solid. */
+  --track-button: 0.02857em;
+  --track-tight: 0;
+  --track-label: 0.08333em;
+
+  /* ── Radius ─────────────────────────────────────────────────────────────
+     Material's `shape.borderRadius` is 4, and it is 4 for everything: cards,
+     buttons, inputs, menus. A design system with one corner radius reads as
+     deliberate; three read as three people. */
+  --r-sm: 4px;
+  --r-md: 4px;
+  --r-lg: 4px;
+  --r-full: 16px;
+  --r-pill: 999px;
+
+  /* ── Elevation ──────────────────────────────────────────────────────────
+     Material's elevation 1, 2, 4 and 8, verbatim. Three superimposed shadows
+     each — a tight umbra, a penumbra and a wide ambient — which is why they
+     read as height rather than as a drop shadow. */
+  --shadow-xs: 0 2px 1px -1px rgba(0, 0, 0, 0.2), 0 1px 1px 0 rgba(0, 0, 0, 0.14),
+    0 1px 3px 0 rgba(0, 0, 0, 0.12);
+  --shadow-sm: 0 3px 1px -2px rgba(0, 0, 0, 0.2), 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+    0 1px 5px 0 rgba(0, 0, 0, 0.12);
+  --shadow-md: 0 2px 4px -1px rgba(0, 0, 0, 0.2), 0 4px 5px 0 rgba(0, 0, 0, 0.14),
+    0 1px 10px 0 rgba(0, 0, 0, 0.12);
+  --shadow-lg: 0 5px 5px -3px rgba(0, 0, 0, 0.2), 0 8px 10px 1px rgba(0, 0, 0, 0.14),
+    0 3px 14px 2px rgba(0, 0, 0, 0.12);
+
+  /* ── Motion ─────────────────────────────────────────────────────────────
+     Material's standard durations and its sharp/standard easing curves. */
+  --fast: 150ms;
+  --med: 225ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-sharp: cubic-bezier(0.4, 0, 0.6, 1);
+
+  /* ── Layout ─────────────────────────────────────────────────────────────
+     can-logistic's drawer is 250px and its toolbar is Material's default 64. */
+  --rail: 250px;
+  --rail-narrow: 68px;
+  --topbar-h: 64px;
+  --measure: 1200px;
+}
+
+/*
+ * Dark.
+ *
+ * Material's dark palette, not an inversion of the above. Its defining move is
+ * that `background.paper` is #121212 with a translucent white overlay whose
+ * strength rises with elevation — so a raised surface gets LIGHTER rather than
+ * casting a shadow, because a shadow on a near-black background is invisible.
+ * The two surface values below are Material's overlay at elevation 1 and 8.
+ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121212;
+    --bg-content: #121212;
+    --surface: #1e1e1e;
+    --surface-sunk: #171717;
+    --surface-raised: #2c2c2c;
+
+    --ink: #ffffff;
+    --ink-soft: #b6c2dd;
+    --ink-faint: rgba(255, 255, 255, 0.7);
+    --ink-disabled: rgba(255, 255, 255, 0.5);
+
+    --line: rgba(255, 255, 255, 0.12);
+    --line-strong: rgba(255, 255, 255, 0.23);
+
+    /* Material's dark primary. #1976d2 on #121212 fails contrast outright. */
+    --accent: #90caf9;
+    --accent-hover: #a6d4fa;
+    --accent-light: #e3f2fd;
+    --accent-ink: rgba(0, 0, 0, 0.87);
+    --accent-soft: #11243a;
+    --accent-line: rgba(144, 202, 249, 0.5);
+
+    --ok: #66bb6a;
+    --ok-soft: #16281a;
+    --ok-line: rgba(102, 187, 106, 0.3);
+
+    --warn: #ffa726;
+    --warn-soft: #2b1f0d;
+    --warn-line: rgba(255, 167, 38, 0.3);
+
+    --bad: #f44336;
+    --bad-soft: #2d1514;
+    --bad-line: rgba(244, 67, 54, 0.3);
+
+    --action-hover: rgba(255, 255, 255, 0.08);
+    --action-selected: rgba(255, 255, 255, 0.16);
+    --action-focus: rgba(255, 255, 255, 0.12);
+  }
+}

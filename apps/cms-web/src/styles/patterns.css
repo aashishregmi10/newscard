@@ -1,0 +1,683 @@
+/*
+ * Navigation and list patterns, in Material's idiom.
+ *
+ * The compound pieces — a breadcrumb trail, a tab strip, a pager, a combo box —
+ * rather than the single-element primitives in components.css. Same rules:
+ * spend tokens, mint none.
+ */
+
+/* ========================================================================
+ * Breadcrumbs — Material's Breadcrumbs
+ * ====================================================================== */
+
+/*
+ * can-logistic puts these in an outlined Paper with a back chevron to their
+ * left and the screen's actions to the right, and makes the whole bar sticky.
+ * Its trail is `text.primary` for the current page and inherited grey for the
+ * links, with `tracking-wider` on both — the extra letter-spacing is what makes
+ * three short words separated by chevrons scan as a path rather than a
+ * sentence.
+ */
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-width: 0;
+}
+
+.crumbs-back {
+  flex: none;
+}
+
+.crumbs-list {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  list-style: none;
+  min-width: 0;
+}
+
+.crumbs-item {
+  min-width: 0;
+}
+
+.crumbs-link,
+.crumbs-current {
+  display: block;
+  /* Clamping matters more here than elsewhere: the last crumb is a headline,
+     and headlines in this product run to ninety characters. */
+  max-width: 34ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 2px var(--s2);
+  border-radius: var(--r-sm);
+  font-size: var(--text-base);
+  letter-spacing: 0.02em;
+}
+
+.crumbs-link {
+  color: var(--ink-faint);
+  text-decoration: none;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.crumbs-link:hover {
+  background: var(--action-hover);
+  color: var(--ink);
+}
+
+.crumbs-current {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.crumbs-sep {
+  display: grid;
+  place-items: center;
+  flex: none;
+  color: var(--ink-disabled);
+}
+
+.crumbs-sep svg {
+  width: 16px;
+  height: 16px;
+}
+
+@media (max-width: 620px) {
+  /* Only the destination survives. An intermediate crumb on a phone is a tap
+     target too small to hit and a word too short to be worth reading. */
+  .crumbs-item:not(:last-child),
+  .crumbs-sep {
+    display: none;
+  }
+}
+
+/* ========================================================================
+ * Tabs — Material's Tabs
+ * ====================================================================== */
+
+/*
+ * Material's tab is uppercase, 14px, weight 500, 48px tall minimum, with a 2px
+ * indicator in the primary colour along the bottom and a full-width divider
+ * beneath the whole strip. An unselected tab is `text.secondary`; the selected
+ * one is primary. can-logistic keeps all of that and adds a Badge for counts.
+ */
+.tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+
+.tabs-strip {
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  overflow-x: auto;
+  /* The strip scrolls but shows no scrollbar: the rule beneath it is the
+     container's, so a visible bar would break that line. */
+  scrollbar-width: none;
+}
+
+.tabs-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  min-height: 48px;
+  padding: var(--s3) var(--s4);
+  border: 0;
+  /*
+   * The indicator is a bottom border on the tab itself, overlapping the
+   * container's rule by 1px. Transparent at rest rather than added on
+   * selection, so selecting a tab cannot change its height and shift the strip.
+   */
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: var(--text-base);
+  font-weight: 500;
+  letter-spacing: var(--track-button);
+  text-transform: uppercase;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--fast) var(--ease), border-color var(--fast) var(--ease),
+    background var(--fast) var(--ease);
+}
+
+.tab:hover:not(:disabled):not([aria-selected='true']) {
+  background: var(--action-hover);
+  color: var(--ink);
+}
+
+.tab[aria-selected='true'] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
+.tab:disabled {
+  color: var(--ink-disabled);
+  cursor: not-allowed;
+}
+
+.tab-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+}
+
+/* Material's Badge, at its small size, carrying the count for the panel. */
+.tab-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--action-selected);
+  color: var(--ink-faint);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 20px;
+  letter-spacing: 0;
+  text-align: center;
+}
+
+.tab[aria-selected='true'] .tab-badge {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.tabs-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-left: auto;
+  padding-bottom: var(--s2);
+}
+
+.tab-panel {
+  padding-top: var(--s5);
+}
+
+@media (max-width: 520px) {
+  /* Icons carry the strip when the labels will not fit. The label stays in the
+     DOM, so the accessible name is unchanged. */
+  .tab-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+
+  .tab {
+    padding-inline: var(--s4);
+  }
+}
+
+/* ========================================================================
+ * Pagination — Material's Pagination
+ * ====================================================================== */
+
+.pager {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s3) var(--s5);
+  margin-top: var(--s4);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+
+/* A flush panel strips its own padding so the rows can meet its edges. The
+   pager is not a row and still needs the gutter back. */
+.panel-body-flush .pager {
+  margin-top: 0;
+  padding: var(--s3) var(--s4);
+}
+
+.pager-range {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.pager-pages {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  margin: 0 auto;
+}
+
+/* Material's PaginationItem: a 32px circle, not a square. */
+.pager-page {
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-base);
+  cursor: pointer;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.pager-page:hover:not([aria-current='page']) {
+  background: var(--action-hover);
+}
+
+.pager-page[aria-current='page'] {
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+
+.pager-gap {
+  min-width: 32px;
+  color: var(--ink-faint);
+  text-align: center;
+  user-select: none;
+}
+
+.pager-size {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-left: auto;
+}
+
+.pager-size-label {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+/*
+ * The page-size select is the one select with no Field around it, so it has no
+ * notched outline to sit in and must draw its own box.
+ */
+.pager-size .select-wrap {
+  width: auto;
+}
+
+.pager-size-select {
+  width: auto;
+  padding: 4px 30px 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  font-size: var(--text-sm);
+}
+
+.pager-size .select-chevron {
+  right: 2px;
+  width: 20px;
+  height: 20px;
+  margin-top: -10px;
+}
+
+@media (max-width: 720px) {
+  .pager {
+    justify-content: space-between;
+  }
+
+  /* The numbers get their own row rather than being squeezed between two
+     labels; they are the part you actually aim at. */
+  .pager-pages {
+    order: 3;
+    width: 100%;
+    margin: 0;
+    justify-content: center;
+  }
+
+  .pager-size {
+    margin-left: 0;
+  }
+}
+
+/* ========================================================================
+ * Search field — Material's TextField with a search adornment
+ * ====================================================================== */
+
+/*
+ * can-logistic's ClearableTextField: an outlined dense field with a search
+ * icon at the start and a clear button at the end that appears only once there
+ * is something to clear.
+ */
+.search {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  width: 100%;
+  max-width: 320px;
+  height: 40px;
+  padding: 0 var(--s2) 0 var(--s3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: transparent;
+  transition: border-color var(--fast) var(--ease), box-shadow var(--fast) var(--ease);
+}
+
+.search:hover {
+  border-color: var(--ink);
+}
+
+/* Material thickens the outline rather than adding a ring. The inset shadow
+   fakes the second pixel without the border changing the box's size, which
+   would shift every sibling by 1px on focus. */
+.search:focus-within {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.search-disabled {
+  opacity: 0.6;
+}
+
+.search-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  color: var(--ink-faint);
+}
+
+.search-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+  font-size: var(--text-base);
+}
+
+.search-input::placeholder {
+  color: var(--ink-faint);
+  opacity: 1;
+}
+
+.search-clear,
+.search-trailing {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.search-clear:hover {
+  background: var(--action-hover);
+  color: var(--ink);
+}
+
+.search-clear svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ========================================================================
+ * Combo box — Material's Autocomplete
+ * ====================================================================== */
+
+.combo {
+  position: relative;
+}
+
+.combo-field {
+  display: flex;
+  align-items: center;
+}
+
+/*
+ * Transparent and borderless, like the other controls: the Field's notched
+ * outline behind it draws the box. Padded on the right for the two adornments.
+ */
+.combo-input {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  padding: 8.5px 64px 8.5px 14px;
+  border: 0;
+  border-radius: var(--r-sm);
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-base);
+  line-height: 1.4375em;
+  cursor: pointer;
+  text-overflow: ellipsis;
+}
+
+/* Closed it behaves like a dropdown, open like a text field — the cursor
+   should say which. */
+.combo-input:focus {
+  outline: none;
+  cursor: text;
+}
+
+/*
+ * The placeholder is hidden until focus, by the rule in components.css that
+ * does the same for every other control.
+ *
+ * It was not covered there, and that was the bug: the Field's label rests
+ * INSIDE an empty control, so "Story" was drawn directly on top of "Search
+ * published stories…" and the two were unreadable. A floating label and a
+ * visible placeholder cannot occupy the same box.
+ */
+
+.combo-disabled .combo-input {
+  color: var(--ink-disabled);
+  cursor: not-allowed;
+}
+
+.combo-chevron {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  z-index: 2;
+  width: 24px;
+  height: 24px;
+  margin-top: -12px;
+  color: var(--ink-faint);
+  pointer-events: none;
+}
+
+.combo-clear {
+  position: absolute;
+  top: 50%;
+  right: 34px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin-top: -12px;
+  border: 0;
+  border-radius: var(--r-pill);
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.combo-clear:hover {
+  background: var(--action-hover);
+  color: var(--ink);
+}
+
+.combo-clear svg {
+  width: 16px;
+  height: 16px;
+}
+
+/*
+ * The popup — Material's Menu paper at elevation 8.
+ *
+ * Absolutely positioned rather than portalled. A portal survives an ancestor
+ * with `overflow: hidden`, but it then has to track the field's position on
+ * every scroll and resize; nothing here sits inside a clipping ancestor, so the
+ * simpler thing is the correct one until it stops being true.
+ */
+.combo-list {
+  position: absolute;
+  z-index: 40;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  padding: var(--s1) 0;
+  list-style: none;
+  background: var(--surface-raised);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Material's MenuItem: 36px dense, 16px side padding, a tint when highlighted. */
+.combo-option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+  padding: 6px var(--s4);
+  cursor: pointer;
+}
+
+/*
+ * Keyed off data-active, not :hover.
+ *
+ * Exactly one row may be highlighted, and it has to be the one Enter will
+ * choose. With a :hover rule as well, moving the pointer across the list while
+ * arrowing through it lights two rows and neither is obviously live. The
+ * pointer sets data-active instead, so hover and the keyboard drive one piece
+ * of state.
+ */
+.combo-option[data-active='true'] {
+  background: var(--action-hover);
+}
+
+.combo-option[aria-selected='true'] {
+  background: var(--accent-soft);
+}
+
+.combo-option[aria-disabled='true'] {
+  cursor: not-allowed;
+  color: var(--ink-disabled);
+}
+
+.combo-tick {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 21px;
+  color: var(--accent);
+}
+
+.combo-tick svg {
+  width: 16px;
+  height: 16px;
+}
+
+.combo-text {
+  min-width: 0;
+}
+
+.combo-label {
+  display: block;
+  font-size: var(--text-base);
+  color: inherit;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combo-hint {
+  display: block;
+  margin-top: 1px;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.combo-empty {
+  padding: var(--s4);
+  color: var(--ink-faint);
+  font-size: var(--text-base);
+  text-align: center;
+}
+
+/* ========================================================================
+ * Detail screen
+ * ====================================================================== */
+
+/*
+ * can-logistic's BreadcrumbLayout: an outlined Paper carrying the trail on the
+ * left and the screen's actions on the right, stuck to the top of the scrolling
+ * area. On a composer two screens tall, the way back and the state of the save
+ * are exactly the two things you should not have to scroll for.
+ */
+.detail-bar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+  padding: var(--s2) var(--s3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.detail-bar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-left: auto;
+}
+
+/* What this record is, stated once above its tabs. */
+.detail-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s3) var(--s4);
+  margin-bottom: var(--s4);
+  padding-bottom: var(--s4);
+  border-bottom: 1px solid var(--line);
+}
+
+.detail-heading {
+  min-width: 0;
+  font-size: var(--text-lg);
+  font-weight: 500;
+}
+
+/* A toolbar above a list: search on the left, controls on the right. */
+.toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+}
+
+.toolbar-end {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-left: auto;
+}

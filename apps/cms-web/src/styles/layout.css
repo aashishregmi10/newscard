@@ -1,0 +1,503 @@
+/*
+ * The shell: a persistent left drawer, a toolbar beside it, and one scrolling
+ * column beneath that.
+ *
+ * -- Matched to can-logistic -------------------------------------------------
+ *
+ * Its SidebarLayout is a Material `Drawer variant="persistent"` at 250px with
+ * an `AppBar position="fixed"` offset to the right of it — the bar is
+ * `width: calc(100% - drawerWidth)` with a matching left margin, so the drawer
+ * runs the full height of the window and the toolbar sits beside it rather than
+ * over it. That is the arrangement reproduced here.
+ *
+ * Two details that are easy to miss and are most of the look:
+ *
+ *   - The toolbar is `background.default`, the same #fafafa as the page, with
+ *     no shadow and a divider underneath. It is not a coloured bar; it reads as
+ *     the top of the content area rather than as a header over it.
+ *   - The drawer has NO right border. can-logistic removes it explicitly
+ *     (`.MuiDrawer-paperAnchorDockedLeft { border: none }`), so the only
+ *     separation is white paper against the #fafafa page. Subtle on purpose.
+ *
+ * -- Why a grid rather than fixed positioning --------------------------------
+ *
+ * Material does this with `position: fixed` and hand-computed margins, which is
+ * what it had to do before grid existed and is why the layout carries a
+ * `calc(100% - 250px)` in three places. Two grid tracks say the same thing once
+ * and cannot fall out of step when the drawer width changes.
+ */
+
+.app {
+  display: grid;
+  /* minmax(0, 1fr) rather than 1fr: without it a long unbroken headline in a
+     grid child sets the column's minimum width and pushes the whole layout
+     wider than the window instead of wrapping. */
+  grid-template-columns: var(--rail) minmax(0, 1fr);
+  grid-template-rows: var(--topbar-h) minmax(0, 1fr);
+  grid-template-areas:
+    'drawer toolbar'
+    'drawer main';
+  height: 100%;
+  overflow: hidden;
+}
+
+/* ── The drawer ───────────────────────────────────────────────────────────── */
+
+.rail {
+  grid-area: drawer;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+/*
+ * The drawer header.
+ *
+ * Exactly one toolbar tall, because Material's `theme.mixins.toolbar` is what
+ * sets it — that is what makes the logo in the drawer sit on the same baseline
+ * as the controls in the bar beside it.
+ */
+.rail-brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  flex: none;
+  height: var(--topbar-h);
+  padding: 0 var(--s4);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.rail-mark {
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+  line-height: 1.2;
+}
+
+.rail-sub {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  line-height: 1.2;
+}
+
+.rail-nav {
+  display: flex;
+  flex-direction: column;
+  list-style: none;
+  padding: var(--s2) 0;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+/*
+ * A Material ListItemButton.
+ *
+ * 48px minimum, 8px/16px padding, and a translucent tint on hover rather than
+ * a repaint — one value works over white paper and over a tinted selected row,
+ * which is why Material tints instead of assigning a colour.
+ */
+.rail-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 48px;
+  padding: var(--s2) var(--s4);
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: var(--text-md);
+  font-weight: 400;
+  line-height: 1.5;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background var(--fast) var(--ease), color var(--fast) var(--ease);
+}
+
+.rail-item:hover {
+  background: var(--action-hover);
+}
+
+/*
+ * The current section.
+ *
+ * Three things at once, as can-logistic does it: the row takes Material's
+ * `selected` tint, the icon and label turn primary, and a 4px bar runs the full
+ * height of the left edge. The bar is an absolutely positioned pseudo-element
+ * for the same reason theirs is a positioned div — it must not occupy layout,
+ * or selecting a row would shift its text sideways.
+ *
+ * Keyed off `aria-current="page"` rather than a class, so what a screen reader
+ * announces and what an eye sees cannot drift apart.
+ */
+.rail-item[aria-current='page'] {
+  background: var(--action-selected);
+  color: var(--accent);
+}
+
+.rail-item[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  /*
+   * Tailwind's blue-500, which is what can-logistic's bar actually is
+   * (`w-1 bg-blue-500`) — a brighter blue than the Material primary on the
+   * label beside it. Reproduced rather than harmonised, because the two-tone
+   * effect is visible and is part of what the screen looks like.
+   */
+  background: #3b82f6;
+}
+
+/* Material's ListItemIcon: a 56px slot holding a 20px `fontSize="small"` icon.
+   The slot is wide so that labels align whether or not an icon is present. */
+.rail-icon {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin-right: 20px;
+  color: var(--ink-faint);
+}
+
+.rail-item[aria-current='page'] .rail-icon {
+  color: var(--accent);
+}
+
+.rail-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A count beside the section it counts, so "how much is waiting" is answerable
+   without opening the queue. Material's Badge, at its small size. */
+.rail-count {
+  flex: none;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 20px;
+  text-align: center;
+}
+
+/*
+ * Who is signed in.
+ *
+ * In the toolbar, not the drawer — can-logistic's UserMenu lives in its AppBar,
+ * and the drawer holds only the logo and the navigation. It reads better too:
+ * the drawer answers "where can I go" and the bar answers "who am I and what
+ * can I do here", and mixing the two is what made the old sign-out control sit
+ * awkwardly under a list of sections.
+ */
+.who {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-width: 0;
+}
+
+.rail-avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--r-pill);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: var(--text-base);
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.rail-identity {
+  min-width: 0;
+  line-height: 1.35;
+}
+
+/*
+ * Both are blocks.
+ *
+ * As inline spans they ran together into "editor@example.invalidadmin", and
+ * `text-overflow: ellipsis` silently does nothing on an inline box — so a long
+ * address had no way to truncate either. Two facts on two lines.
+ */
+.rail-email {
+  display: block;
+  font-size: var(--text-sm);
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-role {
+  display: block;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  text-transform: capitalize;
+}
+
+/* Material hides the identity text on a narrow bar and keeps the avatar, which
+   is the part that still means something at 32px. */
+@media (max-width: 700px) {
+  .rail-identity {
+    display: none;
+  }
+}
+
+/* ── The toolbar ──────────────────────────────────────────────────────────── */
+
+/*
+ * Material's AppBar, as can-logistic configures it: the page's own background
+ * colour, `boxShadow: none`, and a divider along the bottom. A toolbar that
+ * matches the page rather than floating above it.
+ */
+.toolbar-bar {
+  grid-area: toolbar;
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  padding: 0 var(--s6);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.toolbar-title {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  letter-spacing: var(--track-tight);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toolbar-sub {
+  font-size: var(--text-base);
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-left: auto;
+}
+
+/* ── The scrolling column ─────────────────────────────────────────────────── */
+
+.main {
+  grid-area: main;
+  min-width: 0;
+  overflow: auto;
+  background: var(--bg-content);
+}
+
+/*
+ * The content fills the window.
+ *
+ * There was a 1200px cap here, centred, which on a 1900px screen left roughly
+ * 170px of empty page down each side while the rows it was protecting had text
+ * running out at 900px anyway — so it bought nothing and cost a sixth of the
+ * screen. can-logistic does not do it: MainContent is `flexGrow: 1` with
+ * `padding: theme.spacing(2.5)` and no maximum, and a list that fills the
+ * width is the whole point of a table-shaped screen.
+ *
+ * A reading measure is worth enforcing on prose. A queue is not prose.
+ */
+.page {
+  padding: var(--s5) var(--s5) var(--s7);
+}
+
+/*
+ * The exception: a four-question form stretched across 1900px is a row of
+ * fields nobody can scan, so that one screen keeps a measure.
+ *
+ * `margin-inline: auto` is not optional here and was missing. Removing the cap
+ * from `.page` took its `margin: 0 auto` with it, which left every narrow form
+ * a 720px column pinned to the left edge of a 1900px screen with the rest of
+ * the window empty beside it.
+ */
+.page-narrow {
+  max-width: 720px;
+  margin-inline: auto;
+}
+
+/* ── Page header ──────────────────────────────────────────────────────────── */
+
+.page-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--s3) var(--s4);
+  margin-bottom: var(--s5);
+  min-height: 36px;
+}
+
+.page-title {
+  font-size: var(--text-lg);
+  font-weight: 500;
+}
+
+.page-sub {
+  font-size: var(--text-base);
+  color: var(--ink-faint);
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  margin-left: auto;
+}
+
+/* ── Responsive ───────────────────────────────────────────────────────────
+ *
+ * can-logistic collapses its drawer to nothing and shows a hamburger. The same
+ * two steps are used here, placed where something actually breaks rather than
+ * at a device width:
+ *
+ *   1180px — the composer's two columns plus a 250px drawer leave the source
+ *            article too narrow to read, so the drawer drops to icons.
+ *    820px — an icon drawer beside a single column spends the only axis still
+ *            worth having, so navigation moves into the toolbar.
+ */
+
+@media (max-width: 1180px) {
+  .app {
+    grid-template-columns: var(--rail-narrow) minmax(0, 1fr);
+  }
+
+  .rail-brand {
+    align-items: center;
+    padding: 0;
+  }
+
+  .rail-sub,
+  .rail-label,
+  .rail-identity {
+    display: none;
+  }
+
+  .rail-mark {
+    font-size: var(--text-sm);
+    letter-spacing: 0.04em;
+  }
+
+  .rail-item {
+    justify-content: center;
+    padding: var(--s3);
+  }
+
+  .rail-icon {
+    margin-right: 0;
+  }
+
+  /* No room for a count beside a centred icon, so it becomes a badge on the
+     corner of one: still a number, still attached to the same item. */
+  .rail-count {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    font-size: 11px;
+    line-height: 18px;
+  }
+
+  .page {
+    padding: var(--s5);
+  }
+
+  .toolbar-bar {
+    padding: 0 var(--s5);
+  }
+}
+
+@media (max-width: 820px) {
+  /*
+   * Stacked: toolbar, then the navigation as a horizontal strip, then content.
+   *
+   * The toolbar stays — it carries who is signed in and the way out, and on a
+   * phone that is the one thing there is no room to duplicate elsewhere.
+   */
+  .app {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: var(--topbar-h) auto minmax(0, 1fr);
+    grid-template-areas:
+      'toolbar'
+      'drawer'
+      'main';
+  }
+
+  /* The drawer becomes a horizontal strip under the toolbar. */
+  .rail {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--s2);
+    height: var(--topbar-h);
+    padding: 0 var(--s4);
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .rail-brand {
+    flex: none;
+    height: auto;
+    margin-right: var(--s2);
+    border-bottom: 0;
+  }
+
+  .rail-nav {
+    flex-direction: row;
+    padding: 0;
+    overflow: visible;
+  }
+
+  .rail-item {
+    min-height: 40px;
+    padding: var(--s2) var(--s3);
+  }
+
+  /* A bottom bar reads as a tab indicator on a horizontal strip; a left bar
+     would sit against the previous item. */
+  .rail-item[aria-current='page']::before {
+    inset: auto 0 0 0;
+    width: auto;
+    height: 3px;
+  }
+
+  .toolbar-bar {
+    padding: 0 var(--s4);
+  }
+
+  .page {
+    padding: var(--s4);
+  }
+}
+
+@media (max-width: 480px) {
+  .rail-brand {
+    display: none;
+  }
+
+  .page-title {
+    font-size: var(--text-md);
+  }
+}

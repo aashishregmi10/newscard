@@ -14,6 +14,9 @@
   },
   "scripts": {
     "typecheck": "tsc -b --pretty",
+    "//typecheck:web": "apps/cms-web is not a workspace and is not in the root project graph, so `typecheck` above does not check it. This does. `typecheck:all` runs both; it needs `npm ci --prefix apps/cms-web` first, which is why it is not the default.",
+    "typecheck:web": "npm --prefix apps/cms-web run typecheck",
+    "typecheck:all": "npm run typecheck && npm run typecheck:web",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
