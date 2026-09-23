@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { collections, getDb } from '@saar/db';
 import { AppError } from '@saar/shared';
 import {
+  IngestBasisEnum,
   IngestMethodEnum,
   LanguageEnum,
   LicenceStatusEnum,
@@ -68,6 +69,17 @@ const SLUG = z
  */
 const IngestCreate = z.object({
   method: IngestMethodEnum,
+  /*
+   * The legal basis for FETCHING, which is not the basis for publishing.
+   *
+   * This was missing, and its absence was load-bearing in the wrong
+   * direction: `SourceIngest` defaults it to `agreement`, so every publisher
+   * created through the admin UI was the stricter kind and `isPollable`
+   * refused it until a licence was agreed — which is exactly the deadlock
+   * splitting the gate was meant to end. Offering the field is what makes
+   * the split reachable from outside a seed script.
+   */
+  basis: IngestBasisEnum.default('agreement'),
   feedUrl: z.string().url().nullable().optional(),
   /* The floor of 5 is the schema's and the database validator's, to be polite
      to the publisher's servers. The ceiling is this route's: a once-a-day poll
@@ -80,6 +92,7 @@ const IngestCreate = z.object({
    at a call site. */
 const IngestPatch = z.object({
   method: IngestMethodEnum.optional(),
+  basis: IngestBasisEnum.optional(),
   feedUrl: z.string().url().nullable().optional(),
   pollIntervalMin: z.number().int().min(5).max(1440).optional(),
 });
@@ -120,6 +133,22 @@ function issuesOf(error: z.ZodError): { issues: Array<{ path: string; message: s
   return { issues: error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) };
 }
 
+/**
+ * A stored publisher, read defensively.
+ *
+ * Every field is optional because this describes what is ON DISK rather than
+ * what the schema requires, and a document written before a field existed does
+ * not have it. `toRow` supplies the defaults, which is why it can be handed a
+ * row from any era.
+ *
+ * It is, however, a hand-maintained copy of a shape that `@saar/schemas` already
+ * defines — the exact arrangement this repository closed at the mobile boundary
+ * by generating the types. It has already drifted once: `basis` was added to
+ * `SourceIngest` and not here, so the field was invisible to this route and the
+ * `pollable` flag it computes was wrong for the one case the field exists for.
+ * Worth replacing with a derived type; noted here so the next drift is at least
+ * expected.
+ */
 interface SourceDoc {
   slug: string;
   displayName: string;
@@ -134,6 +163,7 @@ interface SourceDoc {
   } | null;
   ingest?: {
     method?: string;
+    basis?: string;
     feedUrl?: string | null;
     pollIntervalMin?: number;
     lastPolledAt?: Date | null;
@@ -161,6 +191,7 @@ function toRow(s: SourceDoc) {
     },
     ingest: {
       method: s.ingest?.method ?? 'manual',
+      basis: s.ingest?.basis ?? 'agreement',
       feedUrl: s.ingest?.feedUrl ?? null,
       pollIntervalMin: s.ingest?.pollIntervalMin ?? 15,
       lastPolledAt: s.ingest?.lastPolledAt?.toISOString() ?? null,
@@ -173,7 +204,10 @@ function toRow(s: SourceDoc) {
     pollable: isPollable({
       isActive: s.isActive ?? true,
       licence: { status: s.licence?.status ?? 'unknown' },
-      ingest: { method: s.ingest?.method ?? 'manual' },
+      /* `basis` belongs in here and was omitted, which made the answer wrong
+         in the one case the field exists for: a public-feed source reported
+         "would not be polled" while the collector would in fact poll it. */
+      ingest: { method: s.ingest?.method ?? 'manual', basis: s.ingest?.basis ?? 'agreement' },
     }),
   };
 }

@@ -305,7 +305,7 @@ const CreateSchema = z.object({
  * has not written yet. Devanagari is transliterated away rather than
  * percent-encoded, because the slug ends up in a shareable URL.
  */
-function draftSlug(language: string, categorySlug: string): string {
+export function draftSlug(language: string, categorySlug: string): string {
   const stamp = new Date().toISOString().slice(0, 10);
   const rand = Math.random().toString(36).slice(2, 8);
   return `${categorySlug}-${language}-${stamp}-${rand}`;

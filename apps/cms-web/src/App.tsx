@@ -8,6 +8,7 @@ import { Composer } from './components/Composer';
 import { NewShort } from './components/NewShort';
 import { NewSource } from './components/NewSource';
 import { NewStory } from './components/NewStory';
+import { Leads } from './components/Leads';
 import { Notify } from './components/Notify';
 import { Queue } from './components/Queue';
 import { Shorts } from './components/Shorts';
@@ -184,6 +185,9 @@ function Screen({
       /* Keyed by slug so moving between two publishers rebuilds the form
          rather than leaving the previous one's values in the fields. */
       return <SourceDetail key={route.slug} slug={route.slug} role={role} />;
+    case 'leads':
+      return <Leads tab={route.tab} />;
+
     case 'notifications':
       return <Notify tab={route.tab} />;
   }

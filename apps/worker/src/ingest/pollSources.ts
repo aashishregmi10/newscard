@@ -220,13 +220,27 @@ async function pollOne(source: SourceRecord, now: Date): Promise<PollReport> {
 
 /** Runs the collector on a timer. Started alongside the notification sweeps. */
 export function startIngestion(everyMs = 60_000): () => void {
-  const timer = setInterval(() => {
+  const run = () => {
     void pollDueSources().catch((e: unknown) => {
       /* One bad run must never take the process down — the next tick is a
          minute away and the sweeps beside it are unrelated. */
       log.error('ingest run failed', { error: e instanceof Error ? e.message : String(e) });
     });
-  }, everyMs);
+  };
+
+  const timer = setInterval(run, everyMs);
   timer.unref?.();
+
+  /*
+   * A tick at startup, like the other two loops.
+   *
+   * It costs nothing and cannot cause a stampede: `pollDueSources` only touches
+   * a source whose `pollIntervalMin` has elapsed since `lastPolledAt`, so
+   * restarting the process six times in a minute still polls each publisher
+   * once. Without it, a deploy means the first collection is a minute late for
+   * no reason.
+   */
+  run();
+
   return () => clearInterval(timer);
 }

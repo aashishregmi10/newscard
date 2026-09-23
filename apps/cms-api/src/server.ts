@@ -26,13 +26,14 @@ import {
 } from './middleware/index.js';
 import { authRoutes } from './routes/auth.routes.js';
 import { articleRoutes } from './routes/articles.routes.js';
+import { leadRoutes } from './routes/leads.routes.js';
 import { notificationRoutes } from './routes/notifications.routes.js';
 import { clientErrorRoutes } from './routes/clientErrors.routes.js';
 import { mediaRoutes } from './routes/media.routes.js';
 import { shortRoutes } from './routes/shorts.routes.js';
 import { sourceRoutes } from './routes/sources.routes.js';
 import { createLogger, drainHttpServer } from '@saar/shared';
-import { startDeferredSweep, startReceiptReconciliation } from '@saar/worker';
+import { startDeferredSweep, startIngestion, startReceiptReconciliation } from '@saar/worker';
 import { ensureSessionIndexes } from './auth/session.js';
 import { loadCmsEnv } from './config/index.js';
 
@@ -73,6 +74,7 @@ export function createCmsApp(ORIGIN = 'http://localhost:5173') {
 
   app.use('/api', authRoutes);
   app.use('/api', articleRoutes);
+  app.use('/api', leadRoutes);
   app.use('/api', notificationRoutes);
   app.use('/api', clientErrorRoutes);
   app.use('/api', mediaRoutes);
@@ -107,6 +109,19 @@ async function main(): Promise<void> {
   // Turns "Expo accepted it" into "a handset showed it". Until this ran,
   // stats.delivered was the accepted count wearing the delivered name.
   const stopReceipts = startReceiptReconciliation();
+  /*
+   * The collector, which had been written and never switched on.
+   *
+   * It runs here for the same reason the other two do: this is the process
+   * that is already up, and the work is small. A tick every minute is not a
+   * request every minute — `pollDueSources` only touches a source whose
+   * `pollIntervalMin` has elapsed, and fetches them one at a time.
+   *
+   * It cannot reach a reader. It writes to `leads` and nothing else, and the
+   * publish gate it does not touch still demands an agreed licence. The most
+   * it can do wrong is offer an editor something not worth summarising.
+   */
+  const stopIngestion = startIngestion();
 
   const server = createCmsApp(env.CMS_ORIGIN).listen(env.CMS_PORT, () => {
     log.info('cms-api listening', {
@@ -119,6 +134,7 @@ async function main(): Promise<void> {
     log.info('shutting down', { signal: sig });
     stopSweep();
     stopReceipts();
+    stopIngestion();
     // See the note in apps/api/src/server.ts: close() only stops accepting.
     const { drained, waitedMs } = await drainHttpServer(server);
     if (drained) log.info('drained', { waitedMs });

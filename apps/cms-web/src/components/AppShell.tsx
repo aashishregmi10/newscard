@@ -46,6 +46,9 @@ interface RailSection {
  */
 const SECTIONS: readonly RailSection[] = [
   { section: 'queue', route: Routes.queue(), label: 'Queue', icon: 'inbox' },
+  /* Triage sits directly under the queue because that is where it leads:
+     promoting a lead creates a draft and drops the editor into the composer. */
+  { section: 'leads', route: Routes.leads(), label: 'Incoming', icon: 'globe' },
   { section: 'shorts', route: Routes.shorts(), label: 'Shorts', icon: 'video' },
   { section: 'sources', route: Routes.sources(), label: 'Publishers', icon: 'newspaper' },
   {

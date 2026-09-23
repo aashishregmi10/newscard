@@ -56,6 +56,15 @@ export const NOTIFY_TABS = ['compose', 'history', 'test'] as const;
 export type NotifyTab = (typeof NOTIFY_TABS)[number];
 
 /**
+ * The triage queue, split by what has been done with each lead.
+ *
+ * The same three values the server stores, because inventing a display
+ * vocabulary on top of a stored one gives you two things to keep in step.
+ */
+export const LEAD_TABS = ['new', 'promoted', 'dismissed'] as const;
+export type LeadTab = (typeof LEAD_TABS)[number];
+
+/**
  * The tabs on the publishers list.
  *
  * Licence status is not an attribute of a publisher — it is the question you
@@ -94,10 +103,11 @@ export type Route =
   | { name: 'sources'; tab: LicenceTab; page: number; perPage: PerPage; q: string }
   | { name: 'sourceNew' }
   | { name: 'source'; slug: string }
+  | { name: 'leads'; tab: LeadTab }
   | { name: 'notifications'; tab: NotifyTab };
 
 /** The top-level sections the rail offers. Every route belongs to one. */
-export type Section = 'queue' | 'shorts' | 'sources' | 'notifications';
+export type Section = 'queue' | 'leads' | 'shorts' | 'sources' | 'notifications';
 
 export type Role = 'author' | 'reviewer' | 'admin';
 
@@ -135,6 +145,7 @@ export const Routes = {
   }),
   sourceNew: (): Route => ({ name: 'sourceNew' }),
   source: (slug: string): Route => ({ name: 'source', slug }),
+  leads: (tab: LeadTab = 'new'): Route => ({ name: 'leads', tab }),
   notifications: (tab: NotifyTab = 'compose'): Route => ({ name: 'notifications', tab }),
 };
 
@@ -196,6 +207,8 @@ export function parseRoute(hash: string): Route {
       if (SLUG_PATTERN.test(slug)) return Routes.source(slug);
     }
   }
+
+  if (section === 'leads') return Routes.leads(readLeadTab(query));
 
   if (section === 'notifications') return Routes.notifications(readNotifyTab(query));
 
@@ -263,6 +276,10 @@ export function routeToHash(route: Route): string {
       return '#/sources/new';
     case 'source':
       return `#/sources/${encodeURIComponent(route.slug)}`;
+    case 'leads':
+      return withQuery('#/leads', {
+        tab: route.tab === 'new' ? null : route.tab,
+      });
     case 'notifications':
       return withQuery('#/notifications', {
         tab: route.tab === 'compose' ? null : route.tab,
@@ -284,6 +301,8 @@ export function sectionOf(route: Route): Section {
     case 'sourceNew':
     case 'source':
       return 'sources';
+    case 'leads':
+      return 'leads';
     case 'notifications':
       return 'notifications';
   }
@@ -315,6 +334,8 @@ export function screenKeyOf(route: Route): string {
       return 'sourceNew';
     case 'source':
       return `source:${route.slug}`;
+    case 'leads':
+      return 'leads';
     case 'notifications':
       return 'notifications';
   }
@@ -434,6 +455,11 @@ function readQuery(query: URLSearchParams): string {
 function readTab(query: URLSearchParams): ArticleTab {
   const raw = (query.get('tab') ?? '').toLowerCase();
   return ARTICLE_TABS.find((tab) => tab === raw) ?? 'source';
+}
+
+function readLeadTab(query: URLSearchParams): LeadTab {
+  const raw = (query.get('tab') ?? '').toLowerCase();
+  return LEAD_TABS.find((tab) => tab === raw) ?? 'new';
 }
 
 function readNotifyTab(query: URLSearchParams): NotifyTab {

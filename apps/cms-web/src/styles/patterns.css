@@ -1010,3 +1010,59 @@
      the poster arrives — and keeps its shape if the media host is down. */
   background: #e8ebe6;
 }
+
+/* ========================================================================
+ * Triage
+ *
+ * A list row that can open. Everything here is the publisher's own material,
+ * held for judging one story against another and never rendered to a reader —
+ * which is why the thumbnail points at their server rather than our media
+ * store, and why the extract is clamped rather than expandable: it is there to
+ * answer "is this worth summarising", not to be read.
+ * ====================================================================== */
+
+.lead-item {
+  align-items: start;
+}
+
+.lead-thumb {
+  flex: none;
+  width: 72px;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: var(--r-sm);
+  background: #e8ebe6;
+}
+
+/* Holds the column open on a feed that carries no images, so the headlines of
+   two publishers still start at the same place. */
+.lead-thumb-empty {
+  display: block;
+  border: 1px dashed var(--line);
+  background: transparent;
+}
+
+.lead-extract {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 4px;
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/*
+ * The controls that appear when a row is opened.
+ *
+ * Inside the body rather than the tail, because they are about this story and
+ * the tail is where every row keeps the same three things. Opening a row must
+ * not move the badges on the rows above it.
+ */
+.lead-actions {
+  display: block;
+  margin-top: var(--s4);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}

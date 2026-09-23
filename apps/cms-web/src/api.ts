@@ -208,6 +208,35 @@ export interface ClusterSibling {
   language: string;
 }
 
+/**
+ * A story the collector found, waiting for an editor to judge it.
+ *
+ * `feedExtract` and `feedImageUrl` are the publisher’s own words and their
+ * own image, held for triage and never rendered to a reader. The image is
+ * referenced on their server and never copied to ours.
+ */
+export interface LeadRow {
+  id: string;
+  sourceSlug: string;
+  sourceName: string;
+  canonicalUrl: string;
+  headline: string;
+  feedExtract: string | null;
+  feedImageUrl: string | null;
+  language: 'ne' | 'en';
+  publishedAt: string | null;
+  fetchedAt: string;
+  status: 'new' | 'promoted' | 'dismissed';
+  promotedArticleId: string | null;
+  dismissedReason: string | null;
+}
+
+export interface LeadCounts {
+  new: number;
+  promoted: number;
+  dismissed: number;
+}
+
 export interface NewStoryOptions {
   categories: Array<{ slug: string; label: { ne: string; en: string } }>;
   sources: Array<{ slug: string; displayName: string; language: string; licensed: boolean }>;
@@ -448,6 +477,27 @@ export const api = {
     }),
 
   /* ---------------------------------------------------------- publishers */
+
+  /* ------------------------------------------------------------- leads */
+
+  leads: (status: string, signal?: AbortSignal) =>
+    req<{ items: LeadRow[]; counts: LeadCounts }>(
+      `/cms/leads?status=${encodeURIComponent(status)}`,
+      { signal },
+    ),
+
+  /** Returns the id of the draft it created, which is where the editor goes. */
+  promoteLead: (id: string, categorySlug: string) =>
+    req<{ articleId: string }>(`/cms/leads/${encodeURIComponent(id)}/promote`, {
+      method: 'POST',
+      body: JSON.stringify({ categorySlug }),
+    }),
+
+  dismissLead: (id: string, reason: string) =>
+    req<{ status: string }>(`/cms/leads/${encodeURIComponent(id)}/dismiss`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
 
   sources: (signal?: AbortSignal) => req<{ items: SourceRow[] }>('/cms/sources', { signal }),
 
