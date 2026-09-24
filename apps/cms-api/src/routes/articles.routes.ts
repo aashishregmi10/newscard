@@ -2,7 +2,16 @@ import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { collections, getDb } from '@saar/db';
-import { AppError, measureSummary, countGraphemes, countWords, type LimitType } from '@saar/shared';
+import {
+  AppError,
+  can,
+  countGraphemes,
+  countWords,
+  measureSummary,
+  type LimitType,
+  type Permission,
+  type StaffRole,
+} from '@saar/shared';
 import { ArticleStatusEnum, DEFAULT_CONFIG, ImageLicenceEnum } from '@saar/schemas';
 import { requireRole, requireAuth } from '../auth/requireRole.js';
 import { asyncRoute } from '../middleware/index.js';
@@ -234,6 +243,16 @@ articleRoutes.patch(
 /** POST /cms/articles/:id/transition — submit, reject, spike. */
 articleRoutes.post(
   '/cms/articles/:id/transition',
+  /*
+   * The floor. Every role may move a story SOMEWHERE — submitting and
+   * rejecting are an author’s own work — so the per-target permissions are
+   * checked inside, against the status actually asked for.
+   *
+   * `article.approve` and `article.spike` were in the matrix from the start
+   * and enforced by nothing: this route accepted any status the state machine
+   * allowed, so an author could approve their own story and spike anyone
+   * else's. Reserving them here is what makes the matrix true.
+   */
   requireRole('article.submit'),
   asyncRoute(async (req, res) => {
     const Body = z.object({
@@ -244,9 +263,23 @@ articleRoutes.post(
     const parsed = Body.safeParse(req.body);
     if (!parsed.success) throw new AppError('BAD_REQUEST', 'A target status is required.');
 
+    const NEEDED: Partial<Record<string, Permission>> = {
+      approved: 'article.approve',
+      spiked: 'article.spike',
+    };
+    const needed = NEEDED[parsed.data.to];
+    if (needed !== undefined && !can(req.staff!.role as StaffRole, needed)) {
+      throw new AppError(
+        'FORBIDDEN',
+        `Your role (${req.staff!.role}) cannot ${needed}.`,
+        { permission: needed },
+      );
+    }
+
     const status = await transitionArticle({
       articleId: String(req.params.id ?? ''),
       to: parsed.data.to,
+      actorLanguages: req.staff!.languages,
       note: parsed.data.note,
       spikeReason: parsed.data.spikeReason,
       actorId: req.staff!.staffId,

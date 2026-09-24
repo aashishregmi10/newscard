@@ -1,6 +1,6 @@
 import { ObjectId } from 'mongodb';
 import { collections, getDb } from '@saar/db';
-import { AppError } from '@saar/shared';
+import { AppError, checkReviewGuards } from '@saar/shared';
 import { canTransition, type ArticleStatus } from '@saar/schemas';
 import { writeAudit } from '../audit/writeAudit.js';
 
@@ -21,6 +21,8 @@ export interface TransitionInput {
   ip: string | null;
   /** Required when rejecting back to draft (Ch. 3.3.1). */
   note?: string | undefined;
+  /** Needed to judge an approval: who is doing it, and in which languages. */
+  actorLanguages?: readonly string[] | undefined;
   spikeReason?: 'editorial' | 'clustered' | 'duplicate' | 'stale' | undefined;
 }
 
@@ -49,6 +51,36 @@ export async function transitionArticle(input: TransitionInput): Promise<Article
     });
   }
 
+  /*
+   * Approving is a review, and reviews have rules.
+   *
+   * `checkReviewGuards` ran only inside `publishArticle`, which meant the
+   * two-person rule was enforced at the moment of publication and not at the
+   * moment of approval — so the approval itself, which is the act the rule is
+   * about, was unguarded. The same guard, at the step it names.
+   *
+   * It self-expires: while exactly one editor is active, approving your own
+   * summary is allowed and is stamped as such. It stops being allowed the
+   * moment a second account is activated, with no code change.
+   */
+  if (input.to === 'approved') {
+    const activeStaffCount = await c.staff.countDocuments({ isActive: true });
+    const guard = checkReviewGuards({
+      authoredBy: article.authoredBy.toString(),
+      reviewerId: input.actorId,
+      activeStaffCount,
+      articleLanguage: article.language,
+      reviewerLanguages: input.actorLanguages ?? [],
+    });
+    if (!guard.ok) {
+      const message =
+        guard.reason === 'same_author'
+          ? 'You cannot approve your own summary now that another editor is active.'
+          : `You are not registered as able to review ${article.language} copy.`;
+      throw new AppError('VALIDATION_FAILED', message, { reason: guard.reason });
+    }
+  }
+
   // A rejection with no explanation is a message the author cannot act on.
   if (article.status === 'in_review' && input.to === 'draft') {
     if (!input.note || input.note.trim().length < 10) {
@@ -60,6 +92,12 @@ export async function transitionArticle(input: TransitionInput): Promise<Article
   }
 
   const set: Record<string, unknown> = { status: input.to, updatedAt: new Date() };
+  if (input.to === 'approved') {
+    /* Recorded on the article so the exception is visible in the trail rather
+       than invisible in the code — the same stamp publishing writes. */
+    set.reviewedBy = new ObjectId(input.actorId);
+    set.selfApproved = article.authoredBy.toString() === input.actorId;
+  }
   if (input.to === 'spiked') set.spikeReason = input.spikeReason ?? 'editorial';
   if (input.note) set.editorialNotes = input.note.trim();
   if (input.to === 'draft') set.revisionCount = (article.revisionCount ?? 0) + 1;

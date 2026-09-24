@@ -440,9 +440,20 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
             }}
           />
 
+          {/*
+            * One primary action per state, and it is the one that moves the
+            * story forward from where it actually is.
+            *
+            * Approve was missing entirely, which made the whole workflow a dead
+            * end: a draft could be submitted, and `approved` was reachable from
+            * no control on any screen, so Publish — which requires it — could
+            * never become available. Every story stopped at in_review and the
+            * reader app stayed empty, because the feed serves `published` and
+            * nothing could ever get there.
+            */}
           <div className="actions">
             <Button
-              variant="primary"
+              variant={article.status === 'draft' ? 'primary' : undefined}
               icon="send"
               busy={action.busy}
               disabled={!canSubmit}
@@ -450,7 +461,19 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
             >
               Submit for review
             </Button>
+            {article.status === 'in_review' && (
+              <Button
+                variant="primary"
+                icon="check"
+                busy={action.busy}
+                disabled={action.busy}
+                onClick={() => void act(() => api.transition(id, 'approved'), 'Approved.')}
+              >
+                Approve
+              </Button>
+            )}
             <Button
+              variant={canPublish ? 'primary' : undefined}
               icon="checkCircle"
               disabled={!canPublish}
               onClick={() => void act(() => api.publish(id), 'Published.')}
@@ -470,15 +493,22 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
           </div>
 
           {/*
-            * Why Publish is unavailable, in text.
+            * Why the next step is unavailable, in text.
             *
             * It was a `title` attribute, which never appears on a touch device,
             * is not read by most screen readers on a disabled control, and
             * requires hovering a button you have already decided not to press.
             */}
-          {article.status !== 'approved' && (
+          {article.status === 'draft' && (
             <p className="field-note">
-              Publishing is available once a reviewer has approved this story.
+              Submitting sends this for review. Publishing becomes available once it is approved.
+            </p>
+          )}
+          {article.status === 'in_review' && (
+            <p className="field-note">
+              Waiting for a reviewer. While yours is the only active account you may approve it
+              yourself — which is recorded as a self-approval, and stops being permitted the moment
+              a second editor is activated.
             </p>
           )}
 
