@@ -87,3 +87,46 @@ export function humanise(token: string): string {
   const spaced = token.replace(/[_-]+/g, ' ').trim();
   return spaced === '' ? '' : spaced.charAt(0).toUpperCase() + spaced.slice(1);
 }
+
+/**
+ * A server rejection, with the part that says which field.
+ *
+ * -- The bug this exists to fix ----------------------------------------------
+ *
+ * Every failing form in this application showed only the top-level sentence.
+ * Saving a licence with a word in the email box produced "Invalid licence
+ * values." on screen, while the server had in fact answered precisely:
+ *
+ *     details.issues = [{ path: "contactEmail", message: "Invalid email" }]
+ *
+ * That half was dropped and could only be found in the network tab. A message
+ * naming no field on a form of eight is a message that sends the person hunting.
+ *
+ * -- Why the raw field name is good enough -----------------------------------
+ *
+ * `contactEmail` is not the label on screen, and mapping every server path to
+ * its label would mean a table per form, kept in step by hand. The path alone
+ * narrows eight fields to one, which is the whole of the difficulty; the field
+ * is also marked in red by the form's own validation wherever that exists.
+ *
+ * The shape is Zod's, flattened by `issuesOf` in the routes. Anything that does
+ * not match falls back to the message unchanged, because a malformed error is
+ * still an error and swallowing it would be worse than not decorating it.
+ */
+export function explainFailure(message: string, details: unknown): string {
+  if (typeof details !== 'object' || details === null) return message;
+
+  const issues = (details as { issues?: unknown }).issues;
+  if (!Array.isArray(issues) || issues.length === 0) return message;
+
+  const named = issues
+    .map((issue): string | null => {
+      if (typeof issue !== 'object' || issue === null) return null;
+      const { path, message: detail } = issue as { path?: unknown; message?: unknown };
+      if (typeof detail !== 'string' || detail.trim() === '') return null;
+      return typeof path === 'string' && path.trim() !== '' ? `${path}: ${detail}` : detail;
+    })
+    .filter((line): line is string => line !== null);
+
+  return named.length === 0 ? message : `${message} (${named.join('; ')})`;
+}

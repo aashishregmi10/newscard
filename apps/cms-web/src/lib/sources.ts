@@ -175,3 +175,31 @@ export function suggestSlug(displayName: string): string {
     .replace(/^-+|-+$/g, '')
     .slice(0, 64);
 }
+
+/**
+ * Does this look like an address a takedown demand could reach?
+ *
+ * -- Why the client checks at all --------------------------------------------
+ *
+ * The server is authoritative and rejects anything Zod's `.email()` refuses.
+ * But the licence form's guard only asked whether the field was NON-EMPTY, so
+ * `hfvhjvfhhj` enabled the Save button, went to the server, and came back as
+ * "Invalid licence values." with the useful half of the answer left in the
+ * network tab. The control is `type="email"`, which does nothing here: it is
+ * saved by a button rather than submitted through a form, so the browser never
+ * runs its own validation.
+ *
+ * -- Why it is deliberately loose --------------------------------------------
+ *
+ * A client check that is STRICTER than the server rejects addresses the server
+ * would have taken, and the person is then stuck with no way to proceed and no
+ * explanation. So this asks only what Zod's email rule also insists on — one
+ * `@`, something either side, and a dot in the domain — and leaves every
+ * argument about what else is legal to the server.
+ *
+ * Real addresses are far stranger than any regex believes. The purpose here is
+ * to catch a typo before a round trip, not to be the authority.
+ */
+export function looksLikeEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}

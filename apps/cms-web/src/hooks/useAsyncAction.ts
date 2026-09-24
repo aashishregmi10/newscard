@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ApiError } from '../api';
+import { explainFailure } from '../lib/format';
 
 /**
  * Running one thing that can fail, and saying so.
@@ -73,7 +74,12 @@ export function useAsyncAction(fallbackMessage = 'Something went wrong.'): Async
         /* ApiError already carries a message written for an editor. Anything
            else is a bug in this application and must not be shown raw — a
            stack trace in a banner tells a newsroom nothing it can act on. */
-        if (mounted.current) setError(e instanceof ApiError ? e.message : fallbackMessage);
+        if (mounted.current) {
+          /* The server often answers precisely — which field, and why. That
+             detail used to be dropped here and could only be found in the
+             network tab; see explainFailure. */
+          setError(e instanceof ApiError ? explainFailure(e.message, e.details) : fallbackMessage);
+        }
         return false;
       } finally {
         running.current = false;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fileSize, humanise, plural, relativeTime } from '../lib/format';
+import { explainFailure, fileSize, humanise, plural, relativeTime } from '../lib/format';
 
 /**
  * Formatting, at the boundaries.
@@ -89,5 +89,46 @@ describe('humanise', () => {
   it('does not fall over on an empty token', () => {
     expect(humanise('')).toBe('');
     expect(humanise('__')).toBe('');
+  });
+});
+
+describe('explainFailure', () => {
+  it('names the field the server objected to', () => {
+    expect(
+      explainFailure('Invalid licence values.', {
+        issues: [{ path: 'contactEmail', message: 'Invalid email' }],
+      }),
+    ).toBe('Invalid licence values. (contactEmail: Invalid email)');
+  });
+
+  it('joins several issues', () => {
+    expect(
+      explainFailure('This publisher is not ready to save.', {
+        issues: [
+          { path: 'slug', message: 'Too short' },
+          { path: 'ingest.feedUrl', message: 'Required when method is rss' },
+        ],
+      }),
+    ).toBe(
+      'This publisher is not ready to save. (slug: Too short; ingest.feedUrl: Required when method is rss)',
+    );
+  });
+
+  it('keeps an issue that carries no path', () => {
+    expect(explainFailure('No.', { issues: [{ message: 'Something is wrong' }] })).toBe(
+      'No. (Something is wrong)',
+    );
+  });
+
+  /* A malformed error is still an error. Decorating it is a nicety; losing it
+     would be a defect. */
+  it('falls back to the plain message on anything unexpected', () => {
+    expect(explainFailure('Plain.', null)).toBe('Plain.');
+    expect(explainFailure('Plain.', undefined)).toBe('Plain.');
+    expect(explainFailure('Plain.', 'a string')).toBe('Plain.');
+    expect(explainFailure('Plain.', {})).toBe('Plain.');
+    expect(explainFailure('Plain.', { issues: [] })).toBe('Plain.');
+    expect(explainFailure('Plain.', { issues: 'not an array' })).toBe('Plain.');
+    expect(explainFailure('Plain.', { issues: [null, 7, { path: 'x' }] })).toBe('Plain.');
   });
 });

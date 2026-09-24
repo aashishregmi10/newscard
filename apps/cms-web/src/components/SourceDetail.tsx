@@ -4,7 +4,7 @@ import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useResource } from '../hooks/useResource';
 import { crumbs } from '../lib/crumbs';
 import { dateTime, plural } from '../lib/format';
-import { ingestHealth, licenceLook } from '../lib/sources';
+import { ingestHealth, licenceLook, looksLikeEmail } from '../lib/sources';
 import { Routes, type Role } from '../nav';
 import { navigate } from '../useRoute';
 import {
@@ -134,7 +134,19 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
   /* Against the STORED status, not the one selected in the form — the warning
      has to describe what the save will actually do. */
   const wouldWithdraw = data.licence.status === 'agreed' && status !== 'agreed';
-  const needsContact = status === 'agreed' && contactEmail.trim() === '';
+  /*
+   * Empty AND malformed, not just empty.
+   *
+   * This asked only whether the field had something in it, so a word typed
+   * into an email box enabled Save, went to the server, and came back as
+   * "Invalid licence values." with the field name left in the network tab.
+   * `type="email"` does not help: the form is saved by a button rather than
+   * submitted, so the browser never runs its own check.
+   */
+  const contactMissing = status === 'agreed' && contactEmail.trim() === '';
+  const contactMalformed =
+    status === 'agreed' && contactEmail.trim() !== '' && !looksLikeEmail(contactEmail);
+  const needsContact = contactMissing || contactMalformed;
   const needsNote = wouldWithdraw && note.trim().length < 10;
   const feedMissing = method === 'rss' && feedUrl.trim() === '';
 
@@ -284,9 +296,11 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
                   label="Takedown contact"
                   invalid={needsContact}
                   note={
-                    needsContact
-                      ? 'A licensed publisher needs a takedown contact — we promise a 24-hour response and cannot meet it without one.'
-                      : 'Where a takedown demand goes. Required once a licence is agreed.'
+                    contactMalformed
+                      ? `“${contactEmail.trim()}” is not an email address. A takedown demand has to be able to reach somebody.`
+                      : contactMissing
+                        ? 'A licensed publisher needs a takedown contact — we promise a 24-hour response and cannot meet it without one.'
+                        : 'The email address a takedown demand goes to. Required once a licence is agreed.'
                   }
                   noteTone={needsContact ? 'bad' : 'default'}
                 >

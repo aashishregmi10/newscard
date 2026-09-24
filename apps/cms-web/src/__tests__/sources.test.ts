@@ -4,6 +4,7 @@ import {
   ingestHealth,
   ingestSummary,
   licenceLook,
+  looksLikeEmail,
   sourceHaystack,
   suggestSlug,
 } from '../lib/sources';
@@ -168,5 +169,30 @@ describe('suggestSlug', () => {
 
   it('respects the 64-character ceiling the schema sets', () => {
     expect(suggestSlug('a'.repeat(200)).length).toBeLessThanOrEqual(64);
+  });
+});
+
+describe('looksLikeEmail', () => {
+  it('accepts an ordinary address', () => {
+    expect(looksLikeEmail('legal@publisher.example.invalid')).toBe(true);
+    expect(looksLikeEmail('  legal@publisher.np  ')).toBe(true);
+  });
+
+  it('rejects the thing that actually got typed', () => {
+    /* A word in an email field. It passed the old non-empty guard, enabled
+       Save, and came back from the server as a generic failure. */
+    expect(looksLikeEmail('hfvhjvfhhj')).toBe(false);
+  });
+
+  it('rejects the near-misses a non-empty check lets through', () => {
+    expect(looksLikeEmail('')).toBe(false);
+    expect(looksLikeEmail('   ')).toBe(false);
+    expect(looksLikeEmail('legal@')).toBe(false);
+    expect(looksLikeEmail('@publisher.np')).toBe(false);
+    /* No dot in the domain — which Zod's email rule also refuses, and which is
+       the case worth pinning because it is where a loose regex usually differs
+       from the server. */
+    expect(looksLikeEmail('legal@publisher')).toBe(false);
+    expect(looksLikeEmail('two words@publisher.np')).toBe(false);
   });
 });
