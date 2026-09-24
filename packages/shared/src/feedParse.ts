@@ -30,6 +30,20 @@ export interface FeedItem {
   link: string;
   /** The feed's own extract, stripped to plain text. Editor-facing only. */
   summary: string | null;
+  /**
+   * The full article, where the publisher syndicates one.
+   *
+   * WordPress and most Nepali portals built on it put the whole story in
+   * `<content:encoded>` while `<description>` carries a short excerpt. We were
+   * reading only the excerpt, because the tag list asked for `content` and the
+   * element is called `encoded` in the content namespace — so three thousand
+   * characters the publisher had deliberately syndicated were discarded and an
+   * editor had to open the story in a tab to read it.
+   *
+   * Editor-facing only, exactly like `summary`, and held for triage and
+   * reference. Nothing downstream renders it to a reader.
+   */
+  content: string | null;
   /** Null when absent or unparseable — a bad date must not lose the story. */
   publishedAt: Date | null;
   imageUrl: string | null;
@@ -222,6 +236,9 @@ export function parseFeed(xml: string): ParsedFeed {
       title,
       link,
       summary: tagText(block, 'description', 'summary', 'content'),
+      /* `encoded` rather than `content`: the element is <content:encoded>, and
+         tagText's optional namespace prefix applies to the name it is given. */
+      content: tagText(block, 'encoded'),
       publishedAt: parseFeedDate(
         rawTag(block, 'pubDate') ??
           rawTag(block, 'published') ??

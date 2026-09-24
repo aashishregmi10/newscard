@@ -5,6 +5,7 @@ import {
   type ArticleImageData,
   type ClusterSibling,
   type Limits,
+  type OriginalStory,
 } from '../api';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useResource } from '../hooks/useResource';
@@ -79,6 +80,8 @@ interface ComposerData {
   article: ArticleDetail;
   cluster: ClusterSibling[];
   limits: Limits;
+  /** Null for a hand-written story; present when this draft came from a lead. */
+  original: OriginalStory | null;
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -115,7 +118,7 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
   const { data, error: loadError, loading, reload } = useResource<ComposerData>(
     async (signal) => {
       const r = await api.article(id, signal);
-      return { article: r.article, cluster: r.cluster, limits: r.limits };
+      return { article: r.article, cluster: r.cluster, limits: r.limits, original: r.original };
     },
     `article:${id}`,
     'Could not open this story.',
@@ -290,7 +293,7 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
 
   if (loading || data === null) return <ComposerSkeleton />;
 
-  const { article, cluster, limits } = data;
+  const { article, cluster, limits, original } = data;
   const language = article.language;
   const band = limits.limits[language];
   const count = measure(summary, limits, language);
@@ -513,6 +516,32 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
                   Open the original
                 </LinkButton>
               </div>
+
+              {/*
+                * The publisher’s own story, beside the box it is being
+                * summarised into.
+                *
+                * Ch. 5.4 asks for the source next to the summary and this is
+                * what it was asking for — until now the panel held a headline
+                * and a link, so reading the thing being summarised meant
+                * leaving the application.
+                *
+                * It is deliberately NOT poured into the summary box. The
+                * guidance tab one click away says that pasting a publisher’s
+                * sentences and lightly editing them is the fastest route to a
+                * copyright complaint, and a prefilled box makes trimming their
+                * text the default action rather than a decision.
+                */}
+              {original?.text != null && original.text !== '' && (
+                <>
+                  <h3 className="field-legend" style={{ marginTop: 'var(--s6)' }}>
+                    Their story
+                  </h3>
+                  <p className="prose prose-scroll" lang={language}>
+                    {original.text}
+                  </p>
+                </>
+              )}
 
               {cluster.length > 0 && (
                 <>

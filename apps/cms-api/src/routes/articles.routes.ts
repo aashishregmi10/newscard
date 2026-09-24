@@ -88,8 +88,35 @@ articleRoutes.get(
           .toArray()
       : [];
 
+    /*
+     * The original, for a draft that came from a lead.
+     *
+     * It is fetched from `leads` rather than copied onto the article, and that
+     * is the whole design: the publisher’s own words never enter the
+     * `articles` collection, so they cannot reach a reader through a DTO that
+     * grows a field, and they expire on the lead’s own 30-day clock rather
+     * than living as long as the story does.
+     *
+     * A hand-written story has no lead and gets null, which is correct — there
+     * is no original to show.
+     */
+    const lead = await c.leads.findOne(
+      { promotedArticleId: d._id },
+      { projection: { headline: 1, feedExtract: 1, feedContent: 1, canonicalUrl: 1 } },
+    );
+
     res.json({
       limits,
+      /* Not nested inside `article`, deliberately: it is not a property of our
+         story, it is the thing our story is about. */
+      original:
+        lead === null
+          ? null
+          : {
+              headline: lead.headline,
+              text: (lead as { feedContent?: string | null }).feedContent ?? lead.feedExtract,
+              url: lead.canonicalUrl,
+            },
       article: {
         id: d._id.toString(),
         status: d.status,

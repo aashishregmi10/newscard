@@ -237,6 +237,19 @@ export interface LeadCounts {
   dismissed: number;
 }
 
+/**
+ * The publisher's own story, for a draft that came from a lead.
+ *
+ * Served from the lead rather than the article, so it never enters the
+ * `articles` collection and expires on the lead’s own clock. Null for a
+ * hand-written story, which has no original to show.
+ */
+export interface OriginalStory {
+  headline: string;
+  text: string | null;
+  url: string;
+}
+
 export interface NewStoryOptions {
   categories: Array<{ slug: string; label: { ne: string; en: string } }>;
   sources: Array<{ slug: string; displayName: string; language: string; licensed: boolean }>;
@@ -394,7 +407,12 @@ export const api = {
     req<{ limits: Limits; items: QueueItem[] }>('/cms/queue', { signal }),
 
   article: (id: string, signal?: AbortSignal) =>
-    req<{ limits: Limits; article: ArticleDetail; cluster: ClusterSibling[] }>(
+    req<{
+      limits: Limits;
+      article: ArticleDetail;
+      cluster: ClusterSibling[];
+      original: OriginalStory | null;
+    }>(
       `/cms/articles/${encodeURIComponent(id)}`,
       { signal },
     ),

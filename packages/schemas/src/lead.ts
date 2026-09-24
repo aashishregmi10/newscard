@@ -59,6 +59,21 @@ export const Lead = z.object({
 
   /** THEIR words, for triage only. Never rendered to a reader. See above. */
   feedExtract: z.string().max(2000).nullable(),
+
+  /**
+   * THEIR full article, where they syndicate one. Triage and reference only.
+   *
+   * Most Nepali portals run WordPress, which puts the whole story in
+   * `<content:encoded>` and a short excerpt in `<description>`. Holding the
+   * whole thing is what lets an editor read a story without opening a tab —
+   * and reading it is the point, because the summary is meant to be written
+   * from what they remember of it rather than trimmed out of it.
+   *
+   * The cap is generous because a truncated article is worse than none: an
+   * editor who reads to a cut-off summarises the first half of the story.
+   * Nothing renders this to a reader, and it expires with the lead.
+   */
+  feedContent: z.string().max(20000).nullable().default(null),
   /** THEIR image, by URL. Never downloaded, never served. See above. */
   feedImageUrl: z.string().url().nullable(),
 

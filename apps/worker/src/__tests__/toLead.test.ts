@@ -26,6 +26,7 @@ function item(over: Partial<FeedItem> = {}): FeedItem {
     title: 'वर्षापछि सडक मर्मतको काम तीव्र',
     link: 'https://namunakhabar.example.invalid/news/123',
     summary: 'वर्षा थामिएपछि मर्मत सुरु।',
+    content: 'वर्षा थामिएपछि सडक मर्मतको काम तीव्र भएको छ। विभागका अनुसार काम सकिनेछ।',
     publishedAt: new Date('2026-09-22T04:00:00Z'),
     imageUrl: 'https://namunakhabar.example.invalid/img/1.jpg',
     guid: 'nk-123',
@@ -223,5 +224,37 @@ describe('fingerprintOf', () => {
     const a = fingerprintOf('समान शीर्षक', 'https://one.example.invalid/a');
     const b = fingerprintOf('समान शीर्षक', 'https://two.example.invalid/a');
     expect(a).not.toBe(b);
+  });
+});
+
+describe('toLead — the publisher’s own story', () => {
+  it('carries the full syndicated body, not just the extract', () => {
+    /*
+     * WordPress, which most Nepali portals run, puts a short excerpt in
+     * <description> and the whole article in <content:encoded>. We read only
+     * the excerpt for a while — four hundred characters of a three-thousand
+     * character story — so an editor had to leave the application to read the
+     * thing they were summarising.
+     */
+    const out = toLead(item({ content: 'क'.repeat(5000) }), SOURCE, NOW);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.lead.feedContent).toHaveLength(5000);
+  });
+
+  it('truncates a very long body rather than rejecting the story', () => {
+    const out = toLead(item({ content: 'क'.repeat(30000) }), SOURCE, NOW);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.lead.feedContent).toHaveLength(20000);
+  });
+
+  it('survives a feed item carrying no body at all', () => {
+    /* Atom feeds, and any RSS feed without content:encoded. A missing field
+       must not take the collector down mid-run. */
+    const out = toLead(item({ content: null }), SOURCE, NOW);
+    expect(out.ok).toBe(true);
+    if (!out.ok) return;
+    expect(out.lead.feedContent).toBeNull();
   });
 });
