@@ -5,7 +5,7 @@ import { crumbs } from '../lib/crumbs';
 import { relativeTime } from '../lib/format';
 import { clampPage, pageCountOf, pageSlice } from '../lib/pagination';
 import { ingestHealth, ingestSummary, licenceLook, sourceHaystack } from '../lib/sources';
-import { Routes, type LicenceTab, type PerPage, type Role } from '../nav';
+import { type LicenceTab, type Role, Routes, SOURCES_PER_PAGE } from '../nav';
 import { navigate } from '../useRoute';
 import {
   Badge,
@@ -71,12 +71,11 @@ function SourcesSkeleton() {
 interface SourcesProps {
   tab: LicenceTab;
   page: number;
-  perPage: PerPage;
   search: string;
   role: Role;
 }
 
-export function Sources({ tab, page, perPage, search, role }: SourcesProps) {
+export function Sources({ tab, page, search, role }: SourcesProps) {
   const { data, error, loading, reload } = useResource<SourceRow[]>(
     async (signal) => (await api.sources(signal)).items,
     'sources',
@@ -107,24 +106,24 @@ export function Sources({ tab, page, perPage, search, role }: SourcesProps) {
   }, [all, tab, search]);
 
   const total = matched?.length ?? 0;
-  const pageCount = pageCountOf(total, perPage);
+  const pageCount = pageCountOf(total, SOURCES_PER_PAGE);
   const current = clampPage(page, pageCount);
   const visible = useMemo(
-    () => (matched === null ? [] : pageSlice(matched, current, perPage)),
-    [matched, current, perPage],
+    () => (matched === null ? [] : pageSlice(matched, current, SOURCES_PER_PAGE)),
+    [matched, current],
   );
 
   const goToTab = useCallback(
-    (next: LicenceTab) => navigate(Routes.sources({ tab: next, perPage, q: search })),
-    [perPage, search],
+    (next: LicenceTab) => navigate(Routes.sources({ tab: next, q: search })),
+    [search],
   );
 
   const setSearch = useCallback(
     (next: string) =>
       /* Replaced, not pushed — typing "khabar" would otherwise leave six
          history entries and Back would delete it one letter at a time. */
-      navigate(Routes.sources({ tab, perPage, q: next }), { replace: true }),
-    [tab, perPage],
+      navigate(Routes.sources({ tab, q: next }), { replace: true }),
+    [tab],
   );
 
   const tabs: ReadonlyArray<TabDef<LicenceTab>> = [
@@ -138,7 +137,7 @@ export function Sources({ tab, page, perPage, search, role }: SourcesProps) {
   const searching = search.trim() !== '';
 
   return (
-    <div className="page page-list">
+    <div className="page">
       <h1 className="sr-only">Publishers</h1>
       <div className="detail-bar">
         <Breadcrumbs items={crumbs({ label: 'Publishers' })} showBack={false} />
@@ -282,12 +281,9 @@ export function Sources({ tab, page, perPage, search, role }: SourcesProps) {
 
             <Pagination
               page={current}
-              perPage={perPage}
+              perPage={SOURCES_PER_PAGE}
               total={total}
-              onPageChange={(next) => navigate(Routes.sources({ tab, page: next, perPage, q: search }))}
-              onPerPageChange={(next) =>
-                navigate(Routes.sources({ tab, page: 1, perPage: next, q: search }))
-              }
+              onPageChange={(next) => navigate(Routes.sources({ tab, page: next, q: search }))}
               noun="publisher"
             />
           </>

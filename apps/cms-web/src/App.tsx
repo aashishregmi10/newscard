@@ -174,7 +174,6 @@ function Screen({
         <Sources
           tab={route.tab}
           page={route.page}
-          perPage={route.perPage}
           search={route.q}
           role={role}
         />

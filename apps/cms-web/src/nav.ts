@@ -76,6 +76,17 @@ export type LeadTab = (typeof LEAD_TABS)[number];
 export const LEADS_PER_PAGE: PerPage = 10;
 
 /**
+ * The publisher list, also fixed.
+ *
+ * For a different reason from the leads queue: this list is not long. A
+ * newsroom watches a dozen or two publishers, not a thousand, so the page
+ * size was never the thing standing between anyone and the row they wanted —
+ * the filter above it is. A menu offering to show a hundred of twenty is a
+ * control that does nothing.
+ */
+export const SOURCES_PER_PAGE: PerPage = 10;
+
+/**
  * The tabs on the publishers list.
  *
  * Licence status is not an attribute of a publisher — it is the question you
@@ -111,7 +122,7 @@ export type Route =
   | { name: 'article'; id: string; tab: ArticleTab }
   | { name: 'shorts'; page: number; perPage: PerPage }
   | { name: 'shortNew' }
-  | { name: 'sources'; tab: LicenceTab; page: number; perPage: PerPage; q: string }
+  | { name: 'sources'; tab: LicenceTab; page: number; q: string }
   | { name: 'sourceNew' }
   | { name: 'source'; slug: string }
   | { name: 'leads'; tab: LeadTab; page: number }
@@ -145,13 +156,10 @@ export const Routes = {
     perPage: params.perPage ?? DEFAULT_PER_PAGE,
   }),
   shortNew: (): Route => ({ name: 'shortNew' }),
-  sources: (
-    params: { tab?: LicenceTab; page?: number; perPage?: PerPage; q?: string } = {},
-  ): Route => ({
+  sources: (params: { tab?: LicenceTab; page?: number; q?: string } = {}): Route => ({
     name: 'sources',
     tab: params.tab ?? 'all',
     page: params.page ?? 1,
-    perPage: params.perPage ?? DEFAULT_PER_PAGE,
     q: params.q ?? '',
   }),
   sourceNew: (): Route => ({ name: 'sourceNew' }),
@@ -200,7 +208,6 @@ export function parseRoute(hash: string): Route {
     return Routes.sources({
       tab: readLicenceTab(query),
       page: readPage(query),
-      perPage: readPerPage(query),
       q: readQuery(query),
     });
   }
@@ -290,7 +297,6 @@ export function routeToHash(route: Route): string {
         tab: route.tab === 'all' ? null : route.tab,
         q: route.q === '' ? null : route.q,
         page: route.page === 1 ? null : String(route.page),
-        perPage: route.perPage === DEFAULT_PER_PAGE ? null : String(route.perPage),
       });
     case 'sourceNew':
       return '#/sources/new';

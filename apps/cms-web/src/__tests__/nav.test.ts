@@ -38,7 +38,7 @@ const ALL_ROUTES: readonly Route[] = [
   Routes.shorts({ page: 2, perPage: 100 }),
   Routes.shortNew(),
   Routes.sources(),
-  Routes.sources({ tab: 'pending', page: 2, perPage: 50, q: 'khabar' }),
+  Routes.sources({ tab: 'pending', page: 2, q: 'khabar' }),
   Routes.sourceNew(),
   Routes.source('namuna-khabar'),
   Routes.notifications(),
