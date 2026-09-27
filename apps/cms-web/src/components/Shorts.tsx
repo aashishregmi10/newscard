@@ -75,7 +75,7 @@ export function Shorts({ page, perPage }: { page: number; perPage: PerPage }) {
   };
 
   return (
-    <div className="page page-list">
+    <div className="page">
       <h1 className="sr-only">Shorts</h1>
       <div className="detail-bar">
         <Breadcrumbs items={crumbs({ label: 'Shorts' })} showBack={false} />

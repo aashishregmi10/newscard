@@ -97,7 +97,7 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
 
   if (loadError !== null && data === null) {
     return (
-      <div className="page page-form">
+      <div className="page">
         <Banner tone="error">{loadError}</Banner>
         <div className="actions actions-plain">
           <Button icon="arrowLeft" onClick={() => navigate(Routes.sources())}>
@@ -113,7 +113,7 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
 
   if (loading || data === null) {
     return (
-      <div className="page page-form" aria-busy="true">
+      <div className="page" aria-busy="true">
         <div className="detail-bar">
           <Skeleton height={16} width={240} />
         </div>
@@ -192,7 +192,7 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
   };
 
   return (
-    <div className="page page-form">
+    <div className="page">
       <h1 className="sr-only">{data.displayName}</h1>
       <div className="detail-bar">
         <Breadcrumbs
@@ -277,7 +277,16 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
                 </Field>
               </div>
 
-              <div className="col-6">
+              {/*
+                * Three columns, not six.
+                *
+                * This is the principle the removed page cap was the wrong way
+                * of expressing: a date is eight characters and a native date
+                * control is a fixed width, so at half of a 1900px row it is a
+                * 180px control sitting in an 800px box. The field takes less
+                * of the grid rather than the page taking less of the screen.
+                */}
+              <div className="col-3">
                 <Field label="Agreed on" optional="optional">
                   {(f) => (
                     <input
@@ -291,7 +300,7 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
                 </Field>
               </div>
 
-              <div className="col-6">
+              <div className="col-9">
                 <Field
                   label="Takedown contact"
                   invalid={needsContact}

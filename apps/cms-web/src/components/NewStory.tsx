@@ -38,10 +38,12 @@ import {
  * window to read four words.
  *
  * They are now a 12-column grid, six each: language beside section, publisher
- * beside headline. Two rows instead of four, each control about 560px, which is
- * still wider than anything that goes in one. The measure did not go away — it
- * went from 720px to 1180px, which is the width at which two fields are better
- * than one rather than merely possible.
+ * beside headline. Two rows instead of four.
+ *
+ * The measure went away entirely rather than widening — see layout.css. A page
+ * cap makes every field narrower in order to stop one being too wide, which is
+ * the wrong end to solve it from; a field that should be short takes fewer
+ * columns instead.
  *
  * -- Why there is a column beside the form ----------------------------------
  *
@@ -126,7 +128,7 @@ export function NewStory({ onCreated, onCancel }: Props) {
 
   if (loadError !== null && options === null) {
     return (
-      <div className="page page-form">
+      <div className="page">
         <Banner tone="error">{loadError}</Banner>
         <div className="actions actions-plain">
           <Button icon="refresh" onClick={reload}>
@@ -141,7 +143,7 @@ export function NewStory({ onCreated, onCancel }: Props) {
   }
 
   return (
-    <div className="page page-form">
+    <div className="page">
       <h1 className="sr-only">New story</h1>
       <div className="detail-bar">
         <Breadcrumbs

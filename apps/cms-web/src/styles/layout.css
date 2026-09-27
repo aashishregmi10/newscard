@@ -324,51 +324,24 @@
 }
 
 /*
- * The exception: a four-question form stretched across 1900px is a row of
- * fields nobody can scan, so that one screen keeps a measure.
+ * There is no measure, and that is a decision rather than an oversight.
  *
- * `margin-inline: auto` is not optional here and was missing. Removing the cap
- * from `.page` took its `margin: 0 auto` with it, which left every narrow form
- * a 720px column pinned to the left edge of a 1900px screen with the rest of
- * the window empty beside it.
+ * There were three: 720px for forms, then 1180px, then 1440px for lists. Each
+ * was defensible on its own — a row of fields nobody can scan across is a real
+ * failure, and so is a list whose title sits an inch of nothing away from its
+ * badge. What they were not was wanted. On a 1900px monitor every one of them
+ * read as the application refusing to use the screen, and it was raised about
+ * each screen in turn.
+ *
+ * So the rule is one rule: content fills the window, and a field that should
+ * not be 800px wide takes fewer of the twelve columns rather than asking the
+ * whole page to be narrower on its behalf. That is the honest place to solve
+ * it — per field, where the content is known — rather than a cap that makes
+ * every OTHER field narrower to fix one.
+ *
+ * `.page-narrow`, `.page-form` and `.page-list` are gone. If a measure is ever
+ * genuinely needed again it belongs on the panel that needs it, not the page.
  */
-.page-narrow {
-  max-width: 720px;
-  margin-inline: auto;
-}
-
-/*
- * A form that holds two fields side by side.
- *
- * 720px is a one-field column: put two 6-column fields in it and each is about
- * 340px, which is narrower than a publisher name reads comfortably. 1180px
- * gives each of them roughly 560px, and still stops well short of the full
- * 1900px, where a row of fields becomes something nobody can scan across.
- *
- * So this is not "wider because there was room". It is the narrowest width at
- * which the two-column arrangement is actually better than one column.
- */
-.page-form {
-  max-width: 1180px;
-  margin-inline: auto;
-}
-
-/*
- * A list of rows.
- *
- * Wider than a form and still bounded, because the two are limited by
- * different things. A form's measure is set by how wide one field needs to
- * be to read a publisher name in: about 560px, so 1180px for two of them.
- * A list's is set by how far the eye has to travel from the title on the
- * left to the badge on the right — and at 1900px that gap is most of a
- * screen of nothing, with the row it belongs to hard to follow across it.
- *
- * So there are two numbers here rather than one, and that is the reason.
- */
-.page-list {
-  max-width: 1440px;
-  margin-inline: auto;
-}
 
 /* ── Page header ──────────────────────────────────────────────────────────── */
 

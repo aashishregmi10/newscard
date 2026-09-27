@@ -105,7 +105,7 @@ export function Notify({ tab }: { tab: NotifyTab }) {
 
   if (loading || data === null) {
     return (
-      <div className="page page-form">
+      <div className="page">
         <Header reach={null} />
         {loadError !== null ? (
           <>
@@ -137,7 +137,7 @@ export function Notify({ tab }: { tab: NotifyTab }) {
   ];
 
   return (
-    <div className="page page-form">
+    <div className="page">
       <Header reach={targets.devices.withToken} />
 
       <Tabs

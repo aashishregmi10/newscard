@@ -218,7 +218,7 @@ export function NewShort() {
   );
 
   return (
-    <div className="page page-form">
+    <div className="page">
       <h1 className="sr-only">New short</h1>
       <div className="detail-bar">
         <Breadcrumbs

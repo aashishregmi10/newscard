@@ -103,7 +103,7 @@ export function NewSource() {
   };
 
   return (
-    <div className="page page-form">
+    <div className="page">
       <h1 className="sr-only">New publisher</h1>
       <div className="detail-bar">
         <Breadcrumbs
