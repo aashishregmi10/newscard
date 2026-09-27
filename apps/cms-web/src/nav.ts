@@ -65,12 +65,13 @@ export const LEAD_TABS = ['new', 'promoted', 'dismissed'] as const;
 export type LeadTab = (typeof LEAD_TABS)[number];
 
 /**
- * Ten, where every other list defaults to twenty.
+ * Ten, and not a setting.
  *
- * A lead row carries a headline, two lines of the story and a thumbnail, so
- * it is three or four times the height of a queue row. Twenty of them make a
- * page nobody reaches the bottom of, and triage is done in passes rather than
- * in one sitting.
+ * Every other list lets the reader pick a page size. A lead row is a
+ * headline, three lines of the story and a thumbnail — three or four times
+ * the height of a queue row — so every option except the smallest produces a
+ * page nobody reaches the bottom of. A menu whose other entries are all
+ * worse is not a choice, so there is no menu and no `perPage` in the route.
  */
 export const LEADS_PER_PAGE: PerPage = 10;
 
@@ -113,7 +114,7 @@ export type Route =
   | { name: 'sources'; tab: LicenceTab; page: number; perPage: PerPage; q: string }
   | { name: 'sourceNew' }
   | { name: 'source'; slug: string }
-  | { name: 'leads'; tab: LeadTab; page: number; perPage: PerPage }
+  | { name: 'leads'; tab: LeadTab; page: number }
   | { name: 'notifications'; tab: NotifyTab };
 
 /** The top-level sections the rail offers. Every route belongs to one. */
@@ -155,11 +156,10 @@ export const Routes = {
   }),
   sourceNew: (): Route => ({ name: 'sourceNew' }),
   source: (slug: string): Route => ({ name: 'source', slug }),
-  leads: (params: { tab?: LeadTab; page?: number; perPage?: PerPage } = {}): Route => ({
+  leads: (params: { tab?: LeadTab; page?: number } = {}): Route => ({
     name: 'leads',
     tab: params.tab ?? 'new',
     page: params.page ?? 1,
-    perPage: params.perPage ?? LEADS_PER_PAGE,
   }),
   notifications: (tab: NotifyTab = 'compose'): Route => ({ name: 'notifications', tab }),
 };
@@ -227,7 +227,6 @@ export function parseRoute(hash: string): Route {
     return Routes.leads({
       tab: readLeadTab(query),
       page: readPage(query),
-      perPage: readPerPage(query),
     });
   }
 
@@ -301,7 +300,6 @@ export function routeToHash(route: Route): string {
       return withQuery('#/leads', {
         tab: route.tab === 'new' ? null : route.tab,
         page: route.page === 1 ? null : String(route.page),
-        perPage: route.perPage === LEADS_PER_PAGE ? null : String(route.perPage),
       });
     case 'notifications':
       return withQuery('#/notifications', {

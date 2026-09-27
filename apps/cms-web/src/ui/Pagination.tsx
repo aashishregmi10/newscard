@@ -37,7 +37,16 @@ interface PaginationProps {
   perPage: PerPage;
   total: number;
   onPageChange: (page: number) => void;
-  onPerPageChange: (perPage: PerPage) => void;
+  /**
+   * Omit to fix the page size.
+   *
+   * Most lists here let the reader choose, and the note above about the
+   * footer being where that happens still holds for them. A list whose row
+   * is a headline, three lines of prose and a thumbnail is different: every
+   * size on the menu except the smallest produces a page nobody reaches the
+   * bottom of, so the choice is not a choice and the control is furniture.
+   */
+  onPerPageChange?: (perPage: PerPage) => void;
   /** Singular noun for the things being paged — 'story', 'short'. */
   noun?: string;
 }
@@ -109,7 +118,8 @@ export function Pagination({
         </div>
       }
 
-      <div className="pager-size">
+      {onPerPageChange !== undefined && (
+        <div className="pager-size">
         <label className="pager-size-label" htmlFor={selectId}>
           Per page
         </label>
@@ -128,8 +138,9 @@ export function Pagination({
               {option}
             </option>
           ))}
-        </Select>
-      </div>
+          </Select>
+        </div>
+      )}
     </nav>
   );
 }

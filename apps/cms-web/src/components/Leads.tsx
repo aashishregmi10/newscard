@@ -4,7 +4,7 @@ import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useResource } from '../hooks/useResource';
 import { crumbs } from '../lib/crumbs';
 import { relativeTime } from '../lib/format';
-import { Routes, type LeadTab, type PerPage } from '../nav';
+import { LEADS_PER_PAGE, Routes, type LeadTab } from '../nav';
 import { navigate } from '../useRoute';
 import {
   Badge,
@@ -80,10 +80,10 @@ interface Data {
   counts: LeadCounts;
 }
 
-export function Leads({ tab, page, perPage }: { tab: LeadTab; page: number; perPage: PerPage }) {
+export function Leads({ tab, page }: { tab: LeadTab; page: number }) {
   const { data, error: loadError, loading, reload } = useResource<Data>(
-    (signal) => api.leads(tab, page, perPage, signal),
-    `leads:${tab}:${page}:${perPage}`,
+    (signal) => api.leads(tab, page, LEADS_PER_PAGE, signal),
+    `leads:${tab}:${page}`,
     'Could not load the incoming stories.',
   );
 
@@ -141,8 +141,8 @@ export function Leads({ tab, page, perPage }: { tab: LeadTab; page: number; perP
     }
   };
 
-  const goTo = (next: { tab?: LeadTab; page?: number; perPage?: PerPage }) =>
-    navigate(Routes.leads({ tab, page, perPage, ...next }));
+  const goTo = (next: { tab?: LeadTab; page?: number }) =>
+    navigate(Routes.leads({ tab, page, ...next }));
 
   return (
     <div className="page">
@@ -180,7 +180,7 @@ export function Leads({ tab, page, perPage }: { tab: LeadTab; page: number; perP
         value={tab}
         /* Back to page one. Landing on page four of a tab you have not looked at
            is the same broken-link feeling the rail avoids. */
-        onChange={(next) => navigate(Routes.leads({ tab: next, perPage }))}
+        onChange={(next) => navigate(Routes.leads({ tab: next }))}
         idBase="leads"
         aria-label="Filter incoming stories"
       />
@@ -373,12 +373,12 @@ export function Leads({ tab, page, perPage }: { tab: LeadTab; page: number; perP
               })}
             </ul>
 
+            {/* No page-size control: see LEADS_PER_PAGE. */}
             <Pagination
               page={page}
-              perPage={perPage}
+              perPage={LEADS_PER_PAGE}
               total={total}
               onPageChange={(next) => goTo({ page: next })}
-              onPerPageChange={(next) => goTo({ page: 1, perPage: next })}
               noun="lead"
             />
           </>
