@@ -65,6 +65,16 @@ export const LEAD_TABS = ['new', 'promoted', 'dismissed'] as const;
 export type LeadTab = (typeof LEAD_TABS)[number];
 
 /**
+ * Ten, where every other list defaults to twenty.
+ *
+ * A lead row carries a headline, two lines of the story and a thumbnail, so
+ * it is three or four times the height of a queue row. Twenty of them make a
+ * page nobody reaches the bottom of, and triage is done in passes rather than
+ * in one sitting.
+ */
+export const LEADS_PER_PAGE: PerPage = 10;
+
+/**
  * The tabs on the publishers list.
  *
  * Licence status is not an attribute of a publisher — it is the question you
@@ -103,7 +113,7 @@ export type Route =
   | { name: 'sources'; tab: LicenceTab; page: number; perPage: PerPage; q: string }
   | { name: 'sourceNew' }
   | { name: 'source'; slug: string }
-  | { name: 'leads'; tab: LeadTab }
+  | { name: 'leads'; tab: LeadTab; page: number; perPage: PerPage }
   | { name: 'notifications'; tab: NotifyTab };
 
 /** The top-level sections the rail offers. Every route belongs to one. */
@@ -145,7 +155,12 @@ export const Routes = {
   }),
   sourceNew: (): Route => ({ name: 'sourceNew' }),
   source: (slug: string): Route => ({ name: 'source', slug }),
-  leads: (tab: LeadTab = 'new'): Route => ({ name: 'leads', tab }),
+  leads: (params: { tab?: LeadTab; page?: number; perPage?: PerPage } = {}): Route => ({
+    name: 'leads',
+    tab: params.tab ?? 'new',
+    page: params.page ?? 1,
+    perPage: params.perPage ?? LEADS_PER_PAGE,
+  }),
   notifications: (tab: NotifyTab = 'compose'): Route => ({ name: 'notifications', tab }),
 };
 
@@ -208,7 +223,13 @@ export function parseRoute(hash: string): Route {
     }
   }
 
-  if (section === 'leads') return Routes.leads(readLeadTab(query));
+  if (section === 'leads') {
+    return Routes.leads({
+      tab: readLeadTab(query),
+      page: readPage(query),
+      perPage: readPerPage(query),
+    });
+  }
 
   if (section === 'notifications') return Routes.notifications(readNotifyTab(query));
 
@@ -279,6 +300,8 @@ export function routeToHash(route: Route): string {
     case 'leads':
       return withQuery('#/leads', {
         tab: route.tab === 'new' ? null : route.tab,
+        page: route.page === 1 ? null : String(route.page),
+        perPage: route.perPage === LEADS_PER_PAGE ? null : String(route.perPage),
       });
     case 'notifications':
       return withQuery('#/notifications', {
@@ -334,8 +357,10 @@ export function screenKeyOf(route: Route): string {
       return 'sourceNew';
     case 'source':
       return `source:${route.slug}`;
+    /* The tab, not the page. Paging must not read as arriving somewhere new:
+       the scroll reset and the focus move belong to changing tab. */
     case 'leads':
-      return 'leads';
+      return `leads:${route.tab}`;
     case 'notifications':
       return 'notifications';
   }

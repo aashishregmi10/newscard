@@ -498,9 +498,10 @@ export const api = {
 
   /* ------------------------------------------------------------- leads */
 
-  leads: (status: string, signal?: AbortSignal) =>
-    req<{ items: LeadRow[]; counts: LeadCounts }>(
-      `/cms/leads?status=${encodeURIComponent(status)}`,
+  /** Paged on the server — see the note on the route; `dismissed` grows. */
+  leads: (status: string, page: number, perPage: number, signal?: AbortSignal) =>
+    req<{ items: LeadRow[]; total: number; counts: LeadCounts }>(
+      `/cms/leads?status=${encodeURIComponent(status)}&page=${page}&perPage=${perPage}`,
       { signal },
     ),
 

@@ -44,11 +44,33 @@ export const leadRoutes = Router();
 
 leadRoutes.use(requireAuth);
 
-/** Long enough to clear a morning's collection, short enough to be one page. */
-const MAX_LEADS = 200;
+/**
+ * Paged on the server, unlike every other list in this application.
+ *
+ * The queue, the publishers and the shorts all load everything and page in
+ * the browser, which is right for a few dozen rows. Leads are different in
+ * kind: most of them are dismissed rather than promoted, dismissals are KEPT
+ * so the same headline is not offered twice, and they live for thirty days —
+ * so `dismissed` grows into the thousands on a handful of publishers while
+ * `new` stays small if anyone is doing their job.
+ *
+ * It was capped at 200 with no paging and no total, which meant leads past
+ * that point were not merely on another page, they were invisible, and they
+ * expired having never been seen by anybody.
+ *
+ * Offset paging rather than the signed cursor: `cursor.ts` refuses offsets
+ * for the reader's feed because new stories arrive at the head of the sort
+ * order and a reader would see a card twice. That risk is real here too and
+ * it is worth far less — an editor who sees one lead twice across a page
+ * boundary has lost nothing, and the cursor codec is machinery this list does
+ * not need.
+ */
+const MAX_PER_PAGE = 100;
 
 const ListQuery = z.object({
   status: z.enum(['new', 'promoted', 'dismissed']).default('new'),
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(MAX_PER_PAGE).default(10),
 });
 
 const PromoteSchema = z.object({
@@ -114,10 +136,17 @@ leadRoutes.get(
     if (!parsed.success) throw new AppError('BAD_REQUEST', 'Unknown lead status.');
 
     const c = collections(getDb());
+    const { status, page, perPage } = parsed.data;
+
+    /* Counted before the slice, so the client can draw a page control that
+       knows how many pages there are. */
+    const total = await c.leads.countDocuments({ status });
+
     const docs = await c.leads
-      .find({ status: parsed.data.status })
+      .find({ status })
       .sort({ publishedAt: -1, fetchedAt: -1 })
-      .limit(MAX_LEADS)
+      .skip((page - 1) * perPage)
+      .limit(perPage)
       .toArray();
 
     /* Counts for the tab strip, in one round trip rather than three requests
@@ -128,6 +157,7 @@ leadRoutes.get(
 
     res.json({
       items: docs.map((d) => toRow(d as unknown as Record<string, unknown>)),
+      total,
       counts: {
         new: counts.find((x) => x._id === 'new')?.n ?? 0,
         promoted: counts.find((x) => x._id === 'promoted')?.n ?? 0,

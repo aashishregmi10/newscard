@@ -186,7 +186,7 @@ function Screen({
          rather than leaving the previous one's values in the fields. */
       return <SourceDetail key={route.slug} slug={route.slug} role={role} />;
     case 'leads':
-      return <Leads tab={route.tab} />;
+      return <Leads tab={route.tab} page={route.page} perPage={route.perPage} />;
 
     case 'notifications':
       return <Notify tab={route.tab} />;

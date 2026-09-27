@@ -1023,11 +1023,13 @@
 
 .lead-item {
   align-items: start;
+  padding-top: var(--s4);
+  padding-bottom: var(--s4);
 }
 
 .lead-thumb {
   flex: none;
-  width: 72px;
+  width: 104px;
   aspect-ratio: 16 / 9;
   object-fit: cover;
   border-radius: var(--r-sm);
@@ -1042,15 +1044,52 @@
   background: transparent;
 }
 
-.lead-extract {
+/*
+ * A lead headline is the thing being judged, so it is read rather than
+ * scanned.
+ *
+ * It used the shared `.item-title`, sized for a queue row where the headline
+ * is a label on something you already know about. Here it is the story
+ * itself, in Devanagari, and 14px was small enough that triage meant leaning
+ * in. Three lines rather than two, because a Nepali headline carrying a
+ * ministry and a district does not fit in two.
+ */
+.lead-title {
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  margin-top: 4px;
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+/* Devanagari needs the extra room between lines; the same rule the reader app
+   applies, for the same reason. */
+.lead-title[lang='ne'] {
+  line-height: 1.6;
+}
+
+/*
+ * The publisher's own opening, at reading size rather than caption size.
+ *
+ * Three lines is the point at which you can tell whether a story is worth
+ * summarising without opening it, which is the entire job of this screen.
+ */
+.lead-extract {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin-top: 6px;
   color: var(--ink-faint);
-  font-size: var(--text-sm);
-  line-height: 1.5;
+  font-size: var(--text-base);
+  line-height: 1.6;
+}
+
+.lead-extract[lang='ne'] {
+  line-height: 1.75;
 }
 
 /*
