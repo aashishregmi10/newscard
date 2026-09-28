@@ -1,5 +1,3 @@
-import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import express, { type Express } from 'express';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -16,9 +14,6 @@ import { publicReadLimit } from './middleware/rateLimit.js';
  * symptom being uploaded images that 404 only in production.
  */
 const MEDIA_DIR = mediaRoot();
-
-/** apps/api/public — the advertiser report page. Static, no build step. */
-const PUBLIC_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', 'public');
 
 /**
  * Middleware order is load-bearing:
@@ -68,18 +63,13 @@ export function createApp(): Express {
     }),
   );
 
-  /**
-   * The advertiser report page.
-   *
-   * Static files only, so helmet's default CSP (`script-src 'self'`) is
-   * satisfied without loosening anything — which is also why the page carries
-   * no inline script and no CDN dependency.
-   *
-   * noindex is set in the page itself; nothing here is secret without a token,
-   * but a campaign report has no business in a search index.
+  /*
+   * The advertiser report page used to be served from here, as static files
+   * out of apps/api/public. It lives on the editorial site now, because every
+   * page a person opens should be at one address — see the proxy note in
+   * apps/cms-web/vite.config.ts. This service is an API again, and the only
+   * bytes it serves that are not JSON are the media above.
    */
-  app.use('/report', express.static(join(PUBLIC_DIR, 'report'), { index: 'index.html' }));
-
   // Applied to the whole read surface. Deliberately generous: carrier-grade NAT
   // means one apparent IP can be a whole mobile cell (Ch. 6.10).
   app.use('/v1', publicReadLimit, v1);

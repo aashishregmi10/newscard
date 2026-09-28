@@ -151,8 +151,10 @@ setTimeout(() => {
   console.log(`\n${c.bold('Ready')}\n`);
   console.log(`  Editorial      ${c.cyan('http://localhost:5173')}`);
   console.log(`                 ${c.dim('editor@example.invalid / seed-editor-password')}`);
-  console.log(`  Reader API     ${c.cyan('http://localhost:3000')}`);
-  console.log(`  Ad report      ${c.cyan('http://localhost:3000/report')}`);
+  console.log(`  Ad report      ${c.cyan('http://localhost:5173/report/')}`);
+  /* Not a page. It is listed because the phone needs the address and
+     because a demo fails silently when it is down. */
+  console.log(`  Reader API     ${c.dim('http://localhost:3000')} ${c.dim('— what the app calls')}`);
   if (lan) {
     console.log(`\n  ${c.bold('For the phone')} ${c.dim('— it must be on this Wi-Fi')}`);
     console.log(`                 ${c.cyan(`http://${lan}:3000`)}`);

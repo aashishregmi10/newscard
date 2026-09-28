@@ -1,13 +1,16 @@
 /**
  * Resolving a media URL.
  *
- * -- Why the origin is not the CMS API ---------------------------------------
+ * -- Why this is same-origin now ---------------------------------------------
  *
- * The editorial backend is on 3001; media is served by the READ api on 3000. A
- * preview built against the CMS origin 404s, which looks exactly like a broken
- * upload and is not — the file is there, addressed to the wrong host. This was
- * worked out once and then copied into two components, where it could drift;
- * it lives here now and is imported.
+ * It used to point at http://localhost:3000, because media is served by the
+ * READ api and a preview built against the CMS origin 404s — the file is there,
+ * addressed to the wrong host, which looks exactly like a broken upload.
+ *
+ * The editorial origin proxies /media to the reader API now, so a bare path
+ * resolves correctly from this site in development and in production, and the
+ * cross-origin problem simply stops existing. The override remains for a
+ * deployment that puts media on a CDN of its own.
  *
  * Stored URLs are relative ('/media/...') so that the same record works from a
  * handset, a laptop on the office network and a production domain. Anything
@@ -15,7 +18,7 @@
  * to call on a value that might be either.
  */
 
-const MEDIA_ORIGIN: string = import.meta.env.VITE_MEDIA_BASE ?? 'http://localhost:3000';
+const MEDIA_ORIGIN: string = import.meta.env.VITE_MEDIA_BASE ?? '';
 
 export function mediaUrl(path: string): string;
 export function mediaUrl(path: string | null | undefined): string | null;

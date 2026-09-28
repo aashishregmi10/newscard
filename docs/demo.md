@@ -101,7 +101,7 @@ Withdrawing it removes it from the reader's feed immediately.
   advertiser named — and at most one in ten cards, never before the fourth card
   of a session, twelve a day. Those limits are enforced on the server, so a
   future build cannot quietly raise them.
-- Open the **advertiser report** at `http://localhost:3000/report`. Delivery,
+- Open the **advertiser report** at `http://localhost:5173/report/`. Delivery,
   viewability against a one-second threshold, click-through, and dwell — broken
   down by section and day. It opens on a per-campaign token, so an advertiser
   gets a link rather than an account, and sees nothing about any reader.

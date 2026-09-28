@@ -28,7 +28,14 @@ export default tseslint.config(
       '**/.expo/**',
       '**/media/**',
       'apps/mobile/assets/**',
-      'apps/api/public/**',
+      /*
+       * The advertiser report: hand-written ES5 in a browser, deliberately
+       * outside every build step this repository has. It moved here from
+       * apps/api/public when the page moved to the editorial origin, and the
+       * ignore has to move with it — Vite copies `public/` out untouched, so
+       * nothing lints or transpiles it and `document` is simply a global.
+       */
+      'apps/cms-web/public/**',
       'App.js', // the wrong-folder signpost; see the file for why
       '**/*.config.js',
       '**/*.config.mjs',

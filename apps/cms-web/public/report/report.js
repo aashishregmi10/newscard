@@ -1,10 +1,15 @@
 /*
  * Campaign report — advertiser view.
  *
- * No framework and no build step on purpose. This page is served by the read
- * API from a static directory; adding a bundler here would mean a second build
- * pipeline for one page, and the page is small enough that the whole thing
- * loads in less than the API call it makes.
+ * No framework and no build step on purpose. It sits in the editorial site’s
+ * `public/`, which Vite copies out untouched; adding a bundler here would mean
+ * a second build pipeline for one page, and the page is small enough that the
+ * whole thing loads in less than the API call it makes.
+ *
+ * It moved here from the read API so that every page a person opens is at one
+ * address. The fetch below stays relative, which is the whole trick: the
+ * editorial origin proxies /v1 to the reader API, so this is same-origin in
+ * development and in production, and no CORS is granted anywhere.
  *
  * The token is held in sessionStorage at most, so it dies with the tab, and it
  * never enters the URL.

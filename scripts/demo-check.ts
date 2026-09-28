@@ -23,6 +23,8 @@ import { connect, close, collections, getDb } from '@saar/db';
 
 const API = process.env.API_BASE_URL ?? 'http://localhost:3000';
 const CMS = `http://localhost:${process.env.CMS_PORT ?? 3001}`;
+/** The editorial site, which now also serves the advertiser report. */
+const WEB = process.env.CMS_ORIGIN ?? 'http://localhost:5173';
 
 const c = {
   green: (s: string) => `\x1b[32m${s}\x1b[0m`,
@@ -229,9 +231,12 @@ async function main(): Promise<void> {
   /* ── advertiser reporting ───────────────────────────────────────────────── */
   section('Advertiser reporting');
 
-  const reportPage = await get(`${API}/report`);
-  if (reportPage?.ok) ok('report page served', `${API}/report`);
-  else bad('the report page 404s');
+  /* Served by the editorial site now, not the API — every page a person
+     opens is at one address. The endpoint it calls is still the API’s, and
+     is checked separately below. */
+  const reportPage = await get(`${WEB}/report/`);
+  if (reportPage?.ok) ok('report page served', `${WEB}/report/`);
+  else bad('the report page 404s', `${WEB}/report/ — is the editorial site running?`);
 
   const campaign = await db.collection('campaigns').findOne({ status: 'live' });
   if (!campaign) bad('no live campaign');
