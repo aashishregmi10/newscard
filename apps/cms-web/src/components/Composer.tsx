@@ -300,8 +300,25 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
   const state = bandState(count, band);
   const look = articleStatus(article.status);
 
+  /*
+   * A published or withdrawn story is a record, not a draft.
+   *
+   * The server has always refused to PATCH one — `published` moves only to
+   * `retracted`, and `retracted` is terminal — but this screen did not know
+   * that. It rendered live fields over a story that could not be saved, so an
+   * editor could rewrite a published summary, watch the header say "Saving…"
+   * and then "Could not save", and have no idea whether the reader was seeing
+   * their new words or their old ones. Submit and Spike were live too, and
+   * both would have come back 409.
+   *
+   * So the fields are locked and the workflow buttons go away. Correcting a
+   * published story is a real act with a real route, and it lives on the
+   * Published screen: withdraw it, and write the correction as a new story.
+   */
+  const locked = article.status === 'published' || article.status === 'retracted';
+
   const headlineTooShort = headline.trim().length < HEADLINE_MIN;
-  const canSubmit = state === 'ok' && !headlineTooShort && !action.busy;
+  const canSubmit = state === 'ok' && !headlineTooShort && !action.busy && !locked;
   const canPublish = article.status === 'approved' && !action.busy;
 
   const shownHeadline = headline.trim() === '' ? 'Untitled draft' : headline;
@@ -377,6 +394,7 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
                 {...f}
                 className="input"
                 lang={language}
+                disabled={locked}
                 value={headline}
                 maxLength={limits.headlineMaxChars}
                 onChange={(e) => {
@@ -408,6 +426,7 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
                 {...f}
                 className="textarea textarea-prose"
                 lang={language}
+                disabled={locked}
                 value={summary}
                 rows={7}
                 onChange={(e) => {
@@ -433,13 +452,42 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
             */}
           <ImagePicker
             image={image}
-            disabled={action.busy}
+            disabled={action.busy || locked}
             onChange={(next) => {
               setImage(next);
               void persist({ image: next });
             }}
           />
 
+          {locked ? (
+            <Banner tone="info" live={false}>
+              {article.status === 'published' ? (
+                <>
+                  <strong>This story is live.</strong> It is shown as it was published and
+                  cannot be edited here — what a reader saw is a matter of record. To fix it,
+                  withdraw it and write the correction as a new story, which carries this
+                  text across and goes back through review.
+                </>
+              ) : (
+                <>
+                  <strong>This story was withdrawn.</strong> It is no longer served, and
+                  anyone still holding its link gets a withdrawal notice. A withdrawal is
+                  final; a replacement is written as a new story.
+                </>
+              )}
+              <span className="actions actions-plain">
+                <Button
+                  size="sm"
+                  variant={article.status === 'published' ? 'primary' : undefined}
+                  icon="newspaper"
+                  onClick={() => navigate(Routes.published())}
+                >
+                  {article.status === 'published' ? 'Withdraw or correct it' : 'Published stories'}
+                </Button>
+              </span>
+            </Banner>
+          ) : (
+            <>
           {/*
             * One primary action per state, and it is the one that moves the
             * story forward from where it actually is.
@@ -515,6 +563,8 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
           <p className="field-note">
             <span className="kbd">Ctrl</span> <span className="kbd">↵</span> submits for review.
           </p>
+            </>
+          )}
         </Panel>
 
         <div className="panel sticky-aside">

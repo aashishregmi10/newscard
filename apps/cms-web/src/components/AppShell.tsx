@@ -49,6 +49,9 @@ const SECTIONS: readonly RailSection[] = [
   /* Triage sits directly under the queue because that is where it leads:
      promoting a lead creates a draft and drops the editor into the composer. */
   { section: 'leads', route: Routes.leads(), label: 'Incoming', icon: 'globe' },
+  /* Between the queue and the rest: the queue is work outstanding, this is
+     the same work finished, and they are read one after the other. */
+  { section: 'published', route: Routes.published(), label: 'Published', icon: 'checkCircle' },
   { section: 'shorts', route: Routes.shorts(), label: 'Shorts', icon: 'video' },
   { section: 'sources', route: Routes.sources(), label: 'Publishers', icon: 'newspaper' },
   {

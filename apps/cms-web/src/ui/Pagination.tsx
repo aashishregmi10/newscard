@@ -49,6 +49,8 @@ interface PaginationProps {
   onPerPageChange?: (perPage: PerPage) => void;
   /** Singular noun for the things being paged — 'story', 'short'. */
   noun?: string;
+  /** Only when adding an s is wrong: 'story' → 'stories'. */
+  nounPlural?: string;
 }
 
 export function Pagination({
@@ -58,6 +60,7 @@ export function Pagination({
   onPageChange,
   onPerPageChange,
   noun = 'item',
+  nounPlural = `${noun}s`,
 }: PaginationProps) {
   const selectId = useId();
   const pageCount = pageCountOf(total, perPage);
@@ -71,7 +74,7 @@ export function Pagination({
   return (
     <nav className="pager" aria-label="Pagination">
       <p className="pager-range" role="status">
-        {from}–{to} of {total} {total === 1 ? noun : `${noun}s`}
+        {from}–{to} of {total} {total === 1 ? noun : nounPlural}
       </p>
 
       {

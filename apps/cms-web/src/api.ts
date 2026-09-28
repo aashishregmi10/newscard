@@ -231,6 +231,22 @@ export interface LeadRow {
   dismissedReason: string | null;
 }
 
+/** A story a reader can see, or one that was withdrawn. */
+export interface PublishedRow {
+  id: string;
+  slug: string;
+  status: 'published' | 'retracted';
+  language: 'ne' | 'en';
+  headline: string;
+  sourceName: string;
+  categorySlug: string;
+  categoryLabel: { ne: string; en: string };
+  publisherUrl: string;
+  publishedAt: string | null;
+  retractionReason: string | null;
+  hasImage: boolean;
+}
+
 export interface LeadCounts {
   new: number;
   promoted: number;
@@ -438,6 +454,26 @@ export const api = {
       body: JSON.stringify({ to, note }),
     }),
 
+  /** Pull a live story. The reason is required and is kept. */
+  retractArticle: (id: string, reason: string) =>
+    req<{ ok: true }>(`/cms/articles/${id}/retract`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  /**
+   * Withdraw a published story and reopen it as a draft carrying its text.
+   *
+   * There is no endpoint that edits a published story, because there is no
+   * transition that would let one exist. This is what "edit" means once a
+   * reader has seen it.
+   */
+  correctArticle: (id: string, reason: string) =>
+    req<{ id: string }>(`/cms/articles/${id}/correct`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
   publish: (id: string) =>
     req<{ status: string; publishedAt: string | null; selfApproved: boolean }>(
       `/cms/articles/${id}/publish`,
@@ -495,6 +531,16 @@ export const api = {
     }),
 
   /* ---------------------------------------------------------- publishers */
+
+  published: (status: string, page: number, perPage: number, signal?: AbortSignal) =>
+    req<{
+      items: PublishedRow[];
+      total: number;
+      counts: { published: number; retracted: number };
+    }>(
+      `/cms/published?status=${encodeURIComponent(status)}&page=${page}&perPage=${perPage}`,
+      { signal },
+    ),
 
   /* ------------------------------------------------------------- leads */
 

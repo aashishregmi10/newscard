@@ -17,6 +17,7 @@ import { NewShort } from './components/NewShort';
 import { NewSource } from './components/NewSource';
 import { NewStory } from './components/NewStory';
 import { Leads } from './components/Leads';
+import { Published } from './components/Published';
 import { Notify } from './components/Notify';
 import { PublicSite } from './components/PublicSite';
 import { Queue } from './components/Queue';
@@ -210,6 +211,9 @@ function Screen({
     case 'about':
     case 'contact':
       return null;
+
+    case 'published':
+      return <Published tab={route.tab} page={route.page} />;
 
     case 'leads':
       return <Leads tab={route.tab} page={route.page} />;

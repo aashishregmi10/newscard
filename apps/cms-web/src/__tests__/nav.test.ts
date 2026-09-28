@@ -43,6 +43,10 @@ const ALL_ROUTES: readonly Route[] = [
   Routes.source('namuna-khabar'),
   Routes.notifications(),
   Routes.notifications('history'),
+  Routes.leads(),
+  Routes.leads({ tab: 'dismissed', page: 4 }),
+  Routes.published(),
+  Routes.published({ tab: 'retracted', page: 2 }),
 ];
 
 describe('parseRoute and routeToHash', () => {
@@ -182,6 +186,22 @@ describe('the tab in the URL', () => {
     expect(parseRoute('#/sources?tab=nonsense')).toEqual(Routes.sources({ tab: 'all' }));
   });
 
+  it('carries the published list tab', () => {
+    expect(parseRoute('#/published')).toEqual(Routes.published({ tab: 'published' }));
+    expect(parseRoute('#/published?tab=retracted')).toEqual(
+      Routes.published({ tab: 'retracted' }),
+    );
+    expect(parseRoute('#/published?tab=RETRACTED')).toEqual(
+      Routes.published({ tab: 'retracted' }),
+    );
+    /* A withdrawn story is the one thing on this screen an editor might
+       arrive at from a stale link, so an unknown tab must land on the live
+       list rather than an empty panel. */
+    expect(parseRoute('#/published?tab=spiked')).toEqual(
+      Routes.published({ tab: 'published' }),
+    );
+  });
+
   it('does not confuse the three kinds of tab', () => {
     /*
      * All three live under `?tab=` and each has its own vocabulary. 'notes' is
@@ -193,6 +213,13 @@ describe('the tab in the URL', () => {
     expect(parseRoute('#/queue/abc?tab=history')).toEqual(Routes.article('abc', 'source'));
     expect(parseRoute('#/sources?tab=compose')).toEqual(Routes.sources({ tab: 'all' }));
     expect(parseRoute('#/sources?tab=source')).toEqual(Routes.sources({ tab: 'all' }));
+    /* The two list screens both have a tab that is a status, and the
+       vocabularies overlap by nothing — a lead is never retracted and a
+       story is never dismissed. */
+    expect(parseRoute('#/published?tab=dismissed')).toEqual(
+      Routes.published({ tab: 'published' }),
+    );
+    expect(parseRoute('#/leads?tab=retracted')).toEqual(Routes.leads({ tab: 'new' }));
   });
 });
 
@@ -284,6 +311,14 @@ describe('sectionOf', () => {
     expect(sectionOf(Routes.sourceNew())).toBe('sources');
     expect(sectionOf(Routes.source('x-y'))).toBe('sources');
   });
+
+  it('gives the two list screens their own rail entries', () => {
+    /* Published is deliberately NOT filed under the queue. The queue is work
+       outstanding and this is work finished, and lighting the same rail
+       entry for both would say they are one screen with a filter. */
+    expect(sectionOf(Routes.published())).toBe('published');
+    expect(sectionOf(Routes.leads())).toBe('leads');
+  });
 });
 
 describe('screenKeyOf', () => {
@@ -307,6 +342,14 @@ describe('screenKeyOf', () => {
     expect(screenKeyOf(Routes.shorts())).not.toBe(screenKeyOf(Routes.shortNew()));
     expect(screenKeyOf(Routes.sources())).not.toBe(screenKeyOf(Routes.sourceNew()));
     expect(screenKeyOf(Routes.source('a-a'))).not.toBe(screenKeyOf(Routes.source('b-b')));
+    /* Live and withdrawn are two different lists, so moving between them
+       should scroll to the top rather than keep the previous offset. */
+    expect(screenKeyOf(Routes.published({ tab: 'published' }))).not.toBe(
+      screenKeyOf(Routes.published({ tab: 'retracted' })),
+    );
+    expect(screenKeyOf(Routes.published({ page: 1 }))).toBe(
+      screenKeyOf(Routes.published({ page: 7 })),
+    );
   });
 });
 

@@ -73,6 +73,72 @@ articleRoutes.get(
   }),
 );
 
+/**
+ * GET /cms/published — what a reader can actually see.
+ *
+ * The queue above deliberately excludes it: a queue is work outstanding, and a
+ * published story is work finished. But the finished pile had no screen at all,
+ * so the only way to answer "is that story still live" was to open the app and
+ * scroll for it.
+ *
+ * Newest first, unlike the queue. The queue sorts oldest-first so nothing rots
+ * at the bottom of a backlog; this is a record rather than a backlog, and the
+ * story someone is looking for is almost always a recent one.
+ *
+ * Paged on the server. It only grows, and 200 rows with no paging is the bug
+ * the triage queue had — rows past the cap are not on another page, they are
+ * invisible.
+ */
+const PublishedQuery = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(100).default(10),
+  status: z.enum(['published', 'retracted']).default('published'),
+});
+
+articleRoutes.get(
+  '/cms/published',
+  requireRole('queue.read'),
+  asyncRoute(async (req, res) => {
+    const parsed = PublishedQuery.safeParse(req.query);
+    if (!parsed.success) throw new AppError('BAD_REQUEST', 'Unknown query.');
+    const { page, perPage, status } = parsed.data;
+
+    const c = collections(getDb());
+    const filter = { status };
+
+    const [total, docs, retractedCount, publishedCount] = await Promise.all([
+      c.articles.countDocuments(filter),
+      c.articles
+        .find(filter)
+        .sort({ publishedAt: -1, _id: -1 })
+        .skip((page - 1) * perPage)
+        .limit(perPage)
+        .toArray(),
+      c.articles.countDocuments({ status: 'retracted' }),
+      c.articles.countDocuments({ status: 'published' }),
+    ]);
+
+    res.json({
+      total,
+      counts: { published: publishedCount, retracted: retractedCount },
+      items: docs.map((d) => ({
+        id: d._id.toString(),
+        slug: d.slug,
+        status: d.status,
+        language: d.language,
+        headline: d.headline,
+        sourceName: d.sourceName,
+        categorySlug: d.categorySlug,
+        categoryLabel: d.categoryLabel,
+        publisherUrl: d.publisherUrl,
+        publishedAt: d.publishedAt?.toISOString() ?? null,
+        retractionReason: d.retractionReason ?? null,
+        hasImage: d.image !== null && d.image !== undefined,
+      })),
+    });
+  }),
+);
+
 /** GET /cms/articles/:id — everything the composer needs, in one request. */
 articleRoutes.get(
   '/cms/articles/:id',
@@ -334,6 +400,126 @@ articleRoutes.post(
     });
 
     res.json({ ok: true });
+  }),
+);
+
+/**
+ * POST /cms/articles/:id/correct — withdraw a published story and reopen it.
+ *
+ * ── Why editing a published story is not a PATCH ────────────────────────────
+ *
+ * PATCH refuses one, deliberately: what a reader saw is a matter of record, and
+ * quietly rewriting it underneath them is worse than the error being fixed. The
+ * state machine agrees — `published` moves only to `retracted`, and `retracted`
+ * is terminal.
+ *
+ * So "edit the published story" has exactly one honest shape, and it is the one
+ * the machine already prescribes: withdraw it, and write the corrected version
+ * as a new story. This does both in a single act, because doing them in two
+ * leaves a window where an editor has pulled a story and not yet begun its
+ * replacement, and it copies the text across, because retyping a story to fix
+ * one word is how the second mistake gets made.
+ *
+ * The withdrawn story keeps its slug, its audit trail and its 410 for anyone
+ * still holding a link. The correction is a NEW story with a new slug and a new
+ * publication time, which is what it is.
+ *
+ * ── Why the licence is checked before anything is withdrawn ─────────────────
+ *
+ * The correction is a fresh draft, and a draft cannot exist against a publisher
+ * whose licence has lapsed. Checking afterwards would leave the story pulled
+ * and the replacement impossible to write — so this refuses the whole act and
+ * says to withdraw it plainly instead.
+ */
+articleRoutes.post(
+  '/cms/articles/:id/correct',
+  /* The withdrawal is the strong half of this, so it takes the strong
+     permission. An author who may write cannot pull a live story. */
+  requireRole('article.retract'),
+  asyncRoute(async (req, res) => {
+    const Body = z.object({ reason: z.string().min(10) });
+    const parsed = Body.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        'A reason of at least 10 characters is required. It is shown in the audit trail and to anyone asking why the story changed.',
+      );
+    }
+
+    const id = String(req.params.id ?? '');
+    if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
+
+    const c = collections(getDb());
+    const original = await c.articles.findOne({ _id: new ObjectId(id) });
+    if (!original) throw new AppError('NOT_FOUND');
+
+    if (original.status !== 'published') {
+      throw new AppError(
+        'INVALID_TRANSITION',
+        'Only a published story is corrected this way. A draft is edited directly, and a withdrawn story stays withdrawn.',
+      );
+    }
+
+    const source = await c.sources.findOne({ _id: original.sourceId });
+    if (source?.licence?.status !== 'agreed') {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        `${source?.displayName ?? 'That publisher'} no longer has an agreed licence, so a corrected version cannot be written. You can still withdraw the story.`,
+        { licenceStatus: source?.licence?.status ?? null },
+      );
+    }
+
+    await retractArticle({
+      articleId: id,
+      reason: parsed.data.reason,
+      actorId: req.staff!.staffId,
+      actorEmail: req.staff!.email,
+      ip: req.ip ?? null,
+    });
+
+    const now = new Date();
+    const _id = new ObjectId();
+
+    await c.articles.insertOne({
+      ...original,
+      _id,
+      slug: draftSlug(original.language, original.categorySlug),
+      status: 'draft',
+      publishedAt: null,
+      /* The correction is this editor's work, whoever wrote the original. */
+      authoredBy: new ObjectId(req.staff!.staffId),
+      reviewedBy: null,
+      selfApproved: false,
+      retractionReason: null,
+      /*
+       * Why the note rather than a `correctionOf` field.
+       *
+       * The reviewer needs to know this is a correction and what was wrong with
+       * the last one, and the reviewer-note panel is where they already look. A
+       * schema field would also have to be decided about in the public DTO, and
+       * "which story was this correcting" is not a reader's question — it is an
+       * audit question, and the audit trail already answers it from both ends.
+       */
+      editorialNotes:
+        `Correction of ${original.slug}, withdrawn ${now.toISOString().slice(0, 10)}: ` +
+        parsed.data.reason,
+      revisionCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    } as never);
+
+    await writeAudit({
+      action: 'article.create',
+      entityType: 'article',
+      entityId: _id.toString(),
+      actorId: req.staff!.staffId,
+      actorEmail: req.staff!.email,
+      before: null,
+      after: { status: 'draft', correctionOf: original.slug, correctionOfId: id },
+      ip: req.ip ?? null,
+    });
+
+    res.status(201).json({ id: _id.toString() });
   }),
 );
 

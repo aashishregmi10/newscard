@@ -61,6 +61,14 @@ export type NotifyTab = (typeof NOTIFY_TABS)[number];
  * The same three values the server stores, because inventing a display
  * vocabulary on top of a stored one gives you two things to keep in step.
  */
+/** Live, and withdrawn. Both are 'what a reader saw', which is the question
+ *  this screen answers; a draft is a different question and has the queue. */
+export const PUBLISHED_TABS = ['published', 'retracted'] as const;
+export type PublishedTab = (typeof PUBLISHED_TABS)[number];
+
+/** Ten, for the same reason as the triage queue: the row is tall. */
+export const PUBLISHED_PER_PAGE: PerPage = 10;
+
 export const LEAD_TABS = ['new', 'promoted', 'dismissed'] as const;
 export type LeadTab = (typeof LEAD_TABS)[number];
 
@@ -142,11 +150,12 @@ export type Route =
   | { name: 'sources'; tab: LicenceTab; page: number; q: string }
   | { name: 'sourceNew' }
   | { name: 'source'; slug: string }
+  | { name: 'published'; tab: PublishedTab; page: number }
   | { name: 'leads'; tab: LeadTab; page: number }
   | { name: 'notifications'; tab: NotifyTab };
 
 /** The top-level sections the rail offers. Every route belongs to one. */
-export type Section = 'queue' | 'leads' | 'shorts' | 'sources' | 'notifications';
+export type Section = 'queue' | 'published' | 'leads' | 'shorts' | 'sources' | 'notifications';
 
 export type Role = 'author' | 'reviewer' | 'admin';
 
@@ -184,6 +193,11 @@ export const Routes = {
   }),
   sourceNew: (): Route => ({ name: 'sourceNew' }),
   source: (slug: string): Route => ({ name: 'source', slug }),
+  published: (params: { tab?: PublishedTab; page?: number } = {}): Route => ({
+    name: 'published',
+    tab: params.tab ?? 'published',
+    page: params.page ?? 1,
+  }),
   leads: (params: { tab?: LeadTab; page?: number } = {}): Route => ({
     name: 'leads',
     tab: params.tab ?? 'new',
@@ -261,6 +275,10 @@ export function parseRoute(hash: string): Route {
       const slug = decodeSegment(rest).toLowerCase();
       if (SLUG_PATTERN.test(slug)) return Routes.source(slug);
     }
+  }
+
+  if (section === 'published') {
+    return Routes.published({ tab: readPublishedTab(query), page: readPage(query) });
   }
 
   if (section === 'leads') {
@@ -341,6 +359,11 @@ export function routeToHash(route: Route): string {
       return '#/sources/new';
     case 'source':
       return `#/sources/${encodeURIComponent(route.slug)}`;
+    case 'published':
+      return withQuery('#/published', {
+        tab: route.tab === 'published' ? null : route.tab,
+        page: route.page === 1 ? null : String(route.page),
+      });
     case 'leads':
       return withQuery('#/leads', {
         tab: route.tab === 'new' ? null : route.tab,
@@ -378,6 +401,8 @@ export function sectionOf(route: Route): Section {
     case 'sourceNew':
     case 'source':
       return 'sources';
+    case 'published':
+      return 'published';
     case 'leads':
       return 'leads';
     case 'notifications':
@@ -417,6 +442,8 @@ export function screenKeyOf(route: Route): string {
       return `source:${route.slug}`;
     /* The tab, not the page. Paging must not read as arriving somewhere new:
        the scroll reset and the focus move belong to changing tab. */
+    case 'published':
+      return `published:${route.tab}`;
     case 'leads':
       return `leads:${route.tab}`;
     case 'notifications':
@@ -538,6 +565,11 @@ function readQuery(query: URLSearchParams): string {
 function readTab(query: URLSearchParams): ArticleTab {
   const raw = (query.get('tab') ?? '').toLowerCase();
   return ARTICLE_TABS.find((tab) => tab === raw) ?? 'source';
+}
+
+function readPublishedTab(query: URLSearchParams): PublishedTab {
+  const raw = (query.get('tab') ?? '').toLowerCase();
+  return PUBLISHED_TABS.find((tab) => tab === raw) ?? 'published';
 }
 
 function readLeadTab(query: URLSearchParams): LeadTab {
