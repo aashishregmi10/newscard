@@ -43,6 +43,8 @@ export type IconName =
   | 'clock'
   | 'copy'
   | 'externalLink'
+  | 'eye'
+  | 'eyeOff'
   | 'fileText'
   | 'globe'
   | 'image'
@@ -129,6 +131,22 @@ const SHAPES: Record<IconName, ReactNode> = {
       <path d="M13.6 4.4h6v6" />
       <path d="M19.6 4.4 11 13" />
       <path d="M17.6 14.4V18a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8.4a2 2 0 0 1 2-2h3.6" />
+    </>
+  ),
+  /* Drawn on the same 24x24 grid at stroke 1.7, like the rest. The slash on
+     eyeOff is a separate path so it keeps the round cap. */
+  eye: (
+    <>
+      <path d="M2.6 12S6 5.4 12 5.4 21.4 12 21.4 12 18 18.6 12 18.6 2.6 12 2.6 12Z" />
+      <circle cx="12" cy="12" r="2.8" />
+    </>
+  ),
+  eyeOff: (
+    <>
+      <path d="M9.6 6a7.6 7.6 0 0 1 2.4-.4c6 0 9.4 6.4 9.4 6.4a15 15 0 0 1-2.5 3.3" />
+      <path d="M6.3 7.7A15 15 0 0 0 2.6 12S6 18.6 12 18.6a8.6 8.6 0 0 0 3.6-.8" />
+      <path d="M10.1 10.1a2.8 2.8 0 0 0 3.8 3.8" />
+      <path d="M3.8 3.8 20.2 20.2" />
     </>
   ),
   fileText: (

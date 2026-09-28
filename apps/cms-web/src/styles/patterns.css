@@ -1105,3 +1105,62 @@
   padding-top: var(--s4);
   border-top: 1px solid var(--line);
 }
+
+/* ========================================================================
+ * A control with something on its right
+ *
+ * One button inside the field's box — a password reveal, and whatever else
+ * wants the same shape later. The Field's notched outline is drawn behind the
+ * control, so the affix has to sit inside that box rather than beside it, or
+ * the outline ends up around the input and the button hangs outside it.
+ * ====================================================================== */
+
+.input-with-affix {
+  position: relative;
+  display: block;
+}
+
+/* Room for the button, so a long value does not run underneath it. */
+.input-with-affix .input {
+  padding-right: 44px;
+}
+
+.input-affix {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-top: -16px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+
+.input-affix:hover:not(:disabled) {
+  background: var(--action-hover);
+  color: var(--ink);
+}
+
+/* The field's outline already turns accent on focus-within, so this only needs
+   to say which control has the ring. */
+.input-affix:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.input-affix:disabled {
+  color: var(--ink-disabled);
+  cursor: not-allowed;
+}
+
+.input-affix svg {
+  width: 18px;
+  height: 18px;
+}

@@ -318,7 +318,25 @@
  * Its label therefore floats permanently, exactly as a select's does, rather
  * than resting on top of the placeholder the browser drew.
  */
+/*
+ * An autofilled control counts as filled.
+ *
+ * This is the bug that made the sign-in form unreadable: the password came
+ * back from the browser's password manager, the box showed dots, and the
+ * label sat on top of them still saying "Password".
+ *
+ * The float is keyed off `:placeholder-shown`, and Chrome does not
+ * re-evaluate that for a value IT supplied — the DOM has content and the
+ * pseudo-class still reports the field empty. The email box above it looked
+ * correct only because it is autofocused, so `:focus-within` was floating
+ * that one for an entirely different reason.
+ *
+ * `:-webkit-autofill` is the state Chromium and WebKit set on such a field,
+ * and the only handle there is. Firefox needs no equivalent: it updates
+ * `:placeholder-shown` correctly.
+ */
 .input[type='date'] ~ .field-label-text,
+.input:-webkit-autofill ~ .field-label-text,
 [data-filled='true'] ~ .field-label-text {
   transform: translate(10px, -8px) scale(0.75);
 }
@@ -374,6 +392,7 @@
 .textarea:not(:placeholder-shown) ~ .field-outline .field-legend,
 .select-wrap ~ .field-outline .field-legend,
 .input[type='date'] ~ .field-outline .field-legend,
+.input:-webkit-autofill ~ .field-outline .field-legend,
 [data-filled='true'] ~ .field-outline .field-legend {
   max-width: 100%;
 }
@@ -521,6 +540,18 @@
 .combo-input:focus::placeholder {
   color: var(--ink-disabled);
   opacity: 1;
+}
+
+/* Chrome paints its own background on an autofilled control, which on this
+   palette reads as a highlighted, almost selected field. The inset shadow
+   is the only way to override it — `background` is ignored. */
+.input:-webkit-autofill,
+.input:-webkit-autofill:hover,
+.input:-webkit-autofill:focus,
+.textarea:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 100px var(--surface) inset;
+  -webkit-text-fill-color: var(--ink);
+  caret-color: var(--ink);
 }
 
 .input:disabled,
@@ -1565,8 +1596,23 @@
   color: var(--accent);
 }
 
+/*
+ * Both halves of the mark are pinned rather than left to inherit.
+ *
+ * `h1` is reset in base.css and `p` is not, so this line was carrying a user
+ * agent margin nothing here had asked for — the gap under the brand was
+ * whatever the browser felt like. An explicit line-height goes with it: the
+ * two lines are a lockup, and a lockup whose spacing depends on the default
+ * body leading is one that moves when that leading is tuned.
+ */
+.login-mark {
+  margin: 0;
+  line-height: 1.25;
+}
+
 .login-sub {
-  margin-bottom: var(--s6);
+  margin: 2px 0 var(--s6);
   font-size: var(--text-base);
+  line-height: 1.4;
   color: var(--ink-faint);
 }

@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
-import { Banner, Button, Field } from '../ui';
+import { Banner, Button, Field, Icon } from '../ui';
 
 /**
  * Signing in.
@@ -30,6 +30,7 @@ interface LoginProps {
 export function Login({ onSignedIn, problem = null }: LoginProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [revealed, setRevealed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -83,18 +84,43 @@ export function Login({ onSignedIn, problem = null }: LoginProps) {
           )}
         </Field>
 
+        {/*
+          * The reveal toggle.
+          *
+          * Worth having on exactly this field and not as a general habit: a
+          * password is the one input where a typo is invisible by design, and
+          * the alternative to showing it is retyping the whole thing to find
+          * out which character was wrong.
+          *
+          * It is a real `<button type="button">` — inside a form, a button
+          * without that attribute submits, so a reveal would have tried to sign
+          * in with a half-typed password. `aria-pressed` says which state it is
+          * in rather than leaving a screen reader to infer it from the label.
+          */}
         <Field label="Password">
           {(f) => (
-            <input
-              {...f}
-              className="input"
-              type="password"
-              autoComplete="current-password"
-              required
-              disabled={busy}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
+            <span className="input-with-affix">
+              <input
+                {...f}
+                className="input"
+                type={revealed ? 'text' : 'password'}
+                autoComplete="current-password"
+                required
+                disabled={busy}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <button
+                type="button"
+                className="input-affix"
+                aria-label={revealed ? 'Hide the password' : 'Show the password'}
+                aria-pressed={revealed}
+                disabled={busy}
+                onClick={() => setRevealed((r) => !r)}
+              >
+                <Icon name={revealed ? 'eyeOff' : 'eye'} />
+              </button>
+            </span>
           )}
         </Field>
 
