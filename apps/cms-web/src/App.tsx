@@ -18,6 +18,7 @@ import { NewSource } from './components/NewSource';
 import { NewStory } from './components/NewStory';
 import { Leads } from './components/Leads';
 import { Published } from './components/Published';
+import { EditPublished } from './components/EditPublished';
 import { Notify } from './components/Notify';
 import { PublicSite } from './components/PublicSite';
 import { Queue } from './components/Queue';
@@ -213,7 +214,11 @@ function Screen({
       return null;
 
     case 'published':
-      return <Published tab={route.tab} page={route.page} />;
+      return <Published tab={route.tab} page={route.page} role={role} />;
+    case 'publishedEdit':
+      /* Keyed by id, as the publisher screen is by slug: moving between two
+         stories must rebuild the form rather than keep the first one's text. */
+      return <EditPublished key={route.id} id={route.id} />;
 
     case 'leads':
       return <Leads tab={route.tab} page={route.page} />;

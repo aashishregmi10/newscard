@@ -1548,3 +1548,164 @@
     display: none;
   }
 }
+
+/* ========================================================================
+ * Published
+ *
+ * A row is a headline and three actions, and the actions are the thing the
+ * eye goes looking for. So they are a column, pinned to the right edge of every
+ * row, rather than trailing whatever the headline happened to leave.
+ * ====================================================================== */
+
+/*
+ * Two columns, not the list's three.
+ *
+ * `.item` is `auto 1fr auto`, built for a row with a leading icon. A row with
+ * no leading element puts its body in the `auto` column and its tail in the
+ * `1fr` one, which is exactly how the actions ended up sitting straight after
+ * each headline at a different x on every row.
+ */
+.published-item {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  padding-top: var(--s3);
+  padding-bottom: var(--s3);
+}
+
+.published-tail {
+  justify-content: flex-end;
+}
+
+/*
+ * The action group. The same three buttons on every row, including a disabled
+ * edit on a withdrawn story, so the icons line up down the whole page instead
+ * of the view button jumping left wherever edit is absent.
+ */
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: var(--s2);
+  padding-left: var(--s3);
+  border-left: 1px solid var(--line);
+}
+
+/* "Edited 2h ago" in the meta line: present, but not louder than the source. */
+.item-edited {
+  color: var(--warn);
+  font-weight: 500;
+}
+
+/* ========================================================================
+ * Correcting a live story
+ *
+ * Laid out like the composer, because it is the same work on the same text.
+ * What differs is the right-hand column: there it shows the source being
+ * summarised, here it shows what readers are being served right now, so the
+ * change is made against the thing it changes.
+ * ====================================================================== */
+
+.edit-live {
+  margin: 0;
+  padding: var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-sunk);
+}
+
+.edit-live-headline {
+  margin: 0 0 var(--s2);
+  font-size: var(--text-md);
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--ink);
+}
+
+.edit-live-headline[lang='ne'] {
+  line-height: 1.6;
+}
+
+.edit-live-summary {
+  margin: 0;
+  font-size: var(--text-base);
+  line-height: 1.6;
+  color: var(--ink-soft);
+  white-space: pre-wrap;
+}
+
+.edit-live-summary[lang='ne'] {
+  line-height: 1.75;
+}
+
+/* The record of the last correction: when, and why. */
+.edit-record {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px var(--s3);
+  margin: var(--s4) 0 0;
+  font-size: var(--text-sm);
+}
+
+.edit-record dt {
+  color: var(--ink-faint);
+}
+
+.edit-record dd {
+  margin: 0;
+  color: var(--ink);
+}
+
+/*
+ * The reason field is set apart from the story fields above it.
+ *
+ * It is not part of the story and a reader never sees it, and a field that
+ * looks like one more line of copy is a field people fill in last and
+ * carelessly. A rule and a heading make it read as the thing that has to be
+ * answered before anything is saved.
+ */
+.edit-reason {
+  margin-top: var(--s5);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+
+.edit-reason-title {
+  margin: 0 0 var(--s3);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+/* The second, deliberate step of a withdrawal. */
+.confirm-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--s2) var(--s3);
+  margin-top: var(--s3);
+  padding: var(--s3);
+  border: 1px solid var(--bad-line);
+  border-radius: var(--r-sm);
+  background: var(--bad-soft);
+  color: var(--bad);
+  font-size: var(--text-sm);
+}
+
+.confirm-strip p {
+  flex: 1 1 260px;
+  margin: 0;
+}
+
+/*
+ * A label for a group of controls that is not itself one field — the image
+ * picker, with its preview, credit and licence. In the flow of the page, sized
+ * like a floated field label so it reads as the same family.
+ */
+.field-heading {
+  margin: 0 0 var(--s2);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--ink-soft);
+}

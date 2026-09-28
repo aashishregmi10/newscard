@@ -150,13 +150,19 @@ export function ImagePicker({ image, disabled, onChange }: Props) {
     }
   };
 
+  /*
+   * A heading, not a floating label.
+   *
+   * It used `.field-label-text`, which is the notched-outline label: absolutely
+   * positioned, and relying on the Field shell around it to be the positioned
+   * ancestor. This picker has no such shell, so the nearest positioned
+   * ancestor was the page itself and "Image optional" was drawn over the
+   * SAAR logo in the top-left corner of every composer.
+   */
   const label = (
-    <div className="field-label">
-      <span className="field-label-text">
-        Image
-        <span className="field-optional">optional</span>
-      </span>
-    </div>
+    <p className="field-heading">
+      Image <span className="field-optional">optional</span>
+    </p>
   );
 
   /* ── Chosen, not yet uploaded ─────────────────────────────────────────── */

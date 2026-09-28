@@ -312,8 +312,8 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
    * both would have come back 409.
    *
    * So the fields are locked and the workflow buttons go away. Correcting a
-   * published story is a real act with a real route, and it lives on the
-   * Published screen: withdraw it, and write the correction as a new story.
+   * live story is a real act with a real route — POST /cms/articles/:id/edit,
+   * behind its own screen, which will not save without a reason.
    */
   const locked = article.status === 'published' || article.status === 'retracted';
 
@@ -463,26 +463,32 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
             <Banner tone="info" live={false}>
               {article.status === 'published' ? (
                 <>
-                  <strong>This story is live.</strong> It is shown as it was published and
-                  cannot be edited here — what a reader saw is a matter of record. To fix it,
-                  withdraw it and write the correction as a new story, which carries this
-                  text across and goes back through review.
+                  <strong>This story is live.</strong> It is not autosaved here, because a
+                  change to something readers can see has to say why. Corrections are made
+                  on the edit screen, which records your reason and the time, and where the
+                  story can also be withdrawn.
                 </>
               ) : (
                 <>
                   <strong>This story was withdrawn.</strong> It is no longer served, and
                   anyone still holding its link gets a withdrawal notice. A withdrawal is
-                  final; a replacement is written as a new story.
+                  final, so it is no longer edited.
                 </>
               )}
               <span className="actions actions-plain">
                 <Button
                   size="sm"
                   variant={article.status === 'published' ? 'primary' : undefined}
-                  icon="newspaper"
-                  onClick={() => navigate(Routes.published())}
+                  icon={article.status === 'published' ? 'pencil' : 'newspaper'}
+                  onClick={() =>
+                    navigate(
+                      article.status === 'published'
+                        ? Routes.publishedEdit(id)
+                        : Routes.published({ tab: 'retracted' }),
+                    )
+                  }
                 >
-                  {article.status === 'published' ? 'Withdraw or correct it' : 'Published stories'}
+                  {article.status === 'published' ? 'Edit the live story' : 'Withdrawn stories'}
                 </Button>
               </span>
             </Banner>

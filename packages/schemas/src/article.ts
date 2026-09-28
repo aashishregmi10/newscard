@@ -47,6 +47,24 @@ export const Article = z.object({
   retractionReason: z.string().min(1).nullable().optional(),
   spikeReason: SpikeReasonEnum.nullable().optional(),
 
+  /**
+   * The last time a LIVE story was changed, by whom, and why.
+   *
+   * A correction to something a reader has already seen is a different act
+   * from editing a draft, and it needs a different record. `updatedAt` cannot
+   * serve: every autosave moves it, so it answers "when did anyone last touch
+   * this" rather than "when did what the public sees last change".
+   *
+   * The reason is required by the route that sets these — an unexplained
+   * change to a published story is the thing this field exists to prevent.
+   * The full history lives in `audit`, which holds the before and after of
+   * every edit; these three are the latest one, denormalised so a list can
+   * show "edited 2h ago" without joining.
+   */
+  lastEditedAt: z.date().nullable().optional(),
+  lastEditedBy: ObjectIdString.nullable().optional(),
+  lastEditReason: z.string().min(1).nullable().optional(),
+
   // --- content (Ch. 3.2.2) ---
   /**
    * Upper bounds only.

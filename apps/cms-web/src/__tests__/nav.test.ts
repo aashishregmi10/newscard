@@ -47,6 +47,7 @@ const ALL_ROUTES: readonly Route[] = [
   Routes.leads({ tab: 'dismissed', page: 4 }),
   Routes.published(),
   Routes.published({ tab: 'retracted', page: 2 }),
+  Routes.publishedEdit('65f1c2a4b8e9d0123456789a'),
 ];
 
 describe('parseRoute and routeToHash', () => {
@@ -202,6 +203,18 @@ describe('the tab in the URL', () => {
     );
   });
 
+  it('opens the edit screen for one published story', () => {
+    expect(parseRoute('#/published/65f1c2a4b8e9d0123456789a')).toEqual(
+      Routes.publishedEdit('65f1c2a4b8e9d0123456789a'),
+    );
+    /* A trailing segment is not half-honoured — the same rule as a story id
+       under #/queue/. It falls through to the default rather than opening
+       an edit screen for an id that was never meant. */
+    expect(parseRoute('#/published/abc/def')).toEqual(DEFAULT_ROUTE);
+    // A trailing slash is the list itself, as it is for every other section.
+    expect(parseRoute('#/published/')).toEqual(Routes.published());
+  });
+
   it('does not confuse the three kinds of tab', () => {
     /*
      * All three live under `?tab=` and each has its own vocabulary. 'notes' is
@@ -317,6 +330,9 @@ describe('sectionOf', () => {
        outstanding and this is work finished, and lighting the same rail
        entry for both would say they are one screen with a filter. */
     expect(sectionOf(Routes.published())).toBe('published');
+    /* The rail must stay lit on Published while a live story is being
+       corrected, not jump to the queue because the composer lives there. */
+    expect(sectionOf(Routes.publishedEdit('x'))).toBe('published');
     expect(sectionOf(Routes.leads())).toBe('leads');
   });
 });
@@ -370,7 +386,13 @@ describe('canAccess and resolveRoute', () => {
        `source.write` (admin). Everything else is open to all three roles. */
     for (const role of ROLES) {
       for (const route of ALL_ROUTES) {
-        if (route.name === 'notifications' || route.name === 'sourceNew') continue;
+        if (
+          route.name === 'notifications' ||
+          route.name === 'sourceNew' ||
+          route.name === 'publishedEdit'
+        ) {
+          continue;
+        }
         expect(canAccess(route, role)).toBe(true);
       }
     }
@@ -396,5 +418,16 @@ describe('canAccess and resolveRoute', () => {
     expect(canAccess(Routes.sourceNew(), 'reviewer')).toBe(false);
     expect(canAccess(Routes.sourceNew(), 'admin')).toBe(true);
     expect(resolveRoute(Routes.sourceNew(), 'reviewer')).toEqual(DEFAULT_ROUTE);
+  });
+
+  it('lets only those who may publish correct a live story', () => {
+    /* The server gates POST /cms/articles/:id/edit on `article.publish`,
+       which is reviewer and admin. Everyone may read the list. */
+    for (const role of ROLES) {
+      expect(canAccess(Routes.published(), role)).toBe(true);
+    }
+    expect(canAccess(Routes.publishedEdit('x'), 'author')).toBe(false);
+    expect(canAccess(Routes.publishedEdit('x'), 'reviewer')).toBe(true);
+    expect(canAccess(Routes.publishedEdit('x'), 'admin')).toBe(true);
   });
 });

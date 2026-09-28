@@ -199,6 +199,12 @@ export interface ArticleDetail {
   revisionCount: number;
   measured: number;
   image: ArticleImageData | null;
+  publishedAt: string | null;
+  retractedAt: string | null;
+  retractionReason: string | null;
+  /** The last correction to a LIVE story. Autosaves to a draft never set it. */
+  lastEditedAt: string | null;
+  lastEditReason: string | null;
 }
 
 export interface ClusterSibling {
@@ -244,6 +250,9 @@ export interface PublishedRow {
   publisherUrl: string;
   publishedAt: string | null;
   retractionReason: string | null;
+  retractedAt: string | null;
+  lastEditedAt: string | null;
+  lastEditReason: string | null;
   hasImage: boolean;
 }
 
@@ -462,17 +471,25 @@ export const api = {
     }),
 
   /**
-   * Withdraw a published story and reopen it as a draft carrying its text.
+   * Correct a live story in place.
    *
-   * There is no endpoint that edits a published story, because there is no
-   * transition that would let one exist. This is what "edit" means once a
-   * reader has seen it.
+   * Deliberately not `save`: that is the draft autosave and records nothing.
+   * This sends the whole text at once with a reason, and the server stamps
+   * the time and keeps the before and after.
    */
-  correctArticle: (id: string, reason: string) =>
-    req<{ id: string }>(`/cms/articles/${id}/correct`, {
-      method: 'POST',
-      body: JSON.stringify({ reason }),
-    }),
+  editPublished: (
+    id: string,
+    body: {
+      headline: string;
+      summary: string;
+      image?: ArticleImageData | null;
+      reason: string;
+    },
+  ) =>
+    req<{ ok: true; lastEditedAt: string }>(
+      `/cms/articles/${id}/edit`,
+      { method: 'POST', body: JSON.stringify(body) },
+    ),
 
   publish: (id: string) =>
     req<{ status: string; publishedAt: string | null; selfApproved: boolean }>(

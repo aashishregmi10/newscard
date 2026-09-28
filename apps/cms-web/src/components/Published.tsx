@@ -1,10 +1,8 @@
-import { useState } from 'react';
 import { api, type PublishedRow } from '../api';
-import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useResource } from '../hooks/useResource';
 import { crumbs } from '../lib/crumbs';
 import { dateTime, relativeTime } from '../lib/format';
-import { PUBLISHED_PER_PAGE, Routes, type PublishedTab } from '../nav';
+import { PUBLISHED_PER_PAGE, Routes, canAccess, type PublishedTab, type Role } from '../nav';
 import { navigate } from '../useRoute';
 import {
   Badge,
@@ -12,7 +10,6 @@ import {
   Breadcrumbs,
   Button,
   EmptyState,
-  Field,
   Icon,
   LangTag,
   Pagination,
@@ -25,28 +22,24 @@ import {
 /**
  * What a reader can actually see.
  *
- * -- Why this screen was missing, and what it cost ---------------------------
+ * -- Why this screen exists ---------------------------------------------------
  *
  * The queue lists draft, in_review and approved — work outstanding. A published
- * story leaves it and appeared nowhere else, so the only way to answer "is that
- * one still live" was to open the app and scroll for it. The one collection
- * anybody is ever asked about in public was the one with no screen.
+ * story left it and appeared nowhere else, so the only way to answer "is that
+ * one still live" was to open the reader app and scroll for it.
  *
- * -- Why the two actions are View and Correct, and not View and Edit ---------
+ * -- The three actions, and why they are a column ----------------------------
  *
- * Because there is no edit. `PATCH /cms/articles/:id` refuses a published story
- * on purpose: what a reader saw is a matter of record, and rewriting it
- * underneath them is worse than the error being fixed. The state machine says
- * the same — `published` moves only to `retracted`, and `retracted` is terminal.
+ * Edit, view, and the publisher's own article — the same three on every row,
+ * in the same order, pinned to the right edge. The eye goes to the same place
+ * on each row to find them, so they must not trail the headline at whatever x
+ * it happened to end on. A withdrawn story keeps a disabled edit rather than
+ * losing the button, so the column does not shift on the rows that have one.
  *
- * So the pencil does the only thing that is both an edit and honest: it
- * withdraws the story and opens a new draft carrying its text, which is the
- * correction path the schema has prescribed from the beginning. The editor then
- * works in the composer as normal and it goes back through review.
- *
- * Withdraw on its own sits beside it, because "this is wrong and should not be
- * up" and "this is wrong and I am fixing it" are different decisions, and the
- * first must not force the second.
+ * Editing opens its own screen rather than expanding the row. A correction to a
+ * live story is a headline, a summary, a picture and a required reason, and it
+ * is made against the text readers can currently see — that is a page of work,
+ * not a row of it. Withdrawal lives there too, beside the same reason field.
  *
  * -- Why a withdrawn story is a tab and not a filter -------------------------
  *
@@ -59,7 +52,7 @@ function PublishedSkeleton() {
   return (
     <ul className="list" aria-busy="true" aria-label="Loading published stories">
       {[0, 1, 2].map((i) => (
-        <li className="item" key={i} style={{ opacity: 1 - i * 0.2 }}>
+        <li className="item published-item" key={i} style={{ opacity: 1 - i * 0.2 }}>
           <span className="item-body">
             <Skeleton height={19} width={`${72 - i * 9}%`} />
             <Skeleton height={13} width="42%" style={{ marginTop: 9 }} />
@@ -76,21 +69,23 @@ interface Data {
   counts: { published: number; retracted: number };
 }
 
-/** The server asks for ten characters. Saying so beats being refused by it. */
-const REASON_MIN = 10;
-
-export function Published({ tab, page }: { tab: PublishedTab; page: number }) {
+export function Published({
+  tab,
+  page,
+  role,
+}: {
+  tab: PublishedTab;
+  page: number;
+  role: Role;
+}) {
+  /* Asked of the router rather than restated here, so the button and the
+     route can never disagree about who may edit. */
+  const mayEdit = canAccess(Routes.publishedEdit('x'), role);
   const { data, error: loadError, loading, reload } = useResource<Data>(
     (signal) => api.published(tab, page, PUBLISHED_PER_PAGE, signal),
     `published:${tab}:${page}`,
     'Could not load the published stories.',
   );
-
-  const action = useAsyncAction();
-
-  /** Which row has its withdrawal controls open. One at a time, as in triage. */
-  const [openId, setOpenId] = useState<string | null>(null);
-  const [reason, setReason] = useState('');
 
   const counts = data?.counts ?? { published: 0, retracted: 0 };
   const total = data?.total ?? 0;
@@ -102,38 +97,13 @@ export function Published({ tab, page }: { tab: PublishedTab; page: number }) {
       icon: 'checkCircle',
       badge: counts.published || undefined,
     },
-    { value: 'retracted', label: 'Withdrawn', icon: 'ban' },
+    {
+      value: 'retracted',
+      label: 'Withdrawn',
+      icon: 'ban',
+      badge: counts.retracted || undefined,
+    },
   ];
-
-  const close = () => {
-    setOpenId(null);
-    setReason('');
-  };
-
-  const ready = reason.trim().length >= REASON_MIN;
-
-  const correct = async (row: PublishedRow) => {
-    if (!ready) return;
-    const ok = await action.run(async () => {
-      const { id } = await api.correctArticle(row.id, reason.trim());
-      /* Straight into the composer, for the reason promoting a lead goes there:
-         the next thing anyone does with a correction is write it. */
-      navigate(Routes.article(id));
-    });
-    if (ok) close();
-  };
-
-  const withdraw = async (row: PublishedRow) => {
-    if (!ready) return;
-    const ok = await action.run(
-      () => api.retractArticle(row.id, reason.trim()),
-      'Withdrawn. Anyone still holding the link now gets a withdrawal notice.',
-    );
-    if (ok) {
-      close();
-      reload();
-    }
-  };
 
   return (
     <div className="page">
@@ -157,13 +127,6 @@ export function Published({ tab, page }: { tab: PublishedTab; page: number }) {
             </Button>
           </div>
         </>
-      )}
-
-      {action.error !== null && <Banner tone="error">{action.error}</Banner>}
-      {action.notice !== null && (
-        <Banner tone="ok" onDismiss={action.clear}>
-          {action.notice}
-        </Banner>
       )}
 
       <Tabs
@@ -199,11 +162,11 @@ export function Published({ tab, page }: { tab: PublishedTab; page: number }) {
           <>
             <ul className="list">
               {data.items.map((row) => {
-                const isOpen = openId === row.id;
                 const live = row.status === 'published';
+                const canEdit = live && mayEdit;
 
                 return (
-                  <li className="item" key={row.id}>
+                  <li className="item published-item" key={row.id}>
                     <span className="item-body">
                       <span className="lead-title" lang={row.language}>
                         {row.headline}
@@ -219,7 +182,23 @@ export function Published({ tab, page }: { tab: PublishedTab; page: number }) {
                             what you quote back to someone. */}
                         {row.publishedAt !== null && (
                           <span title={dateTime(row.publishedAt) ?? undefined}>
-                            {relativeTime(row.publishedAt)}
+                            Published {relativeTime(row.publishedAt)}
+                          </span>
+                        )}
+                        {row.lastEditedAt !== null && (
+                          <span
+                            className="item-edited"
+                            title={
+                              `${dateTime(row.lastEditedAt) ?? ''}` +
+                              (row.lastEditReason !== null ? ` — ${row.lastEditReason}` : '')
+                            }
+                          >
+                            Edited {relativeTime(row.lastEditedAt)}
+                          </span>
+                        )}
+                        {row.retractedAt !== null && (
+                          <span title={dateTime(row.retractedAt) ?? undefined}>
+                            Withdrawn {relativeTime(row.retractedAt)}
                           </span>
                         )}
                         {!row.hasImage && <span>No picture</span>}
@@ -227,66 +206,12 @@ export function Published({ tab, page }: { tab: PublishedTab; page: number }) {
 
                       {row.retractionReason !== null && (
                         <span className="item-meta">
-                          <span>Withdrawn: {row.retractionReason}</span>
-                        </span>
-                      )}
-
-                      {isOpen && (
-                        <span className="lead-actions">
-                          <span className="grid">
-                            <span className="col-12">
-                              <Field
-                                label="Because"
-                                note="Kept with the story, and read by whoever asks why it changed. At least ten characters."
-                              >
-                                {(f) => (
-                                  <input
-                                    {...f}
-                                    className="input"
-                                    placeholder="The minister’s name was wrong in the headline"
-                                    value={reason}
-                                    onChange={(e) => setReason(e.target.value)}
-                                  />
-                                )}
-                              </Field>
-                            </span>
-                          </span>
-
-                          <span className="actions actions-plain">
-                            <Button
-                              variant="primary"
-                              size="sm"
-                              icon="pencil"
-                              busy={action.busy}
-                              disabled={!ready}
-                              onClick={() => void correct(row)}
-                            >
-                              Withdraw and rewrite
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="danger"
-                              icon="ban"
-                              disabled={action.busy || !ready}
-                              onClick={() => void withdraw(row)}
-                            >
-                              Withdraw only
-                            </Button>
-                            <Button size="sm" disabled={action.busy} onClick={close}>
-                              Cancel
-                            </Button>
-                          </span>
-
-                          <p className="field-note">
-                            Rewriting pulls this story and opens a new draft carrying its text. The
-                            correction goes back through review before readers see it — a published
-                            story is never edited in place.
-                          </p>
+                          <span>Because: {row.retractionReason}</span>
                         </span>
                       )}
                     </span>
 
-                    <span className="item-tail">
+                    <span className="item-tail published-tail">
                       <LangTag language={row.language} />
                       {live ? (
                         <Badge tone="ok" icon="checkCircle">
@@ -298,39 +223,49 @@ export function Published({ tab, page }: { tab: PublishedTab; page: number }) {
                         </Badge>
                       )}
 
-                      {/* Icons rather than words: two actions on each of ten
-                          rows is where labels stop reading as a choice and
-                          start reading as noise. Both carry a name for a screen
+                      {/* Icons rather than words: three actions on each of ten
+                          rows is where labels stop reading as a choice and start
+                          reading as noise. Each carries a name for a screen
                           reader and a tooltip for everyone else. */}
-                      <Button
-                        size="sm"
-                        icon="eye"
-                        aria-label={`Open “${row.headline}”`}
-                        title="Open the story"
-                        onClick={() => navigate(Routes.article(row.id))}
-                      />
-                      {live && !isOpen && (
+                      <span className="row-actions">
                         <Button
                           size="sm"
+                          variant="ghost"
                           icon="pencil"
-                          aria-label={`Correct “${row.headline}”`}
-                          title="Withdraw and rewrite"
-                          onClick={() => {
-                            setOpenId(row.id);
-                            setReason('');
-                          }}
+                          aria-label={
+                            canEdit
+                              ? `Edit “${row.headline}”`
+                              : `“${row.headline}” cannot be edited by you`
+                          }
+                          title={
+                            canEdit
+                              ? 'Edit the live story'
+                              : !live
+                                ? 'A withdrawn story is not edited'
+                                : 'Editing a live story needs a reviewer or an admin'
+                          }
+                          disabled={!canEdit}
+                          onClick={() => navigate(Routes.publishedEdit(row.id))}
                         />
-                      )}
-                      <a
-                        className="btn btn-sm btn-icon"
-                        href={row.publisherUrl}
-                        target="_blank"
-                        rel="noreferrer noopener"
-                        aria-label={`Open the publisher’s article for “${row.headline}”`}
-                        title="The publisher’s own article"
-                      >
-                        <Icon name="externalLink" className="btn-icon-glyph" />
-                      </a>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          icon="eye"
+                          aria-label={`View “${row.headline}”`}
+                          title="View the story and its source"
+                          onClick={() => navigate(Routes.article(row.id))}
+                        />
+                        <a
+                          className="btn btn-ghost btn-sm btn-icon"
+                          href={row.publisherUrl}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          aria-label={`Open the publisher’s article for “${row.headline}”`}
+                          title="The publisher’s own article"
+                        >
+                          <Icon name="externalLink" className="btn-icon-glyph" />
+                        </a>
+                      </span>
                     </span>
                   </li>
                 );

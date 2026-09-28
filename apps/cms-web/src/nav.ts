@@ -151,6 +151,7 @@ export type Route =
   | { name: 'sourceNew' }
   | { name: 'source'; slug: string }
   | { name: 'published'; tab: PublishedTab; page: number }
+  | { name: 'publishedEdit'; id: string }
   | { name: 'leads'; tab: LeadTab; page: number }
   | { name: 'notifications'; tab: NotifyTab };
 
@@ -198,6 +199,7 @@ export const Routes = {
     tab: params.tab ?? 'published',
     page: params.page ?? 1,
   }),
+  publishedEdit: (id: string): Route => ({ name: 'publishedEdit', id }),
   leads: (params: { tab?: LeadTab; page?: number } = {}): Route => ({
     name: 'leads',
     tab: params.tab ?? 'new',
@@ -281,6 +283,19 @@ export function parseRoute(hash: string): Route {
     return Routes.published({ tab: readPublishedTab(query), page: readPage(query) });
   }
 
+  if (section.startsWith('published/')) {
+    /* #/published/<id> is the correction screen for one live story. It sits
+       under the list rather than at #/queue/<id>, because the composer is
+       where drafts are written and this is where live stories are corrected
+       — two screens with different rules, and the URL should say which.
+       One segment, checked before decoding, for the reason given under queue. */
+    const rest = path.slice('published/'.length);
+    if (rest !== '' && !rest.includes('/')) {
+      const id = decodeSegment(rest);
+      if (id !== '') return Routes.publishedEdit(id);
+    }
+  }
+
   if (section === 'leads') {
     return Routes.leads({
       tab: readLeadTab(query),
@@ -359,6 +374,8 @@ export function routeToHash(route: Route): string {
       return '#/sources/new';
     case 'source':
       return `#/sources/${encodeURIComponent(route.slug)}`;
+    case 'publishedEdit':
+      return `#/published/${encodeURIComponent(route.id)}`;
     case 'published':
       return withQuery('#/published', {
         tab: route.tab === 'published' ? null : route.tab,
@@ -402,6 +419,7 @@ export function sectionOf(route: Route): Section {
     case 'source':
       return 'sources';
     case 'published':
+    case 'publishedEdit':
       return 'published';
     case 'leads':
       return 'leads';
@@ -444,6 +462,8 @@ export function screenKeyOf(route: Route): string {
        the scroll reset and the focus move belong to changing tab. */
     case 'published':
       return `published:${route.tab}`;
+    case 'publishedEdit':
+      return `publishedEdit:${route.id}`;
     case 'leads':
       return `leads:${route.tab}`;
     case 'notifications':
@@ -472,6 +492,14 @@ export function canAccess(route: Route, role: Role): boolean {
      */
     case 'sourceNew':
       return role === 'admin';
+    /*
+     * Correcting a live story is the same act as publishing it, and the
+     * server gates it on `article.publish` for that reason. An author reaching
+     * the form would fill it in and be refused at Save, which is the worst
+     * place to find out.
+     */
+    case 'publishedEdit':
+      return role !== 'author';
     default:
       return true;
   }

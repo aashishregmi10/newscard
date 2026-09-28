@@ -133,6 +133,9 @@ articleRoutes.get(
         publisherUrl: d.publisherUrl,
         publishedAt: d.publishedAt?.toISOString() ?? null,
         retractionReason: d.retractionReason ?? null,
+        retractedAt: d.retractedAt?.toISOString() ?? null,
+        lastEditedAt: d.lastEditedAt?.toISOString() ?? null,
+        lastEditReason: d.lastEditReason ?? null,
         hasImage: d.image !== null && d.image !== undefined,
       })),
     });
@@ -206,6 +209,11 @@ articleRoutes.get(
         image: d.image,
         editorialNotes: d.editorialNotes ?? null,
         revisionCount: d.revisionCount,
+        publishedAt: d.publishedAt?.toISOString() ?? null,
+        retractedAt: d.retractedAt?.toISOString() ?? null,
+        retractionReason: d.retractionReason ?? null,
+        lastEditedAt: d.lastEditedAt?.toISOString() ?? null,
+        lastEditReason: d.lastEditReason ?? null,
         authoredBy: d.authoredBy.toString(),
         measured: measureSummary(d.summary, limits.limitType as LimitType, d.language),
       },
@@ -287,10 +295,22 @@ articleRoutes.patch(
     const existing = await c.articles.findOne({ _id: new ObjectId(id) });
     if (!existing) throw new AppError('NOT_FOUND');
 
-    // A published article is not a draft. Corrections go through retract and
-    // republish so the change is visible in the audit trail.
+    /*
+     * A published article is not a draft, and this is the autosave route.
+     *
+     * Silently rewriting what a reader already saw, on a 1.5-second timer,
+     * with no record of what changed or why, is the one newsroom failure that
+     * costs more than the error being fixed. Corrections to a live story go
+     * through POST /cms/articles/:id/edit, which demands a reason, stamps the
+     * time, and writes the before and after into the audit trail.
+     */
     if (existing.status === 'published' || existing.status === 'retracted') {
-      throw new AppError('INVALID_TRANSITION', `Cannot edit an article that is ${existing.status}.`);
+      throw new AppError(
+        'INVALID_TRANSITION',
+        existing.status === 'published'
+          ? 'This story is live, so it is corrected rather than autosaved. Use the edit screen, which records your reason.'
+          : 'This story was withdrawn and is no longer edited.',
+      );
     }
 
     const set: Record<string, unknown> = { ...parsed.data, updatedAt: new Date() };
@@ -404,122 +424,203 @@ articleRoutes.post(
 );
 
 /**
- * POST /cms/articles/:id/correct — withdraw a published story and reopen it.
+ * POST /cms/articles/:id/edit — correct a story a reader has already seen.
  *
- * ── Why editing a published story is not a PATCH ────────────────────────────
+ * ── Why this is a route of its own and not PATCH ────────────────────────
  *
- * PATCH refuses one, deliberately: what a reader saw is a matter of record, and
- * quietly rewriting it underneath them is worse than the error being fixed. The
- * state machine agrees — `published` moves only to `retracted`, and `retracted`
- * is terminal.
+ * PATCH is the composer autosave: it fires on a 1.5-second timer and records
+ * nothing about what changed. That is right for a draft and wrong for a story
+ * that is already out, where the question asked afterwards is never "what does
+ * it say now" but "what did it say before, and who changed it, and why".
  *
- * So "edit the published story" has exactly one honest shape, and it is the one
- * the machine already prescribes: withdraw it, and write the corrected version
- * as a new story. This does both in a single act, because doing them in two
- * leaves a window where an editor has pulled a story and not yet begun its
- * replacement, and it copies the text across, because retyping a story to fix
- * one word is how the second mistake gets made.
+ * So this one is deliberate rather than automatic: it takes the whole text at
+ * once, demands a reason, stamps the time, and writes the before and after to
+ * the audit trail. There is no autosave on a live story.
  *
- * The withdrawn story keeps its slug, its audit trail and its 410 for anyone
- * still holding a link. The correction is a NEW story with a new slug and a new
- * publication time, which is what it is.
+ * ── Why the story is edited in place rather than replaced ───────────────
  *
- * ── Why the licence is checked before anything is withdrawn ─────────────────
+ * An earlier attempt withdrew the story and opened a copy of it as a fresh
+ * draft, on the reasoning that a published story should be immutable. It could
+ * not work, and the failure is instructive: `publisher_url_unique` allows
+ * exactly one article per publisher URL, so the copy was refused by the index
+ * — after the original had already been retracted. Two live stories were
+ * pulled and neither replacement was ever created.
  *
- * The correction is a fresh draft, and a draft cannot exist against a publisher
- * whose licence has lapsed. Checking afterwards would leave the story pulled
- * and the replacement impossible to write — so this refuses the whole act and
- * says to withdraw it plainly instead.
+ * The index is not the obstacle, it is the design: this collection holds one
+ * row per publisher story for the whole life of that story. Correcting it
+ * means changing that row, and the history lives where history belongs.
+ *
+ * ── What is deliberately NOT changed ───────────────────────────────
+ *
+ * `publishedAt`. It is half of the feed cursor and the whole of the sort
+ * order, so touching it would move a three-day-old story to the top of every
+ * reader feed and duplicate or skip cards for anyone paging at that moment. A
+ * corrected story stays where it was published.
+ *
+ * `status`, for the reason it is not re-approved either: this route corrects a
+ * live story, it does not take one down. That is withdrawal, and it is next
+ * door.
  */
-articleRoutes.post(
-  '/cms/articles/:id/correct',
-  /* The withdrawal is the strong half of this, so it takes the strong
-     permission. An author who may write cannot pull a live story. */
-  requireRole('article.retract'),
-  asyncRoute(async (req, res) => {
-    const Body = z.object({ reason: z.string().min(10) });
-    const parsed = Body.safeParse(req.body);
-    if (!parsed.success) {
-      throw new AppError(
-        'VALIDATION_FAILED',
-        'A reason of at least 10 characters is required. It is shown in the audit trail and to anyone asking why the story changed.',
-      );
-    }
+const EditSchema = z.object({
+  headline: z.string().min(1).max(90),
+  summary: z.string().min(1).max(1200),
+  pullQuote: z.string().max(70).nullable().optional(),
+  /* Absent leaves the picture alone; null removes it. The same convention as
+     the autosave route, so the composer and the edit screen agree. */
+  image: ImagePatch.optional(),
+  reason: z.string().min(10).max(300),
+});
 
+articleRoutes.post(
+  '/cms/articles/:id/edit',
+  /*
+   * Changing what readers are being shown is the same act as publishing it,
+   * so it takes the same permission. An author may write and submit; putting
+   * different words in front of the public is a reviewer decision.
+   */
+  requireRole('article.publish'),
+  asyncRoute(async (req, res) => {
     const id = String(req.params.id ?? '');
     if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
 
-    const c = collections(getDb());
-    const original = await c.articles.findOne({ _id: new ObjectId(id) });
-    if (!original) throw new AppError('NOT_FOUND');
-
-    if (original.status !== 'published') {
-      throw new AppError(
-        'INVALID_TRANSITION',
-        'Only a published story is corrected this way. A draft is edited directly, and a withdrawn story stays withdrawn.',
-      );
-    }
-
-    const source = await c.sources.findOne({ _id: original.sourceId });
-    if (source?.licence?.status !== 'agreed') {
+    const parsed = EditSchema.safeParse(req.body);
+    if (!parsed.success) {
       throw new AppError(
         'VALIDATION_FAILED',
-        `${source?.displayName ?? 'That publisher'} no longer has an agreed licence, so a corrected version cannot be written. You can still withdraw the story.`,
-        { licenceStatus: source?.licence?.status ?? null },
+        'A headline, a summary and a reason of at least ten characters are all required.',
+        {
+          issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+        },
       );
     }
 
-    await retractArticle({
-      articleId: id,
-      reason: parsed.data.reason,
-      actorId: req.staff!.staffId,
-      actorEmail: req.staff!.email,
-      ip: req.ip ?? null,
-    });
+    const reason = parsed.data.reason.trim();
+    if (reason.length < 10) {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        'Say why this is being changed, in at least ten characters. It is kept with the story.',
+      );
+    }
+
+    const c = collections(getDb());
+    const existing = await c.articles.findOne({ _id: new ObjectId(id) });
+    if (!existing) throw new AppError('NOT_FOUND');
+
+    if (existing.status !== 'published') {
+      throw new AppError(
+        'INVALID_TRANSITION',
+        existing.status === 'retracted'
+          ? 'This story was withdrawn. A withdrawal is final, and a replacement is written as a new story.'
+          : `Only a live story is corrected this way. This one is ${existing.status}, so it is edited in the composer.`,
+        { status: existing.status },
+      );
+    }
+
+    /*
+     * The publish preconditions that are about the CONTENT, run again.
+     *
+     * They were checked when the story went out, against text that has just
+     * been replaced. Skipping them here would make this route the one way to
+     * put a two-word summary or an uncredited photograph in front of a reader
+     * — through the screen whose whole purpose is fixing mistakes.
+     *
+     * What is NOT re-checked is the source licence. If an agreement has lapsed
+     * the story should come down, and that is a withdrawal; refusing the
+     * correction would leave a wrong story up and forbid fixing it.
+     */
+    const headline = parsed.data.headline.trim();
+    if (countGraphemes(headline) < 10) {
+      throw new AppError('VALIDATION_FAILED', 'The headline is too short to publish.');
+    }
+
+    const cfg = (await c.config.findOne({})) ?? DEFAULT_CONFIG;
+    const limits = cfg.summaryLimits ?? DEFAULT_CONFIG.summaryLimits;
+    const band = limits.limits[existing.language];
+    const measured = measureSummary(
+      parsed.data.summary,
+      limits.limitType as LimitType,
+      existing.language,
+    );
+    if (measured < band.min || measured > band.max) {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        `Summary is ${measured} ${limits.limitType}; allowed ${band.min}–${band.max}.`,
+        { measured, min: band.min, max: band.max, unit: limits.limitType },
+      );
+    }
+
+    const image = parsed.data.image === undefined ? existing.image : parsed.data.image;
+    if (image) {
+      const valid = ['publisher_licensed', 'agency', 'cc_by', 'own'];
+      if (!image.licence || !valid.includes(image.licence)) {
+        throw new AppError('VALIDATION_FAILED', 'Image has no recognised licence.');
+      }
+      if (!image.credit) throw new AppError('VALIDATION_FAILED', 'Image has no credit.');
+    }
 
     const now = new Date();
-    const _id = new ObjectId();
 
-    await c.articles.insertOne({
-      ...original,
-      _id,
-      slug: draftSlug(original.language, original.categorySlug),
-      status: 'draft',
-      publishedAt: null,
-      /* The correction is this editor's work, whoever wrote the original. */
-      authoredBy: new ObjectId(req.staff!.staffId),
-      reviewedBy: null,
-      selfApproved: false,
-      retractionReason: null,
-      /*
-       * Why the note rather than a `correctionOf` field.
-       *
-       * The reviewer needs to know this is a correction and what was wrong with
-       * the last one, and the reviewer-note panel is where they already look. A
-       * schema field would also have to be decided about in the public DTO, and
-       * "which story was this correcting" is not a reader's question — it is an
-       * audit question, and the audit trail already answers it from both ends.
-       */
-      editorialNotes:
-        `Correction of ${original.slug}, withdrawn ${now.toISOString().slice(0, 10)}: ` +
-        parsed.data.reason,
-      revisionCount: 0,
-      createdAt: now,
+    /* Compare-and-swap on the status, as publishing does. If someone withdrew
+       this story while the edit was being written the filter matches nothing,
+       and we refuse rather than quietly editing a story that is now down. */
+    /* Typed loosely for the same reason the autosave route is: the collection
+       type describes ids as strings, and the stored value is an ObjectId. */
+    const set: Record<string, unknown> = {
+      headline,
+      summary: parsed.data.summary,
+      /* Recomputed here, never taken from the client: the publish gate and the
+         reader app both read these. */
+      summaryWordCount: countWords(parsed.data.summary),
+      summaryCharCount: countGraphemes(parsed.data.summary),
+      pullQuote: parsed.data.pullQuote ?? existing.pullQuote ?? null,
+      lastEditedAt: now,
+      lastEditedBy: new ObjectId(req.staff!.staffId),
+      lastEditReason: reason,
       updatedAt: now,
-    } as never);
+    };
+    if (parsed.data.image !== undefined) set.image = parsed.data.image;
 
+    const write = await c.articles.updateOne(
+      { _id: existing._id, status: 'published' },
+      /* Not `revisionCount`. That already means "sent back to the author in
+         review" and the transition service counts it; folding live
+         corrections into the same number would make both meaningless. */
+      { $set: set },
+    );
+
+    if (write.matchedCount === 0) {
+      throw new AppError(
+        'INVALID_TRANSITION',
+        'This story was withdrawn while you were editing it, so nothing has been saved.',
+      );
+    }
+
+    /* The whole before and after, not a diff. The trail is read long afterwards
+       by someone who needs to know what the story said, and a diff of text they
+       no longer have is not an answer. */
     await writeAudit({
-      action: 'article.create',
+      action: 'article.edit',
       entityType: 'article',
-      entityId: _id.toString(),
+      entityId: id,
       actorId: req.staff!.staffId,
       actorEmail: req.staff!.email,
-      before: null,
-      after: { status: 'draft', correctionOf: original.slug, correctionOfId: id },
+      before: {
+        headline: existing.headline,
+        summary: existing.summary,
+        pullQuote: existing.pullQuote ?? null,
+        image: existing.image ?? null,
+      },
+      after: {
+        headline,
+        summary: parsed.data.summary,
+        pullQuote: parsed.data.pullQuote ?? existing.pullQuote ?? null,
+        image: image ?? null,
+        reason,
+      },
       ip: req.ip ?? null,
     });
 
-    res.status(201).json({ id: _id.toString() });
+    res.json({ ok: true, lastEditedAt: now.toISOString() });
   }),
 );
 
