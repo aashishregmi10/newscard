@@ -1,6 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ApiError, api, isAbort, type Staff } from './api';
-import { Routes, resolveRoute, screenKeyOf, sectionOf, type Role, type Route } from './nav';
+import {
+  Routes,
+  isPublicRoute,
+  resolveRoute,
+  screenKeyOf,
+  sectionOf,
+  type Role,
+  type Route,
+} from './nav';
 import { navigate, useRoute } from './useRoute';
 import { AppShell } from './components/AppShell';
 import { Booting, Login } from './components/Login';
@@ -10,6 +18,7 @@ import { NewSource } from './components/NewSource';
 import { NewStory } from './components/NewStory';
 import { Leads } from './components/Leads';
 import { Notify } from './components/Notify';
+import { PublicSite } from './components/PublicSite';
 import { Queue } from './components/Queue';
 import { Shorts } from './components/Shorts';
 import { SourceDetail } from './components/SourceDetail';
@@ -103,6 +112,16 @@ export default function App() {
     navigate(Routes.queue(), { replace: true });
   }, []);
 
+  /*
+   * The public site, before anything is known about who is asking.
+   *
+   * Ahead of the session gate on purpose. A visitor who has never signed in
+   * must not watch the sign-in form appear and vanish, and must not wait on
+   * a request that can only ever answer "nobody" — so these routes never
+   * consult the session at all, in either direction.
+   */
+  if (isPublicRoute(requested)) return <PublicSite route={requested} />;
+
   if (session === 'pending') return <Booting />;
   if (session === null) {
     return <Login problem={sessionError} onSignedIn={() => void checkSession()} />;
@@ -184,6 +203,14 @@ function Screen({
       /* Keyed by slug so moving between two publishers rebuilds the form
          rather than leaving the previous one's values in the fields. */
       return <SourceDetail key={route.slug} slug={route.slug} role={role} />;
+    /* Rendered above, outside the shell. Unreachable here, and named so the
+       switch stays exhaustive — adding a route is a compile error until it
+       is handled somewhere. */
+    case 'home':
+    case 'about':
+    case 'contact':
+      return null;
+
     case 'leads':
       return <Leads tab={route.tab} page={route.page} />;
 

@@ -1164,3 +1164,259 @@
   width: 18px;
   height: 18px;
 }
+
+/* ========================================================================
+ * The public site
+ *
+ * Home, About and Contact, on the same origin as the application and sharing
+ * its tokens — one palette, one typeface, one corner radius. What it does NOT
+ * share is the shell: no rail, no toolbar, no measure-less full-bleed layout.
+ * A person reading prose wants a column they can follow, which is the one place
+ * a reading measure genuinely earns its keep, so it lives here on the content
+ * rather than on the page.
+ * ====================================================================== */
+
+.site {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  background: var(--bg-content);
+}
+
+.site-wrap {
+  width: 100%;
+  max-width: 980px;
+  margin-inline: auto;
+  padding-inline: var(--s5);
+}
+
+.site-top {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.site-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  height: var(--topbar-h);
+}
+
+.site-brand {
+  text-decoration: none;
+}
+
+.site-mark {
+  font-size: var(--text-md);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+
+.site-nav {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  margin-right: auto;
+  flex-wrap: wrap;
+}
+
+.site-link {
+  color: var(--ink-faint);
+  font-size: var(--text-base);
+  text-decoration: none;
+}
+
+.site-link:hover {
+  color: var(--ink);
+}
+
+/* Marked by weight and colour rather than an underline, which on a bar of four
+   links reads as one of them being a different kind of thing. */
+.site-link[aria-current='page'] {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.site-staff {
+  flex: none;
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.site-staff:hover {
+  color: var(--accent);
+}
+
+/* The arrow points the way in, so it is mirrored rather than given its own
+   glyph — the set has no arrowRight and one arrow is enough. */
+.site-staff-icon {
+  width: 14px;
+  height: 14px;
+  transform: rotate(180deg);
+  vertical-align: -2px;
+}
+
+.site-main {
+  flex: 1;
+  padding-block: var(--s9) var(--s10);
+}
+
+.site-main h1 {
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.site-main h2 {
+  margin-top: var(--s8);
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.site-main p {
+  margin-top: var(--s4);
+  font-size: var(--text-md);
+  line-height: 1.7;
+  color: var(--ink-faint);
+}
+
+.site-lead {
+  font-size: var(--text-lg) !important;
+  line-height: 1.6 !important;
+  color: var(--ink-soft) !important;
+}
+
+.site-hero {
+  max-width: 34ch;
+}
+
+.site-hero h1 {
+  font-size: var(--text-2xl);
+}
+
+.site-list {
+  margin-top: var(--s4);
+  padding-left: var(--s5);
+  color: var(--ink-faint);
+  font-size: var(--text-md);
+  line-height: 1.7;
+}
+
+.site-list li + li {
+  margin-top: var(--s2);
+}
+
+/* ── Home ─────────────────────────────────────────────────────────────── */
+
+.site-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--s4);
+  margin-top: var(--s9);
+}
+
+.site-card {
+  padding: var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.site-card h2 {
+  margin-top: var(--s3);
+  font-size: var(--text-md);
+}
+
+.site-card p {
+  margin-top: var(--s2);
+  font-size: var(--text-base);
+  line-height: 1.6;
+}
+
+.site-card-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.site-card-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.site-panel {
+  margin-top: var(--s9);
+  padding: var(--s6);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.site-panel h2 {
+  margin-top: 0;
+}
+
+/* ── Contact ──────────────────────────────────────────────────────────── */
+
+.site-contacts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--s4);
+  margin-top: var(--s7);
+}
+
+.site-contact {
+  padding: var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.site-contact h2 {
+  margin-top: 0;
+  font-size: var(--text-md);
+}
+
+.site-contact-address {
+  margin-top: var(--s2) !important;
+  font-size: var(--text-base) !important;
+}
+
+.site-contact-note {
+  margin-top: var(--s2) !important;
+  font-size: var(--text-sm) !important;
+  line-height: 1.5 !important;
+}
+
+.site-address {
+  white-space: pre-line;
+}
+
+/* ── Footer ───────────────────────────────────────────────────────────── */
+
+.site-foot {
+  padding-block: var(--s6);
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+.site-foot p {
+  font-size: var(--text-sm);
+  color: var(--ink-faint);
+}
+
+@media (max-width: 640px) {
+  .site-bar {
+    height: auto;
+    flex-wrap: wrap;
+    padding-block: var(--s3);
+    gap: var(--s3) var(--s4);
+  }
+}

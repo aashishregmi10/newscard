@@ -116,7 +116,24 @@ export const DEFAULT_PER_PAGE: PerPage = 20;
 /** Long enough for any real search, short enough not to be a payload. */
 const MAX_QUERY_LENGTH = 120;
 
+/**
+ * The pages anyone may open.
+ *
+ * They render without a session and before one has been checked for — see
+ * App.tsx. That is the whole distinction: a staff route waits to find out
+ * who you are, a public one never asks.
+ *
+ * The advertiser report is not in here because it is not a React route at
+ * all. It is a static page in `public/report`, kept that way deliberately
+ * — the header links to it like any other address.
+ */
+export const PUBLIC_ROUTES = ['home', 'about', 'contact'] as const;
+export type PublicRouteName = (typeof PUBLIC_ROUTES)[number];
+
 export type Route =
+  | { name: 'home' }
+  | { name: 'about' }
+  | { name: 'contact' }
   | { name: 'queue'; page: number; perPage: PerPage; q: string }
   | { name: 'new' }
   | { name: 'article'; id: string; tab: ArticleTab }
@@ -142,6 +159,9 @@ export type Role = 'author' | 'reviewer' | 'admin';
  * fields and a constructor keep exactly one representation of each state.
  */
 export const Routes = {
+  home: (): Route => ({ name: 'home' }),
+  about: (): Route => ({ name: 'about' }),
+  contact: (): Route => ({ name: 'contact' }),
   queue: (params: { page?: number; perPage?: PerPage; q?: string } = {}): Route => ({
     name: 'queue',
     page: params.page ?? 1,
@@ -190,7 +210,20 @@ export function parseRoute(hash: string): Route {
      the moment ids stop being lowercase hex. */
   const section = path.toLowerCase();
 
-  if (section === '' || section === 'queue') {
+  /*
+   * The bare address is the public homepage, not the queue.
+   *
+   * DEFAULT_ROUTE stays the queue on purpose: it is the fallback for a
+   * route that exists but is not allowed or not understood, and sending a
+   * signed-in author to a marketing page because they followed a stale link
+   * would be worse than sending them to their work.
+   */
+  if (section === '') return Routes.home();
+  if (section === 'home') return Routes.home();
+  if (section === 'about') return Routes.about();
+  if (section === 'contact') return Routes.contact();
+
+  if (section === 'queue') {
     return Routes.queue({
       page: readPage(query),
       perPage: readPerPage(query),
@@ -273,6 +306,12 @@ export function parseRoute(hash: string): Route {
  */
 export function routeToHash(route: Route): string {
   switch (route.name) {
+    case 'home':
+      return '#/';
+    case 'about':
+      return '#/about';
+    case 'contact':
+      return '#/contact';
     case 'queue':
       return withQuery('#/queue', {
         q: route.q === '' ? null : route.q,
@@ -315,8 +354,19 @@ export function routeToHash(route: Route): string {
 }
 
 /** Which rail item should light up. */
+/** Does this render without asking who is looking at it? */
+export function isPublicRoute(route: Route): boolean {
+  return (PUBLIC_ROUTES as readonly string[]).includes(route.name);
+}
+
 export function sectionOf(route: Route): Section {
   switch (route.name) {
+    /* Not in the rail at all — the rail belongs to the signed-in
+       application, and these render outside it. */
+    case 'home':
+    case 'about':
+    case 'contact':
+      return 'queue';
     case 'queue':
     case 'new':
     case 'article':
@@ -345,6 +395,10 @@ export function sectionOf(route: Route): Section {
  */
 export function screenKeyOf(route: Route): string {
   switch (route.name) {
+    case 'home':
+    case 'about':
+    case 'contact':
+      return route.name;
     case 'queue':
       return 'queue';
     case 'new':

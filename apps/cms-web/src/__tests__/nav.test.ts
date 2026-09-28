@@ -52,10 +52,15 @@ describe('parseRoute and routeToHash', () => {
     }
   });
 
-  it('treats an empty location as the queue', () => {
-    expect(parseRoute('')).toEqual(Routes.queue());
-    expect(parseRoute('#')).toEqual(Routes.queue());
-    expect(parseRoute('#/')).toEqual(Routes.queue());
+  it('treats an empty location as the public homepage', () => {
+    /* The bare address is the public homepage now. DEFAULT_ROUTE stays the
+       queue, because that is the fallback for a route that exists and is not
+       allowed — a different question from where a stranger lands. */
+    expect(parseRoute('')).toEqual(Routes.home());
+    expect(parseRoute('#')).toEqual(Routes.home());
+    expect(parseRoute('#/')).toEqual(Routes.home());
+    expect(parseRoute('#/about')).toEqual(Routes.about());
+    expect(parseRoute('#/contact')).toEqual(Routes.contact());
   });
 
   it('accepts the spellings a hand-typed link actually has', () => {
