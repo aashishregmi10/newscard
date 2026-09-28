@@ -1183,11 +1183,20 @@
   background: var(--bg-content);
 }
 
+/*
+ * Wide, with the measure on the prose instead.
+ *
+ * 980px left a third of a large monitor blank down each side, which is the
+ * same complaint the application had and the same answer: the page fills the
+ * window and the things that need a column get one. A card grid and a header
+ * want the room; a paragraph does not, so `.site-prose` below caps the text
+ * and nothing else.
+ */
 .site-wrap {
   width: 100%;
-  max-width: 980px;
+  max-width: 1440px;
   margin-inline: auto;
-  padding-inline: var(--s5);
+  padding-inline: var(--s7);
 }
 
 .site-top {
@@ -1281,6 +1290,17 @@
   font-size: var(--text-md);
   line-height: 1.7;
   color: var(--ink-faint);
+  /* The one place a measure belongs: a line of prose that runs the width of a
+     wide monitor is one the eye loses its place in on the way back. Cards,
+     grids and headers are unaffected. */
+  max-width: 68ch;
+}
+
+/* Inside a card the column is already narrow; a second cap would fight it. */
+.site-card p,
+.site-contact p,
+.site-foot p {
+  max-width: none;
 }
 
 .site-lead {
@@ -1290,7 +1310,7 @@
 }
 
 .site-hero {
-  max-width: 34ch;
+  max-width: 46ch;
 }
 
 .site-hero h1 {
@@ -1298,6 +1318,7 @@
 }
 
 .site-list {
+  max-width: 68ch;
   margin-top: var(--s4);
   padding-left: var(--s5);
   color: var(--ink-faint);
@@ -1418,5 +1439,112 @@
     flex-wrap: wrap;
     padding-block: var(--s3);
     gap: var(--s3) var(--s4);
+  }
+}
+
+/* ========================================================================
+ * Sign in
+ *
+ * Two halves: what the product is, and the way into it. The left is a panel
+ * rather than a photograph — a stock newsroom would be a picture of somebody
+ * else's office presented as ours, and a real one does not exist yet.
+ * ====================================================================== */
+
+.signin {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 100%;
+  background: var(--surface);
+}
+
+.signin-side {
+  display: grid;
+  place-items: center;
+  padding: var(--s8);
+  /* Built from the accent rather than an image, so it carries no weight, needs
+     no licence, and follows the palette into dark mode on its own. */
+  background:
+    radial-gradient(120% 100% at 0% 0%, var(--accent) 0%, transparent 60%),
+    linear-gradient(140deg, var(--accent) 0%, #12407a 100%);
+  color: #fff;
+}
+
+.signin-side-inner {
+  max-width: 34ch;
+}
+
+.signin-mark {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  opacity: 0.85;
+}
+
+.signin-pitch {
+  margin-top: var(--s5);
+  font-size: var(--text-2xl);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.signin-note {
+  margin-top: var(--s4);
+  font-size: var(--text-md);
+  line-height: 1.6;
+  opacity: 0.85;
+}
+
+.signin-main {
+  display: grid;
+  place-items: center;
+  padding: var(--s8) var(--s6);
+}
+
+.signin-form {
+  width: 100%;
+  max-width: 380px;
+}
+
+.signin-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--s7);
+  color: var(--ink-faint);
+  font-size: var(--text-sm);
+  text-decoration: none;
+}
+
+.signin-back:hover {
+  color: var(--accent);
+}
+
+.signin-back svg {
+  width: 15px;
+  height: 15px;
+}
+
+.signin-title {
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.signin-sub {
+  margin: 4px 0 var(--s6);
+  color: var(--ink-faint);
+}
+
+/*
+ * Below this the decorative half is a screen of scrolling before the form, so
+ * it goes rather than shrinking. The form was always the point.
+ */
+@media (max-width: 900px) {
+  .signin {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .signin-side {
+    display: none;
   }
 }

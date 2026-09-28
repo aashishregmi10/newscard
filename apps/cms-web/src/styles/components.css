@@ -1616,3 +1616,20 @@
   line-height: 1.4;
   color: var(--ink-faint);
 }
+
+/*
+ * A control that WRAPS its input, floating its label.
+ *
+ * The sibling selectors above reach the label from the control itself, which
+ * stops working the moment anything sits between them — a reveal button beside
+ * a password box, for instance. `[data-filled]` covers the value the component
+ * knows about; `:has()` covers the one the browser filled in behind its back,
+ * which no amount of React state will ever see.
+ */
+.input-with-affix:has(.input:-webkit-autofill) ~ .field-label-text {
+  transform: translate(10px, -8px) scale(0.75);
+}
+
+.input-with-affix:has(.input:-webkit-autofill) ~ .field-outline .field-legend {
+  max-width: 100%;
+}

@@ -1,4 +1,4 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
 /**
@@ -18,8 +18,36 @@ import react from '@vitejs/plugin-react';
  * two in step — if a path is added to one it has to be added to the other,
  * and the symptom of forgetting is a 404 that only appears once deployed.
  */
+/**
+ * Serve /report/ as the directory index it is.
+ *
+ * Vite's dev server answers any unmatched path with index.html so the SPA can
+ * route it, and that fallback runs before the static handler resolves a
+ * directory to its index. So `/report/` returned the application shell — a
+ * blank React page where the advertiser report should be — while
+ * `/report/index.html` served correctly, which is a difference nobody would
+ * think to test.
+ *
+ * Development only. Every static host resolves a directory index natively, so
+ * the built site needs nothing.
+ */
+function serveReportIndex(): Plugin {
+  return {
+    name: 'saar-report-index',
+    apply: 'serve',
+    configureServer(server) {
+      server.middlewares.use((req, _res, next) => {
+        if (req.url === '/report' || req.url === '/report/') {
+          req.url = '/report/index.html';
+        }
+        next();
+      });
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), serveReportIndex()],
   server: {
     port: 5173,
     strictPort: true,

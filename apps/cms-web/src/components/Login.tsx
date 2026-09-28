@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { api, ApiError } from '../api';
+import { Routes, routeToHash } from '../nav';
 import { Banner, Button, Field, Icon } from '../ui';
 
 /**
@@ -16,6 +17,14 @@ import { Banner, Button, Field, Icon } from '../ui';
  * The server does not say which of the two was wrong, and it should not: that
  * is what turns a login form into a way of discovering which addresses have
  * accounts. A message that belongs to neither field belongs above both.
+ *
+ * -- Why the left half is a panel and not a photograph -----------------------
+ *
+ * A stock photograph of a newsroom would be a picture of someone else's office
+ * presented as ours, and a real one does not exist yet. The panel says what the
+ * product is instead, which is the only thing that half of the screen was ever
+ * going to communicate honestly. It collapses below 900px, where a decorative
+ * half is a screen of scrolling before the form.
  */
 interface LoginProps {
   onSignedIn: () => void;
@@ -53,83 +62,104 @@ export function Login({ onSignedIn, problem = null }: LoginProps) {
   };
 
   return (
-    <div className="login">
-      <form className="login-card" onSubmit={submit}>
-        <h1 className="login-mark">SAAR</h1>
-        <p className="login-sub">Editorial</p>
+    <div className="signin">
+      <aside className="signin-side">
+        <div className="signin-side-inner">
+          <p className="signin-mark">SAAR</p>
+          <p className="signin-pitch">The day’s news, in sixty words a story.</p>
+          <p className="signin-note">
+            Nepali and English in one feed, every card credited to the publisher who reported it.
+          </p>
+        </div>
+      </aside>
 
-        {/* A connection problem is not a rejected password, and saying so stops
-            someone retyping a password that was never wrong. It gives way to
-            the real error once an attempt has actually been made. */}
-        {error === null && problem !== null && (
-          <Banner tone="warn" live={false}>
-            {problem} Your sign-in may still be valid — try reloading once it is back.
-          </Banner>
-        )}
-        {error !== null && <Banner tone="error">{error}</Banner>}
+      <main className="signin-main">
+        <form className="signin-form" onSubmit={submit}>
+          {/* The way back out. Someone who reached this screen by following
+              "Staff sign in" and is not staff has otherwise no exit but the
+              browser's own back button. */}
+          <a className="signin-back" href={routeToHash(Routes.home())}>
+            <Icon name="arrowLeft" /> Back to the site
+          </a>
 
-        <Field label="Email">
-          {(f) => (
-            <input
-              {...f}
-              className="input"
-              type="email"
-              autoComplete="username"
-              autoFocus
-              required
-              disabled={busy}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-            />
+          <h1 className="signin-title">Editorial</h1>
+          <p className="signin-sub">Sign in to the newsroom.</p>
+
+          {/* A connection problem is not a rejected password, and saying so stops
+              someone retyping a password that was never wrong. It gives way to
+              the real error once an attempt has actually been made. */}
+          {error === null && problem !== null && (
+            <Banner tone="warn" live={false}>
+              {problem} Your sign-in may still be valid — try reloading once it is back.
+            </Banner>
           )}
-        </Field>
+          {error !== null && <Banner tone="error">{error}</Banner>}
 
-        {/*
-          * The reveal toggle.
-          *
-          * Worth having on exactly this field and not as a general habit: a
-          * password is the one input where a typo is invisible by design, and
-          * the alternative to showing it is retyping the whole thing to find
-          * out which character was wrong.
-          *
-          * It is a real `<button type="button">` — inside a form, a button
-          * without that attribute submits, so a reveal would have tried to sign
-          * in with a half-typed password. `aria-pressed` says which state it is
-          * in rather than leaving a screen reader to infer it from the label.
-          */}
-        <Field label="Password">
-          {(f) => (
-            <span className="input-with-affix">
+          <Field label="Email">
+            {(f) => (
               <input
                 {...f}
                 className="input"
-                type={revealed ? 'text' : 'password'}
-                autoComplete="current-password"
+                type="email"
+                autoComplete="username"
+                autoFocus
                 required
                 disabled={busy}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
-              <button
-                type="button"
-                className="input-affix"
-                aria-label={revealed ? 'Hide the password' : 'Show the password'}
-                aria-pressed={revealed}
-                disabled={busy}
-                onClick={() => setRevealed((r) => !r)}
-              >
-                <Icon name={revealed ? 'eyeOff' : 'eye'} />
-              </button>
-            </span>
-          )}
-        </Field>
+            )}
+          </Field>
 
-        <div className="actions actions-plain">
-          <Button type="submit" variant="primary" block busy={busy}>
-            Sign in
-          </Button>
-        </div>
-      </form>
+          {/*
+            * `data-filled` is not optional here, and its absence was a bug.
+            *
+            * The Field floats its label with a sibling selector on the control.
+            * Wrapping the input to hang a reveal button beside it put a span
+            * between the two, the selector stopped matching, and the label sat
+            * on top of the dots reading "Password" — the exact symptom the
+            * autofill fix had just removed, reintroduced by the wrapper.
+            *
+            * This is the escape hatch Field.tsx documents for a control that
+            * wraps its input, and the combo box uses it for the same reason.
+            */}
+          <Field label="Password">
+            {(f) => (
+              <span
+                className="input-with-affix"
+                data-filled={password === '' ? 'false' : 'true'}
+              >
+                <input
+                  {...f}
+                  className="input"
+                  type={revealed ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  disabled={busy}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  className="input-affix"
+                  aria-label={revealed ? 'Hide the password' : 'Show the password'}
+                  aria-pressed={revealed}
+                  disabled={busy}
+                  onClick={() => setRevealed((r) => !r)}
+                >
+                  <Icon name={revealed ? 'eyeOff' : 'eye'} />
+                </button>
+              </span>
+            )}
+          </Field>
+
+          <div className="actions actions-plain">
+            <Button type="submit" variant="primary" block busy={busy}>
+              Sign in
+            </Button>
+          </div>
+        </form>
+      </main>
     </div>
   );
 }
