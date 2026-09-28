@@ -280,6 +280,39 @@ describe('withdrawing a short', () => {
   });
 });
 
+describe('the library list', () => {
+  it('pages on the server, ten at a time, newest first, and says how many there are', async () => {
+    /* Twelve, so there is a second page. The old route returned the newest 60
+       and stopped, so anything past that was on no page at all. */
+    const ids: ObjectId[] = [];
+    for (let i = 0; i < 12; i += 1) {
+      const id = await insertShort('published');
+      await getDb().collection('videos').updateOne(
+        { _id: id },
+        { $set: { createdAt: new Date(Date.UTC(2026, 8, 1, 0, i)), title: 'Short ' + String(i) } },
+      );
+      ids.push(id);
+    }
+
+    const first = await get('/api/cms/shorts', adminCookie);
+    expect(first.status).toBe(200);
+    expect(first.body.total).toBe(12);
+    expect(first.body.items).toHaveLength(10);
+    expect(first.body.items[0].title).toBe('Short 11');
+
+    const second = await get('/api/cms/shorts?page=2&perPage=10', adminCookie);
+    expect(second.body.items.map((r: { title: string }) => r.title)).toEqual(['Short 1', 'Short 0']);
+
+    /* No row on both pages, none on neither. */
+    const seen = [...first.body.items, ...second.body.items].map((r: { id: string }) => r.id);
+    expect(new Set(seen).size).toBe(12);
+  });
+
+  it('refuses a page size past 100', async () => {
+    expect((await get('/api/cms/shorts?perPage=500', adminCookie)).status).toBe(400);
+  });
+});
+
 describe('the detail route', () => {
   it('returns what the edit screen needs', async () => {
     const id = await insertShort('published');

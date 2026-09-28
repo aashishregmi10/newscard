@@ -1,12 +1,14 @@
+import { useEffect } from 'react';
 import { api, type ShortItem } from '../api';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useResource } from '../hooks/useResource';
 import { crumbs } from '../lib/crumbs';
 import { dateTime, relativeTime } from '../lib/format';
 import { mediaUrl } from '../lib/media';
-import { clampPage, pageCountOf, pageSlice } from '../lib/pagination';
+import { pageCountOf } from '../lib/pagination';
+
 import { shortStatus } from '../lib/status';
-import { Routes, type PerPage } from '../nav';
+import { Routes, SHORTS_PER_PAGE } from '../nav';
 import { navigate } from '../useRoute';
 import {
   Badge,
@@ -67,19 +69,38 @@ function ShortsSkeleton() {
   );
 }
 
-export function Shorts({ page, perPage }: { page: number; perPage: PerPage }) {
-  const { data, error: loadError, loading, reload } = useResource<ShortItem[]>(
-    async (signal) => (await api.shorts(signal)).items,
-    'shorts',
+interface Data {
+  items: ShortItem[];
+  total: number;
+}
+
+export function Shorts({ page }: { page: number }) {
+  /* Keyed by page, so moving between pages is a fresh request rather than
+     the previous page shown under a new number. */
+  const { data, error: loadError, loading, reload } = useResource<Data>(
+    (signal) => api.shorts(page, SHORTS_PER_PAGE, signal),
+    `shorts:${page}`,
     'Could not load the shorts.',
   );
 
   const action = useAsyncAction();
 
-  const total = data?.length ?? 0;
-  const pageCount = pageCountOf(total, perPage);
-  const currentPage = clampPage(page, pageCount);
-  const visible = data === null ? [] : pageSlice(data, currentPage, perPage);
+  const total = data?.total ?? 0;
+  const visible = data?.items ?? [];
+
+  /*
+   * A page past the end goes to the last real one.
+   *
+   * Paging in the browser clamped this for free; paging on the server does
+   * not. A bookmarked `?page=7` from when there were seventy shorts would
+   * otherwise come back as an empty page under a pager reading "61–60 of
+   * 20". Replace rather than push, so Back does not return to the dead page.
+   */
+  useEffect(() => {
+    if (data === null) return;
+    const last = pageCountOf(data.total, SHORTS_PER_PAGE);
+    if (page > last) navigate(Routes.shorts({ page: last }), { replace: true });
+  }, [data, page]);
 
   const act = async (work: () => Promise<unknown>, okMessage: string) => {
     if (await action.run(work, okMessage)) reload();
@@ -229,12 +250,12 @@ export function Shorts({ page, perPage }: { page: number; perPage: PerPage }) {
             })}
           </ul>
 
+          {/* No page-size control: see SHORTS_PER_PAGE. */}
           <Pagination
-            page={currentPage}
-            perPage={perPage}
+            page={page}
+            perPage={SHORTS_PER_PAGE}
             total={total}
-            onPageChange={(next) => navigate(Routes.shorts({ page: next, perPage }))}
-            onPerPageChange={(next) => navigate(Routes.shorts({ page: 1, perPage: next }))}
+            onPageChange={(next) => navigate(Routes.shorts({ page: next }))}
             noun="short"
           />
         </>

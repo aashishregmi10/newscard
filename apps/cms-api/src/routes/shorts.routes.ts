@@ -68,19 +68,44 @@ function slugFor(title: string, language: string): string {
   return `${base || `short-${language}`}-${stamp}-${rand}`;
 }
 
-/** GET /cms/shorts — newest first, every status. */
+/**
+ * GET /cms/shorts — newest first, every status, a page at a time.
+ *
+ * It returned the newest 60 and stopped, and the screen paged those 60 in
+ * the browser. So the 61st short was not on another page — it was nowhere,
+ * with nothing on screen to say the list had been cut. The same bug the
+ * triage queue had at 200, fixed the same way: the server pages and says how
+ * many there are in total.
+ *
+ * `_id` breaks ties, so two shorts saved in the same millisecond cannot swap
+ * places between one page request and the next and appear twice.
+ */
+const ListQuery = z.object({
+  page: z.coerce.number().int().min(1).default(1),
+  perPage: z.coerce.number().int().min(1).max(100).default(10),
+});
+
 shortRoutes.get(
   '/cms/shorts',
   requireRole('queue.read'),
-  asyncRoute(async (_req, res) => {
-    const docs = await getDb()
-      .collection('videos')
-      .find({})
-      .sort({ createdAt: -1 })
-      .limit(60)
-      .toArray();
+  asyncRoute(async (req, res) => {
+    const parsed = ListQuery.safeParse(req.query);
+    if (!parsed.success) throw new AppError('BAD_REQUEST', 'Unknown query.');
+    const { page, perPage } = parsed.data;
+
+    const videos = getDb().collection('videos');
+    const [total, docs] = await Promise.all([
+      videos.countDocuments({}),
+      videos
+        .find({})
+        .sort({ createdAt: -1, _id: -1 })
+        .skip((page - 1) * perPage)
+        .limit(perPage)
+        .toArray(),
+    ]);
 
     res.json({
+      total,
       items: docs.map((v) => ({
         id: v._id.toString(),
         slug: v.slug,

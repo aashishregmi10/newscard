@@ -35,7 +35,7 @@ const ALL_ROUTES: readonly Route[] = [
   Routes.article('65f1c2a4b8e9d0123456789a'),
   Routes.article('65f1c2a4b8e9d0123456789a', 'notes'),
   Routes.shorts(),
-  Routes.shorts({ page: 2, perPage: 100 }),
+  Routes.shorts({ page: 2 }),
   Routes.shortNew(),
   Routes.sources(),
   Routes.sources({ tab: 'pending', page: 2, q: 'khabar' }),
@@ -251,6 +251,13 @@ describe('paging in the URL', () => {
   it('reads a page number', () => {
     expect(parseRoute('#/queue?page=4')).toEqual(Routes.queue({ page: 4 }));
     expect(parseRoute('#/shorts?page=2')).toEqual(Routes.shorts({ page: 2 }));
+  });
+
+  it('ignores a page size on the shorts library, which is fixed at ten', () => {
+    /* A link saved when the library offered 50 a page still opens — on the
+       same page, at ten — and the size is not written back into the URL. */
+    expect(parseRoute('#/shorts?page=3&perPage=50')).toEqual(Routes.shorts({ page: 3 }));
+    expect(routeToHash(Routes.shorts({ page: 3 }))).toBe('#/shorts?page=3');
   });
 
   it('treats anything that is not a positive whole number as the first page', () => {

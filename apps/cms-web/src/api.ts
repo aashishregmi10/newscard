@@ -547,7 +547,11 @@ export const api = {
     return upload<{ video: UploadedVideo }>('/cms/media/video', form);
   },
 
-  shorts: (signal?: AbortSignal) => req<{ items: ShortItem[] }>('/cms/shorts', { signal }),
+  shorts: (page: number, perPage: number, signal?: AbortSignal) =>
+    req<{ items: ShortItem[]; total: number }>(
+      `/cms/shorts?page=${page}&perPage=${perPage}`,
+      { signal },
+    ),
 
   createShort: (body: {
     language: 'ne' | 'en';

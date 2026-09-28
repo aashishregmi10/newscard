@@ -95,6 +95,16 @@ export const LEADS_PER_PAGE: PerPage = 10;
 export const SOURCES_PER_PAGE: PerPage = 10;
 
 /**
+ * The shorts library, fixed at ten like the other lists.
+ *
+ * Each row carries a poster, so it is taller than a queue row, and a library
+ * of clips is scanned by picture rather than read — ten posters is a page
+ * you can take in at once. It is paged on the server: see GET /cms/shorts
+ * for the cap that used to hide everything past the sixtieth.
+ */
+export const SHORTS_PER_PAGE: PerPage = 10;
+
+/**
  * The tabs on the publishers list.
  *
  * Licence status is not an attribute of a publisher — it is the question you
@@ -145,7 +155,7 @@ export type Route =
   | { name: 'queue'; page: number; perPage: PerPage; q: string }
   | { name: 'new' }
   | { name: 'article'; id: string; tab: ArticleTab }
-  | { name: 'shorts'; page: number; perPage: PerPage }
+  | { name: 'shorts'; page: number }
   | { name: 'shortEdit'; id: string }
   | { name: 'shortNew' }
   | { name: 'sources'; tab: LicenceTab; page: number; q: string }
@@ -181,10 +191,9 @@ export const Routes = {
   }),
   new: (): Route => ({ name: 'new' }),
   article: (id: string, tab: ArticleTab = 'source'): Route => ({ name: 'article', id, tab }),
-  shorts: (params: { page?: number; perPage?: PerPage } = {}): Route => ({
+  shorts: (params: { page?: number } = {}): Route => ({
     name: 'shorts',
     page: params.page ?? 1,
-    perPage: params.perPage ?? DEFAULT_PER_PAGE,
   }),
   shortNew: (): Route => ({ name: 'shortNew' }),
   shortEdit: (id: string): Route => ({ name: 'shortEdit', id }),
@@ -250,7 +259,7 @@ export function parseRoute(hash: string): Route {
   }
 
   if (section === 'shorts') {
-    return Routes.shorts({ page: readPage(query), perPage: readPerPage(query) });
+    return Routes.shorts({ page: readPage(query) });
   }
 
   if (section === 'shorts/new') return Routes.shortNew();
@@ -372,7 +381,6 @@ export function routeToHash(route: Route): string {
     case 'shorts':
       return withQuery('#/shorts', {
         page: route.page === 1 ? null : String(route.page),
-        perPage: route.perPage === DEFAULT_PER_PAGE ? null : String(route.perPage),
       });
     case 'shortNew':
       return '#/shorts/new';

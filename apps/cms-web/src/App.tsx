@@ -188,7 +188,7 @@ function Screen({
          of the key — switching tabs must not discard unsaved edits. */
       return <Composer key={route.id} id={route.id} tab={route.tab} />;
     case 'shorts':
-      return <Shorts page={route.page} perPage={route.perPage} />;
+      return <Shorts page={route.page} />;
     case 'shortNew':
       return <NewShort />;
     case 'shortEdit':
