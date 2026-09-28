@@ -1709,3 +1709,25 @@
   font-weight: 500;
   color: var(--ink-soft);
 }
+
+/* The clip itself on the edit screen, in the poster’s frame. Letterboxed on
+   black rather than cropped: someone checking what was captured needs the
+   whole frame, and a cropped video hides exactly the edge they are checking. */
+.clip-player {
+  max-width: 220px;
+  object-fit: contain;
+  background: #000;
+}
+
+/*
+ * A notice at the top of a panel, and the form under it.
+ *
+ * A banner carries no bottom margin and a single field no top one, so the
+ * first control sat flush against the notice — the Language legend on the
+ * shorts edit screen touching the banner above it. A gap between the two
+ * belongs to neither, so it is set on the pair.
+ */
+.panel-body > .banner + .grid,
+.panel-body > .banner + .field {
+  margin-top: var(--s4);
+}

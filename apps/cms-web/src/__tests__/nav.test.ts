@@ -48,6 +48,7 @@ const ALL_ROUTES: readonly Route[] = [
   Routes.published(),
   Routes.published({ tab: 'retracted', page: 2 }),
   Routes.publishedEdit('65f1c2a4b8e9d0123456789a'),
+  Routes.shortEdit('65f1c2a4b8e9d0123456789b'),
 ];
 
 describe('parseRoute and routeToHash', () => {
@@ -79,8 +80,8 @@ describe('parseRoute and routeToHash', () => {
   it('falls back to the queue for anything it does not recognise', () => {
     expect(parseRoute('#/nonsense')).toEqual(DEFAULT_ROUTE);
     expect(parseRoute('#/queue/new/extra')).toEqual(DEFAULT_ROUTE);
-    // Shorts have no detail screen, so a short's id is not a route.
-    expect(parseRoute('#/shorts/123')).toEqual(DEFAULT_ROUTE);
+    // A short's id is its edit screen now; two segments are still nothing.
+    expect(parseRoute('#/shorts/123')).toEqual(Routes.shortEdit('123'));
     expect(parseRoute('#/shorts/new/extra')).toEqual(DEFAULT_ROUTE);
   });
 
@@ -203,6 +204,16 @@ describe('the tab in the URL', () => {
     );
   });
 
+  it('opens the edit screen for one short, without shadowing the upload form', () => {
+    expect(parseRoute('#/shorts/65f1c2a4b8e9d0123456789b')).toEqual(
+      Routes.shortEdit('65f1c2a4b8e9d0123456789b'),
+    );
+    /* `new` is the upload form, never a short with that id — the same
+       ordering rule as #/queue/new against a story id. */
+    expect(parseRoute('#/shorts/new')).toEqual(Routes.shortNew());
+    expect(parseRoute('#/shorts/abc/def')).toEqual(DEFAULT_ROUTE);
+  });
+
   it('opens the edit screen for one published story', () => {
     expect(parseRoute('#/published/65f1c2a4b8e9d0123456789a')).toEqual(
       Routes.publishedEdit('65f1c2a4b8e9d0123456789a'),
@@ -317,6 +328,7 @@ describe('sectionOf', () => {
   it('files the upload form under shorts', () => {
     // Same reason: the rail must not unlight while you are uploading a clip.
     expect(sectionOf(Routes.shortNew())).toBe('shorts');
+    expect(sectionOf(Routes.shortEdit('x'))).toBe('shorts');
   });
 
   it('files every publisher screen under publishers', () => {
@@ -356,6 +368,7 @@ describe('screenKeyOf', () => {
     // A list and its create form are different screens, so arriving at the
     // upload form should scroll to the top rather than keep the list's offset.
     expect(screenKeyOf(Routes.shorts())).not.toBe(screenKeyOf(Routes.shortNew()));
+    expect(screenKeyOf(Routes.shortEdit('a'))).not.toBe(screenKeyOf(Routes.shortEdit('b')));
     expect(screenKeyOf(Routes.sources())).not.toBe(screenKeyOf(Routes.sourceNew()));
     expect(screenKeyOf(Routes.source('a-a'))).not.toBe(screenKeyOf(Routes.source('b-b')));
     /* Live and withdrawn are two different lists, so moving between them

@@ -14,6 +14,7 @@ import { AppShell } from './components/AppShell';
 import { Booting, Login } from './components/Login';
 import { Composer } from './components/Composer';
 import { NewShort } from './components/NewShort';
+import { EditShort } from './components/EditShort';
 import { NewSource } from './components/NewSource';
 import { NewStory } from './components/NewStory';
 import { Leads } from './components/Leads';
@@ -190,6 +191,9 @@ function Screen({
       return <Shorts page={route.page} perPage={route.perPage} />;
     case 'shortNew':
       return <NewShort />;
+    case 'shortEdit':
+      /* Keyed by id so moving between two shorts rebuilds the form. */
+      return <EditShort key={route.id} id={route.id} role={role} />;
     case 'sources':
       return (
         <Sources

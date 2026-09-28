@@ -146,6 +146,7 @@ export type Route =
   | { name: 'new' }
   | { name: 'article'; id: string; tab: ArticleTab }
   | { name: 'shorts'; page: number; perPage: PerPage }
+  | { name: 'shortEdit'; id: string }
   | { name: 'shortNew' }
   | { name: 'sources'; tab: LicenceTab; page: number; q: string }
   | { name: 'sourceNew' }
@@ -186,6 +187,7 @@ export const Routes = {
     perPage: params.perPage ?? DEFAULT_PER_PAGE,
   }),
   shortNew: (): Route => ({ name: 'shortNew' }),
+  shortEdit: (id: string): Route => ({ name: 'shortEdit', id }),
   sources: (params: { tab?: LicenceTab; page?: number; q?: string } = {}): Route => ({
     name: 'sources',
     tab: params.tab ?? 'all',
@@ -252,6 +254,16 @@ export function parseRoute(hash: string): Route {
   }
 
   if (section === 'shorts/new') return Routes.shortNew();
+
+  /* After `shorts/new`, for the same reason `queue/new` precedes a story id.
+     One segment, checked before decoding — see the note under queue. */
+  if (section.startsWith('shorts/')) {
+    const rest = path.slice('shorts/'.length);
+    if (rest !== '' && !rest.includes('/')) {
+      const id = decodeSegment(rest);
+      if (id !== '') return Routes.shortEdit(id);
+    }
+  }
 
   if (section === 'sources') {
     return Routes.sources({
@@ -364,6 +376,8 @@ export function routeToHash(route: Route): string {
       });
     case 'shortNew':
       return '#/shorts/new';
+    case 'shortEdit':
+      return `#/shorts/${encodeURIComponent(route.id)}`;
     case 'sources':
       return withQuery('#/sources', {
         tab: route.tab === 'all' ? null : route.tab,
@@ -413,6 +427,7 @@ export function sectionOf(route: Route): Section {
       return 'queue';
     case 'shorts':
     case 'shortNew':
+    case 'shortEdit':
       return 'shorts';
     case 'sources':
     case 'sourceNew':
@@ -452,6 +467,8 @@ export function screenKeyOf(route: Route): string {
       return 'shorts';
     case 'shortNew':
       return 'shortNew';
+    case 'shortEdit':
+      return `shortEdit:${route.id}`;
     case 'sources':
       return 'sources';
     case 'sourceNew':

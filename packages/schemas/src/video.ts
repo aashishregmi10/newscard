@@ -55,6 +55,22 @@ export const Video = z.object({
 
   publishedAt: z.date().nullable(),
 
+  /** Set together when a short is withdrawn. The reason is required by the
+   *  route, and is what anyone asking "why did that clip disappear" reads. */
+  retractedAt: z.date().nullable().optional(),
+  retractionReason: z.string().min(1).nullable().optional(),
+
+  /**
+   * The last change to a LIVE short: when, by whom, and why. The same record
+   * a published article keeps, for the same reason — `updatedAt` moves on
+   * every save of a draft, so it cannot answer "when did what readers see
+   * last change". Edits to a draft do not set these. The full before and
+   * after of every edit is in `audit`.
+   */
+  lastEditedAt: z.date().nullable().optional(),
+  lastEditedBy: ObjectIdString.nullable().optional(),
+  lastEditReason: z.string().min(1).nullable().optional(),
+
   /** Shown over the poster. Shorter than an article headline: it competes with
    *  the picture for attention rather than sitting above it. */
   title: z.string().max(80),

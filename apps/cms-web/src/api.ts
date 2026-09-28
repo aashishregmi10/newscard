@@ -138,6 +138,34 @@ export interface ShortItem {
   categorySlug: string;
   publishedAt: string | null;
   createdAt: string;
+  /** The last change to a LIVE short. Edits to a draft do not set it. */
+  lastEditedAt: string | null;
+  lastEditReason: string | null;
+  retractionReason: string | null;
+}
+
+/** One short, with everything the edit screen needs. */
+export interface ShortDetail {
+  id: string;
+  slug: string;
+  status: 'draft' | 'published' | 'retracted';
+  language: 'ne' | 'en';
+  title: string;
+  caption: string;
+  credit: string;
+  licence: ImageLicence;
+  durationSeconds: number;
+  posterUrl: string;
+  posterBlurHash: string | null;
+  renditions: UploadedVideo['renditions'];
+  sourceName: string;
+  categorySlug: string;
+  publishedAt: string | null;
+  createdAt: string | null;
+  retractedAt: string | null;
+  retractionReason: string | null;
+  lastEditedAt: string | null;
+  lastEditReason: string | null;
 }
 
 /** What the transcoder returns: three renditions the player chooses between. */
@@ -541,10 +569,41 @@ export const api = {
       body: JSON.stringify({}),
     }),
 
-  retractShort: (id: string) =>
+  /** A reason is required: a withdrawal is final, and is kept on the record. */
+  retractShort: (id: string, reason: string) =>
     req<{ status: string }>(`/cms/shorts/${id}/retract`, {
       method: 'POST',
-      body: JSON.stringify({}),
+      body: JSON.stringify({ reason }),
+    }),
+
+  short: (id: string, signal?: AbortSignal) =>
+    req<{ short: ShortDetail }>(`/cms/shorts/${encodeURIComponent(id)}`, { signal }),
+
+  /**
+   * Save changes to a short. `clip` only when the video was replaced;
+   * `reason` is required by the server when the short is live.
+   */
+  editShort: (
+    id: string,
+    body: {
+      language: 'ne' | 'en';
+      categorySlug: string;
+      title: string;
+      caption: string;
+      credit: string;
+      licence: ImageLicence;
+      clip?: {
+        durationSeconds: number;
+        posterUrl: string;
+        posterBlurHash: string;
+        renditions: UploadedVideo['renditions'];
+      };
+      reason?: string;
+    },
+  ) =>
+    req<{ ok: true; lastEditedAt: string | null }>(`/cms/shorts/${id}/edit`, {
+      method: 'POST',
+      body: JSON.stringify(body),
     }),
 
   /* ---------------------------------------------------------- publishers */

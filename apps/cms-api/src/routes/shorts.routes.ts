@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { collections, getDb } from '@saar/db';
-import { AppError } from '@saar/shared';
+import { AppError, can, type StaffRole } from '@saar/shared';
 import { LanguageEnum, MAX_VIDEO_DURATION_S } from '@saar/schemas';
 import { requireAuth, requireRole } from '../auth/requireRole.js';
 import { asyncRoute } from '../middleware/index.js';
@@ -28,6 +28,16 @@ export const shortRoutes = Router();
 
 shortRoutes.use(requireAuth);
 
+const Rendition = z.object({
+  quality: z.enum(['low', 'medium', 'high']),
+  url: z.string().min(1),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+  bytes: z.number().int().nonnegative(),
+});
+
+const Licence = z.enum(['publisher_licensed', 'agency', 'cc_by', 'own']);
+
 const CreateSchema = z.object({
   language: LanguageEnum,
   categorySlug: z.string().min(1).max(40),
@@ -35,23 +45,13 @@ const CreateSchema = z.object({
   title: z.string().min(1).max(80),
   caption: z.string().min(1).max(400),
   credit: z.string().min(1).max(200),
-  licence: z.enum(['publisher_licensed', 'agency', 'cc_by', 'own']),
+  licence: Licence,
   sourceUrl: z.string().nullable().optional(),
   /** Straight from POST /cms/media/video. */
   durationSeconds: z.number().positive().max(MAX_VIDEO_DURATION_S),
   posterUrl: z.string().min(1),
   posterBlurHash: z.string().min(6),
-  renditions: z
-    .array(
-      z.object({
-        quality: z.enum(['low', 'medium', 'high']),
-        url: z.string().min(1),
-        width: z.number().int().positive(),
-        height: z.number().int().positive(),
-        bytes: z.number().int().nonnegative(),
-      }),
-    )
-    .min(1),
+  renditions: z.array(Rendition).min(1),
 });
 
 function slugFor(title: string, language: string): string {
@@ -95,6 +95,9 @@ shortRoutes.get(
         categorySlug: v.categorySlug,
         publishedAt: v.publishedAt ? (v.publishedAt as Date).toISOString() : null,
         createdAt: (v.createdAt as Date).toISOString(),
+        lastEditedAt: v.lastEditedAt ? (v.lastEditedAt as Date).toISOString() : null,
+        lastEditReason: (v.lastEditReason as string | undefined) ?? null,
+        retractionReason: (v.retractionReason as string | undefined) ?? null,
       })),
     });
   }),
@@ -177,6 +180,205 @@ shortRoutes.post(
   }),
 );
 
+/** GET /cms/shorts/:id — everything the edit screen needs. */
+shortRoutes.get(
+  '/cms/shorts/:id',
+  requireRole('queue.read'),
+  asyncRoute(async (req, res) => {
+    const id = String(req.params.id ?? '');
+    if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
+
+    const v = await getDb().collection('videos').findOne({ _id: new ObjectId(id) });
+    if (!v) throw new AppError('NOT_FOUND');
+
+    const iso = (d: unknown) => (d instanceof Date ? d.toISOString() : null);
+    res.json({
+      short: {
+        id: v._id.toString(),
+        slug: v.slug,
+        status: v.status,
+        language: v.language,
+        title: v.title,
+        caption: v.caption,
+        credit: v.credit,
+        licence: v.licence,
+        durationSeconds: v.durationSeconds,
+        posterUrl: v.posterUrl,
+        posterBlurHash: v.posterBlurHash ?? null,
+        renditions: v.renditions,
+        sourceName: v.sourceName,
+        categorySlug: v.categorySlug,
+        publishedAt: iso(v.publishedAt),
+        createdAt: iso(v.createdAt),
+        retractedAt: iso(v.retractedAt),
+        retractionReason: v.retractionReason ?? null,
+        lastEditedAt: iso(v.lastEditedAt),
+        lastEditReason: v.lastEditReason ?? null,
+      },
+    });
+  }),
+);
+
+/**
+ * POST /cms/shorts/:id/edit — change a short after it was saved.
+ *
+ * ── Draft and live are edited through one route, under different rules ─────
+ *
+ * A draft is nobody’s business but the newsroom’s, so it is edited freely by
+ * anyone who may write. A live short is what readers are being shown, so it
+ * follows the article rule exactly: it takes the permission publishing takes,
+ * a reason of at least ten characters, and the time and reason are stamped on
+ * the record. A withdrawn short is final and is not edited at all.
+ *
+ * ── What can change ────────────────────────────────────────────────────────
+ *
+ * Everything the upload form asked except the publisher. The words, the
+ * section, the language, the credit and licence, and the clip itself — a
+ * wrong file is the likeliest mistake of all. The publisher is fixed because
+ * it decides which licence the short was filed under; a clip from someone else
+ * is a different short, and is uploaded as one.
+ *
+ * `publishedAt` is never touched, for the reason given on the article route:
+ * it is the sort order, and a correction must not float an old clip back to
+ * the top of the tab.
+ */
+const EditSchema = z.object({
+  language: LanguageEnum,
+  categorySlug: z.string().min(1).max(40),
+  title: z.string().trim().min(1).max(80),
+  caption: z.string().trim().min(1).max(400),
+  credit: z.string().trim().min(1).max(200),
+  licence: Licence,
+  /** Present only when the clip was replaced. Straight from POST /cms/media/video. */
+  clip: z
+    .object({
+      durationSeconds: z.number().positive().max(MAX_VIDEO_DURATION_S),
+      posterUrl: z.string().min(1),
+      posterBlurHash: z.string().min(6),
+      renditions: z.array(Rendition).min(1),
+    })
+    .optional(),
+  /** Required for a live short; ignored for a draft. */
+  reason: z.string().max(300).optional(),
+});
+
+shortRoutes.post(
+  '/cms/shorts/:id/edit',
+  requireRole('article.write'),
+  asyncRoute(async (req, res) => {
+    const id = String(req.params.id ?? '');
+    if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
+
+    const parsed = EditSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError('VALIDATION_FAILED', 'A title, a caption and a credit are all required.', {
+        issues: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+      });
+    }
+    const d = parsed.data;
+
+    const c = collections(getDb());
+    const videos = getDb().collection('videos');
+    const v = await videos.findOne({ _id: new ObjectId(id) });
+    if (!v) throw new AppError('NOT_FOUND');
+
+    if (v.status === 'retracted') {
+      throw new AppError(
+        'INVALID_TRANSITION',
+        'This short was withdrawn. A withdrawal is final, so it is no longer edited.',
+      );
+    }
+
+    const live = v.status === 'published';
+    const reason = (d.reason ?? '').trim();
+    if (live) {
+      if (!can(req.staff!.role as StaffRole, 'article.publish')) {
+        throw new AppError(
+          'FORBIDDEN',
+          'Editing a live short needs a reviewer or an admin, as publishing one does.',
+        );
+      }
+      if (reason.length < 10) {
+        throw new AppError(
+          'VALIDATION_FAILED',
+          'This short is live, so say why it is being changed, in at least ten characters. It is kept with the short.',
+        );
+      }
+    }
+
+    const category = await c.categories.findOne({ slug: d.categorySlug });
+    if (!category) throw new AppError('BAD_REQUEST', `No such section: ${d.categorySlug}.`);
+
+    const now = new Date();
+    const set: Record<string, unknown> = {
+      language: d.language,
+      title: d.title,
+      caption: d.caption,
+      credit: d.credit,
+      licence: d.licence,
+      categoryId: category._id,
+      categorySlug: category.slug,
+      categoryLabel: category.label,
+      updatedAt: now,
+    };
+    if (d.clip !== undefined) {
+      set.durationSeconds = d.clip.durationSeconds;
+      set.posterUrl = d.clip.posterUrl;
+      set.posterBlurHash = d.clip.posterBlurHash;
+      set.renditions = d.clip.renditions;
+    }
+    if (live) {
+      set.lastEditedAt = now;
+      set.lastEditedBy = new ObjectId(req.staff!.staffId);
+      set.lastEditReason = reason;
+    }
+
+    /* Compare-and-swap on the status the checks were made against. A short
+       published or withdrawn by someone else mid-edit changes which rules
+       apply, so the edit is refused rather than applied under the old ones. */
+    const write = await videos.updateOne({ _id: v._id, status: v.status }, { $set: set });
+    if (write.matchedCount === 0) {
+      throw new AppError(
+        'INVALID_TRANSITION',
+        'This short changed while you were editing it, so nothing has been saved. Reload and try again.',
+      );
+    }
+
+    await writeAudit({
+      action: 'short.edit',
+      entityType: 'video',
+      entityId: id,
+      actorId: req.staff!.staffId,
+      actorEmail: req.staff!.email,
+      before: {
+        status: v.status,
+        language: v.language,
+        categorySlug: v.categorySlug,
+        title: v.title,
+        caption: v.caption,
+        credit: v.credit,
+        licence: v.licence,
+        posterUrl: v.posterUrl,
+      },
+      after: {
+        status: v.status,
+        language: d.language,
+        categorySlug: category.slug,
+        title: d.title,
+        caption: d.caption,
+        credit: d.credit,
+        licence: d.licence,
+        posterUrl: d.clip?.posterUrl ?? v.posterUrl,
+        clipReplaced: d.clip !== undefined,
+        ...(live ? { reason } : {}),
+      },
+      ip: req.ip ?? null,
+    });
+
+    res.json({ ok: true, lastEditedAt: live ? now.toISOString() : null });
+  }),
+);
+
 /**
  * POST /cms/shorts/:id/publish
  *
@@ -234,7 +436,14 @@ shortRoutes.post(
   }),
 );
 
-/** POST /cms/shorts/:id/retract — withdraw a published short. */
+/**
+ * POST /cms/shorts/:id/retract — withdraw a published short.
+ *
+ * It took no reason, and was one unconfirmed click on the library row. A
+ * withdrawal is final and is the one act most likely to be asked about
+ * later, so it now asks for a reason exactly as an article withdrawal does,
+ * and keeps it on the record.
+ */
 shortRoutes.post(
   '/cms/shorts/:id/retract',
   requireRole('article.retract'),
@@ -242,10 +451,27 @@ shortRoutes.post(
     const id = String(req.params.id ?? '');
     if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
 
+    const parsed = z.object({ reason: z.string() }).safeParse(req.body);
+    const reason = parsed.success ? parsed.data.reason.trim() : '';
+    if (reason.length < 10) {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        'A reason of at least 10 characters is required to withdraw a short.',
+      );
+    }
+
     const videos = getDb().collection('videos');
+    const now = new Date();
     const result = await videos.updateOne(
       { _id: new ObjectId(id), status: 'published' },
-      { $set: { status: 'retracted', updatedAt: new Date() } },
+      {
+        $set: {
+          status: 'retracted',
+          retractedAt: now,
+          retractionReason: reason,
+          updatedAt: now,
+        },
+      },
     );
     if (result.matchedCount === 0) {
       throw new AppError('INVALID_TRANSITION', 'Only a published short can be retracted.');
@@ -258,7 +484,7 @@ shortRoutes.post(
       actorId: req.staff!.staffId,
       actorEmail: req.staff!.email,
       before: { status: 'published' },
-      after: { status: 'retracted' },
+      after: { status: 'retracted', retractionReason: reason },
       ip: req.ip ?? null,
     });
 

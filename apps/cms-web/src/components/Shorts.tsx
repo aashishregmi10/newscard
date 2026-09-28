@@ -2,7 +2,7 @@ import { api, type ShortItem } from '../api';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useResource } from '../hooks/useResource';
 import { crumbs } from '../lib/crumbs';
-import { relativeTime } from '../lib/format';
+import { dateTime, relativeTime } from '../lib/format';
 import { mediaUrl } from '../lib/media';
 import { clampPage, pageCountOf, pageSlice } from '../lib/pagination';
 import { shortStatus } from '../lib/status';
@@ -33,6 +33,17 @@ import {
  * It is a list now, and uploading is its own screen at `#/shorts/new` — the
  * same split the queue already had between `#/queue` and `#/queue/new`. One
  * screen, one job.
+ *
+ * -- Why Withdraw is no longer on the row ------------------------------------
+ *
+ * It was one click, unconfirmed, with no reason asked, sitting beside the
+ * pencil in a list of look-alike rows — and a withdrawal is final. It lives on
+ * the edit screen now, beside Save, where it shares the reason field and asks
+ * a second time. Publish stays on the row: it is the next step for a draft,
+ * and it can be undone by withdrawing.
+ *
+ * The pencil is always the last thing on the row, so it lines up down the
+ * list whatever else a row happens to carry.
  */
 
 function ShortsSkeleton() {
@@ -157,7 +168,23 @@ export function Shorts({ page, perPage }: { page: number; perPage: PerPage }) {
                       {meta.map((part, index) => (
                         <span key={index}>{part}</span>
                       ))}
+                      {short.lastEditedAt !== null && (
+                        <span
+                          className="item-edited"
+                          title={
+                            `${dateTime(short.lastEditedAt) ?? ''}` +
+                            (short.lastEditReason !== null ? ` — ${short.lastEditReason}` : '')
+                          }
+                        >
+                          Edited {relativeTime(short.lastEditedAt)}
+                        </span>
+                      )}
                     </span>
+                    {short.retractionReason !== null && (
+                      <span className="item-meta">
+                        <span>Withdrawn because: {short.retractionReason}</span>
+                      </span>
+                    )}
                   </span>
 
                   <span className="item-tail">
@@ -176,17 +203,26 @@ export function Shorts({ page, perPage }: { page: number; perPage: PerPage }) {
                         Publish
                       </Button>
                     )}
-                    {short.status === 'published' && (
+                    <span className="row-actions">
                       <Button
                         size="sm"
-                        variant="danger"
-                        icon="ban"
-                        disabled={action.busy}
-                        onClick={() => void act(() => api.retractShort(short.id), 'Withdrawn.')}
-                      >
-                        Withdraw
-                      </Button>
-                    )}
+                        variant="ghost"
+                        icon={short.status === 'retracted' ? 'eye' : 'pencil'}
+                        aria-label={
+                          short.status === 'retracted'
+                            ? `View “${short.title}”`
+                            : `Edit “${short.title}”`
+                        }
+                        title={
+                          short.status === 'retracted'
+                            ? 'Withdrawn — view only'
+                            : short.status === 'published'
+                              ? 'Edit, or withdraw, the live short'
+                              : 'Edit the draft'
+                        }
+                        onClick={() => navigate(Routes.shortEdit(short.id))}
+                      />
+                    </span>
                   </span>
                 </li>
               );
