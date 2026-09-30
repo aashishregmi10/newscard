@@ -38,11 +38,42 @@ export type Advertiser = z.infer<typeof Advertiser>;
 export const CampaignStatusEnum = z.enum(['draft', 'scheduled', 'live', 'paused', 'ended']);
 export type CampaignStatus = z.infer<typeof CampaignStatusEnum>;
 
+/**
+ * Where an ad appears. Two different products, sold and weighted separately.
+ *
+ *   card     takes a whole card in the feed, between stories — the poster.
+ *            Density is the policy in adPolicy.ts: one in ten at most.
+ *   inline   a small labelled link in a story’s action row, beside save and
+ *            share. On every story by default; see DEFAULT_INLINE_ADS.
+ *
+ * A campaign belongs to exactly one. A business that wants both buys two, which
+ * keeps each price, each share of voice and each report about one thing.
+ */
+export const AdPlacementEnum = z.enum(['card', 'inline']);
+export type AdPlacement = z.infer<typeof AdPlacementEnum>;
+
+/** The most text the small ad can carry and still fit beside two icons on a
+ *  360dp phone with the publisher name. Measured in graphemes, as a summary is. */
+export const INLINE_AD_TEXT_MAX = 24;
+
+/**
+ * What the advertiser supplied. One shape for both placements; which fields
+ * matter depends on where it runs.
+ *
+ *                card (poster)                     inline (small ad)
+ *   headline     one-line description — the       the words on the pill,
+ *                screen-reader label, and what      INLINE_AD_TEXT_MAX at most
+ *                data-saver shows instead of the
+ *                poster
+ *   body         optional supporting line           unused
+ *   image        the poster, portrait               an optional square logo
+ *   callToAction the button                         unused (the pill is the link)
+ */
 export const AdCreative = z.object({
-  headline: z.string().min(4).max(90),
-  /** Deliberately capped near the editorial summary length: an ad that looks
-   *  like a story must READ like one in length too, or the feed rhythm breaks. */
-  body: z.string().min(20).max(300),
+  headline: z.string().min(2).max(90),
+  /** Optional now that the full-card ad is a poster: the image carries the
+   *  message, and a forced paragraph under it was copy nobody would read. */
+  body: z.string().max(300).nullable().optional(),
   /** The words on the button. Kept short so it never wraps on a small screen. */
   callToAction: LocalisedText,
   /** Where a tap goes. HTTPS only, opened in the in-app browser like any link. */
@@ -68,6 +99,9 @@ export const Campaign = z
     advertiserId: ObjectIdString,
     name: z.string().min(1),
     status: CampaignStatusEnum,
+    /** Absent on campaigns created before placements existed, which were all
+     *  full-card. Read as `card`. */
+    placement: AdPlacementEnum.default('card'),
     language: LanguageEnum,
     creative: AdCreative,
 
@@ -79,18 +113,30 @@ export const Campaign = z
     startsAt: z.date(),
     endsAt: z.date(),
 
-    /** Bought impressions. Delivery stops when this is reached, so an
-     *  advertiser can never be over-delivered and then billed for it. */
-    impressionGoal: z.number().int().positive(),
-    /** Smooths delivery so a campaign does not exhaust itself on day one and
-     *  leave the rest of its flight empty. Zero means no pacing. */
-    dailyImpressionCap: z.number().int().nonnegative().default(0),
-
-    /** Nepali paisa, integer. Money is never a float. */
+    /**
+     * What was paid, for the whole flight. Nepali paisa, integer: money is
+     * never a float.
+     *
+     * This is also what decides how often the ad is shown. Advertising is sold
+     * by time — "Rs 5,000 for a week" — so the weight is the price PER DAY
+     * (campaignWeight in adPolicy.ts). A campaign that paid twice as much per
+     * day is shown twice as often; one that paid 0 is a house ad, shown only
+     * when no paying campaign can fill the slot.
+     *
+     * There used to be a separate `weight`, typed in by hand. Two numbers that
+     * both claim to mean "how much this advertiser gets" will disagree, and the
+     * one the advertiser can see on their invoice is the one that should win.
+     */
     pricePaisa: z.number().int().nonnegative().default(0),
 
-    /** Rotation weight among eligible campaigns. */
-    weight: z.number().int().min(1).max(100).default(10),
+    /**
+     * Optional caps, from when campaigns were sold by impressions. Time-sold
+     * campaigns leave both unset and are shown for their whole flight; a
+     * campaign that does carry one stops or paces on it, so older campaigns
+     * keep behaving as they were sold.
+     */
+    impressionGoal: z.number().int().positive().nullable().optional(),
+    dailyImpressionCap: z.number().int().nonnegative().nullable().optional(),
 
     /**
      * sha256 of the campaign's report token.
@@ -153,6 +199,37 @@ export const AdCardDto = z.object({
 });
 export type AdCardDto = z.infer<typeof AdCardDto>;
 
+/**
+ * The small ad, as the app receives it.
+ *
+ * Attached to a story’s FEED ENTRY, never to ArticleCardDto: the card DTO is a
+ * snapshot-tested whitelist, it is what the deep-link endpoint returns, and it
+ * is what the phone caches for offline reading — and an ad must not be
+ * replayed from a cache after its campaign has ended.
+ */
+export const InlineAdDto = z.object({
+  kind: z.literal('inlineAd'),
+  /** Unique per story it sits on, for the same reason a card ad’s id carries
+   *  its position: two stories carrying one campaign are two impressions. */
+  id: z.string(),
+  campaignId: z.string(),
+  language: LanguageEnum,
+  advertiser: z.string(),
+  text: z.string(),
+  landingUrl: z.string(),
+  logo: z
+    .object({
+      blurHash: z.string().nullable(),
+      urls: z.object({
+        sm: z.string().nullable(),
+        md: z.string().nullable(),
+        lg: z.string().nullable(),
+      }),
+    })
+    .nullable(),
+});
+export type InlineAdDto = z.infer<typeof InlineAdDto>;
+
 export const AdEventTypeEnum = z.enum(['impression', 'viewable', 'click']);
 export type AdEventType = z.infer<typeof AdEventTypeEnum>;
 
@@ -169,6 +246,9 @@ export const AdEvent = z.object({
   campaignId: ObjectIdString,
   deviceId: z.string().uuid(),
   type: AdEventTypeEnum,
+  /** Which product delivered it. Events written before placements existed
+   *  carry none, and were all full-card: read as 'card'. */
+  placement: AdPlacementEnum.default('card'),
   /** Time the card was the active card, for the viewable determination. */
   dwellMs: z.number().int().nonnegative().max(120_000),
   categorySlug: z.string(),

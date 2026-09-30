@@ -4,7 +4,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { getDb } from '@saar/db';
 import { AppError, clampClientTimestamp } from '@saar/shared';
-import { AdEventTypeEnum, VIEWABLE_THRESHOLD_MS } from '@saar/schemas';
+import { AdEventTypeEnum, AdPlacementEnum, VIEWABLE_THRESHOLD_MS } from '@saar/schemas';
 import { asyncRoute } from '../middleware/index.js';
 import { adEventsLimit } from '../middleware/rateLimit.js';
 import { buildCampaignReport } from '../services/adReport.service.js';
@@ -17,6 +17,9 @@ const EventsSchema = z.object({
       z.object({
         campaignId: z.string().regex(/^[0-9a-f]{24}$/),
         type: AdEventTypeEnum,
+        /** Optional: an app from before the small ad sends none, and every ad it
+            could have shown was a full card. */
+        placement: AdPlacementEnum.default('card'),
         dwellMs: z.number().int().nonnegative().max(600_000),
         categorySlug: z.string().max(40),
         occurredAt: z.string().datetime().optional(),
@@ -47,6 +50,7 @@ adRoutes.post(
       campaignId: new ObjectId(e.campaignId),
       deviceId: parsed.data.deviceId,
       type: e.type,
+      placement: e.placement,
       // Clamped: a phone left on a card overnight is not two hours of
       // attention, and letting it through would inflate median dwell.
       dwellMs: Math.min(e.dwellMs, 120_000),

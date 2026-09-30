@@ -24,6 +24,41 @@ export interface FeedResult {
   items: ArticleCardDto[];
   nextCursor: string | null;
   hasMore: boolean;
+  /**
+   * Stories on this page that must not carry a small ad: marked "no ads" by an
+   * editor, or from a publisher whose agreement does not allow them.
+   *
+   * Returned beside the cards rather than on them. The card DTO is a public
+   * whitelist, and whether an editor judged a story too grave for an ad is
+   * not something to publish. The route strips this before responding.
+   */
+  inlineBlocked: Set<string>;
+}
+
+/**
+ * Publishers whose stories take no small ads, cached for a minute.
+ *
+ * Read on every feed request that could carry one, and it changes when an
+ * admin flips a switch on a publisher — rarely. A minute of staleness is the
+ * price of not querying `sources` on the hottest path in the product.
+ */
+let noInlineSources: { at: number; ids: Set<string> } | null = null;
+const NO_INLINE_TTL_MS = 60_000;
+
+async function sourcesWithoutInlineAds(): Promise<Set<string>> {
+  if (noInlineSources && Date.now() - noInlineSources.at < NO_INLINE_TTL_MS) {
+    return noInlineSources.ids;
+  }
+  const rows = await collections(getDb())
+    .sources.find({ inlineAds: false }, { projection: { _id: 1 } })
+    .toArray();
+  noInlineSources = { at: Date.now(), ids: new Set(rows.map((r) => r._id.toString())) };
+  return noInlineSources.ids;
+}
+
+/** Test seam: the cache above is process-wide by design. */
+export function __resetInlineSourceCache(): void {
+  noInlineSources = null;
 }
 
 export async function getFeed(params: FeedParams): Promise<FeedResult> {
@@ -85,10 +120,18 @@ export async function getFeed(params: FeedParams): Promise<FeedResult> {
         )
       : null;
 
+  const blockedSources = await sourcesWithoutInlineAds();
+  const inlineBlocked = new Set(
+    window
+      .filter((d) => d.adsSuppressed === true || blockedSources.has(d.sourceId.toString()))
+      .map((d) => d._id.toString()),
+  );
+
   return {
     items: display.map((d) => toArticleCard(d.doc)),
     nextCursor,
     hasMore: nextCursor !== null,
+    inlineBlocked,
   };
 }
 

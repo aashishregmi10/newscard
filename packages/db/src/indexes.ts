@@ -220,6 +220,13 @@ const AD_EVENTS: IndexSpec[] = [
       'whole event collection on each ad served — the one query on the serving hot path',
   },
   {
+    key: { placement: 1, occurredAt: -1 },
+    name: 'ad_events_by_placement',
+    serves:
+      'Delivered share: of all views in one placement over a period, how many each campaign ' +
+      'got — the number that proves the weighting did what the share of voice promised',
+  },
+  {
     // Server clock, for the same reason as readEvents above.
     key: { receivedAt: 1 },
     name: 'ad_events_ttl',

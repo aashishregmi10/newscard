@@ -52,6 +52,13 @@ export const Source = z
      *  summarise from. Sparse integers so one can be inserted without renumbering. */
     priority: z.number().int().default(50),
     isActive: z.boolean().default(true),
+    /**
+     * Whether small ads may sit on this publisher’s stories. The small ad sells
+     * space on a card that carries their name and their reporting, and not
+     * every licence agreement permits that. Absent means allowed; set false for
+     * a publisher whose agreement says otherwise.
+     */
+    inlineAds: z.boolean().optional(),
   })
   .superRefine((s, ctx) => {
     if (s.ingest.method === 'rss' && !s.ingest.feedUrl) {

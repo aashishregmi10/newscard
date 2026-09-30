@@ -1,15 +1,38 @@
 import { ObjectId, type Filter } from 'mongodb';
 import { getDb } from '@saar/db';
-import { adSlotsForPage, clampDensity, type AdDensityConfig } from '@saar/shared';
-import { isVirtualCategory, type AdCardDto, type ArticleCardDto, type Language } from '@saar/schemas';
+import {
+  adSlotsForPage,
+  clampDensity,
+  inlineSlotsForPage,
+  interleaveWeighted,
+  pickDistinctWeighted,
+  servingPool,
+  type AdDensityConfig,
+  type InlineAdConfig,
+  type Rng,
+} from '@saar/shared';
+import {
+  isVirtualCategory,
+  type AdCardDto,
+  type AdPlacement,
+  type ArticleCardDto,
+  type InlineAdDto,
+  type Language,
+} from '@saar/schemas';
 
 /**
  * Ad selection and injection.
  *
- * Two jobs, kept separate on purpose: WHICH ad to show (this file) and HOW
- * OFTEN (packages/shared/adPolicy). The density rules are pure and heavily
- * tested precisely so that no amount of selection cleverness can quietly raise
- * them.
+ * Two jobs, kept separate on purpose: WHICH ad to show (this file, drawing with
+ * the weights in adPolicy.ts) and HOW OFTEN (the density rules, also there).
+ * The density rules are pure and heavily tested precisely so that no amount of
+ * selection cleverness can quietly raise them.
+ *
+ * Two placements, weighted separately — they are different products at
+ * different prices, and a small-ad buyer must never take a poster slot:
+ *
+ *   card     a whole card between stories, at the density adPolicy allows
+ *   inline   a small labelled link on a story itself, beside save and share
  */
 
 interface CampaignDoc {
@@ -17,16 +40,18 @@ interface CampaignDoc {
   advertiserId: ObjectId;
   advertiserName?: string;
   status: string;
+  /** Absent on campaigns from before placements existed: all full-card. */
+  placement?: AdPlacement;
   language: Language;
   categories: string[];
   startsAt: Date;
   endsAt: Date;
-  impressionGoal: number;
-  dailyImpressionCap: number;
-  weight: number;
+  pricePaisa: number;
+  impressionGoal?: number | null;
+  dailyImpressionCap?: number | null;
   creative: {
     headline: string;
-    body: string;
+    body?: string | null;
     callToAction: { ne: string; en: string };
     landingUrl: string;
     image: {
@@ -40,6 +65,8 @@ interface CampaignDoc {
 const campaigns = () => getDb().collection<CampaignDoc>('campaigns');
 const adEvents = () => getDb().collection('adEvents');
 
+const placementOf = (c: CampaignDoc): AdPlacement => c.placement ?? 'card';
+
 /** Impressions this campaign has already served today, for pacing. */
 async function servedToday(campaignId: ObjectId): Promise<number> {
   const since = new Date();
@@ -52,18 +79,15 @@ async function servedToday(campaignId: ObjectId): Promise<number> {
 }
 
 /**
- * Eligible campaigns for this request, in weighted-random order.
+ * Every campaign that may be shown on this request, both placements.
  *
- * Weighted rather than strictly ordered so a single high-weight campaign does
- * not monopolise every slot — an advertiser who bought 20% of inventory should
- * see their ad spread across the day, not delivered in one burst.
+ * One query for both: they share every condition except placement, and the
+ * split is a filter in memory over a handful of documents.
  */
-export async function selectCampaigns(
+export async function eligibleCampaigns(
   languages: Language[],
   categorySlug: string,
-  count: number,
 ): Promise<CampaignDoc[]> {
-  if (count <= 0) return [];
   const now = new Date();
 
   const filter: Filter<CampaignDoc> = {
@@ -71,12 +95,22 @@ export async function selectCampaigns(
     language: { $in: languages },
     startsAt: { $lte: now },
     endsAt: { $gte: now },
-    // Never over-deliver. An advertiser billed for impressions they did not
-    // buy is a refund and a lost relationship.
-    $expr: { $lt: ['$stats.impressions', '$impressionGoal'] },
+    /*
+     * A goal, where one was sold, still stops delivery: an advertiser billed for
+     * impressions they did not buy is a refund and a lost relationship.
+     *
+     * But time-sold campaigns carry no goal, and `$lt` against a missing field
+     * compares with null — which every number is greater than — so the old
+     * filter alone would have silently excluded every one of them.
+     */
+    $or: [
+      { impressionGoal: { $exists: false } },
+      { impressionGoal: null },
+      { $expr: { $lt: ['$stats.impressions', '$impressionGoal'] } },
+    ],
   };
 
-  const eligible = await campaigns().find(filter).limit(50).toArray();
+  const eligible = await campaigns().find(filter).limit(100).toArray();
 
   // `top` and `all` are virtual — no article carries them, they are the mixed
   // feed. A campaign that bought "business" must be eligible there, because the
@@ -90,22 +124,14 @@ export async function selectCampaigns(
       c.categories.includes(categorySlug),
   );
 
-  // Pacing: drop anything that has hit today's allowance.
+  // Pacing, for a campaign sold with one. Time-sold campaigns have none.
   const paced: CampaignDoc[] = [];
   for (const c of matching) {
-    if (c.dailyImpressionCap > 0) {
-      const today = await servedToday(c._id);
-      if (today >= c.dailyImpressionCap) continue;
-    }
+    const cap = c.dailyImpressionCap ?? 0;
+    if (cap > 0 && (await servedToday(c._id)) >= cap) continue;
     paced.push(c);
   }
-
-  // Weighted shuffle: one random draw per campaign, scaled by weight.
-  return paced
-    .map((c) => ({ c, key: Math.random() ** (1 / Math.max(1, c.weight)) }))
-    .sort((a, b) => b.key - a.key)
-    .slice(0, count)
-    .map((x) => x.c);
+  return paced;
 }
 
 /**
@@ -125,7 +151,7 @@ export function toAdCard(c: CampaignDoc, placement: number): AdCardDto {
     language: c.language,
     advertiser: c.advertiserName ?? 'Sponsor',
     headline: c.creative.headline,
-    body: c.creative.body,
+    body: c.creative.body ?? '',
     callToAction: c.creative.callToAction,
     landingUrl: c.creative.landingUrl,
     image: c.creative.image
@@ -141,13 +167,44 @@ export function toAdCard(c: CampaignDoc, placement: number): AdCardDto {
   };
 }
 
-export type FeedEntry = (ArticleCardDto & { kind: 'article' }) | AdCardDto;
+/**
+ * The small ad, for the story with this id.
+ *
+ * The id pairs the campaign with the story rather than with a position: the
+ * same story scrolled past twice is one impression, and two stories carrying
+ * the same campaign are two.
+ */
+export function toInlineAd(c: CampaignDoc, articleId: string): InlineAdDto {
+  return {
+    kind: 'inlineAd',
+    id: `inl_${c._id.toString()}_${articleId}`,
+    campaignId: c._id.toString(),
+    language: c.language,
+    advertiser: c.advertiserName ?? 'Sponsor',
+    text: c.creative.headline,
+    landingUrl: c.creative.landingUrl,
+    logo: c.creative.image
+      ? {
+          blurHash: c.creative.image.blurHash ?? null,
+          urls: {
+            sm: c.creative.image.urls.sm ?? null,
+            md: c.creative.image.urls.md ?? null,
+            lg: c.creative.image.urls.lg ?? null,
+          },
+        }
+      : null,
+  };
+}
+
+export type ArticleEntry = ArticleCardDto & { kind: 'article'; inlineAd?: InlineAdDto };
+export type FeedEntry = ArticleEntry | AdCardDto;
 
 /**
  * Interleave ads into a page of content.
  *
- * Content order is never changed — ads are inserted between cards, so the
- * editorial sequence and the diversity work upstream survive intact.
+ * Content order is never changed — full-card ads are inserted between cards
+ * and small ads ride on the cards they belong to, so the editorial sequence
+ * and the diversity work upstream survive intact.
  */
 export async function injectAds(
   articles: ArticleCardDto[],
@@ -157,32 +214,65 @@ export async function injectAds(
     pageOffset: number;
     density: AdDensityConfig;
     adsShownToday: number;
+    inline: Partial<InlineAdConfig>;
+    inlineShownToday: number;
+    /** Stories that must not carry a small ad: marked by an editor, or from a
+     *  publisher whose agreement does not allow it. */
+    inlineBlocked: ReadonlySet<string>;
+    rng?: Rng;
   },
-): Promise<{ entries: FeedEntry[]; adCount: number }> {
+): Promise<{ entries: FeedEntry[]; adCount: number; inlineCount: number }> {
+  const rng = opts.rng ?? Math.random;
   const density = clampDensity(opts.density);
-  const slots = adSlotsForPage(articles.length, opts.pageOffset, density, opts.adsShownToday);
 
-  if (slots.length === 0) {
-    return { entries: articles.map((a) => ({ ...a, kind: 'article' as const })), adCount: 0 };
-  }
+  const cardSlots = adSlotsForPage(articles.length, opts.pageOffset, density, opts.adsShownToday);
+  const inlineSlots = inlineSlotsForPage(
+    articles.length,
+    opts.pageOffset,
+    opts.inline,
+    opts.inlineShownToday,
+  ).filter((i) => !opts.inlineBlocked.has(articles[i]!.id));
 
-  const picked = await selectCampaigns(opts.languages, opts.categorySlug, slots.length);
+  const plain = (): { entries: FeedEntry[]; adCount: number; inlineCount: number } => ({
+    entries: articles.map((a) => ({ ...a, kind: 'article' as const })),
+    adCount: 0,
+    inlineCount: 0,
+  });
+
+  if (cardSlots.length === 0 && inlineSlots.length === 0) return plain();
+
+  const eligible = await eligibleCampaigns(opts.languages, opts.categorySlug);
+  if (eligible.length === 0) return plain();
+
+  /* ---- full-card: distinct per page ---------------------------------------- */
   // Fewer campaigns than slots simply means fewer ads. An empty slot is left
-  // empty rather than filled with a repeat — showing the same ad twice on one
+  // empty rather than filled with a repeat — the same poster twice on one
   // screen reads as a bug and annoys the advertiser as much as the reader.
-  if (picked.length === 0) {
-    return { entries: articles.map((a) => ({ ...a, kind: 'article' as const })), adCount: 0 };
-  }
+  const cardPool = servingPool(eligible.filter((c) => placementOf(c) === 'card'));
+  const cardPicks = pickDistinctWeighted(cardPool, cardSlots.length, rng);
+  const cardAt = new Map<number, CampaignDoc>();
+  cardSlots.slice(0, cardPicks.length).forEach((slot, i) => cardAt.set(slot, cardPicks[i]!));
 
-  const slotSet = new Map<number, CampaignDoc>();
-  slots.slice(0, picked.length).forEach((slot, i) => slotSet.set(slot, picked[i]!));
+  /* ---- small ad: interleaved across the page's stories ---------------------- */
+  // Each advertiser gets its share of voice of this page's small ads to within
+  // one, spread out rather than clumped. Why not independent draws, and why not
+  // "never the same advertiser twice running": see interleaveWeighted.
+  const inlinePool = servingPool(eligible.filter((c) => placementOf(c) === 'inline'));
+  const inlinePicks = interleaveWeighted(inlinePool, inlineSlots.length, rng);
+  const inlineAt = new Map<number, CampaignDoc>();
+  inlineSlots.slice(0, inlinePicks.length).forEach((slot, i) => inlineAt.set(slot, inlinePicks[i]!));
 
   const entries: FeedEntry[] = [];
   articles.forEach((a, i) => {
-    entries.push({ ...a, kind: 'article' as const });
-    const campaign = slotSet.get(i);
-    if (campaign) entries.push(toAdCard(campaign, opts.pageOffset + i + 1));
+    const inline = inlineAt.get(i);
+    entries.push({
+      ...a,
+      kind: 'article' as const,
+      ...(inline ? { inlineAd: toInlineAd(inline, a.id) } : {}),
+    });
+    const card = cardAt.get(i);
+    if (card) entries.push(toAdCard(card, opts.pageOffset + i + 1));
   });
 
-  return { entries, adCount: slotSet.size };
+  return { entries, adCount: cardAt.size, inlineCount: inlineAt.size };
 }

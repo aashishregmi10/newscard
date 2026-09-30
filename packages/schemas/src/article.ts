@@ -124,6 +124,14 @@ export const Article = z.object({
   // --- ingestion flags (Ch. 4.5, 4.6) ---
   possibleDuplicate: z.boolean().default(false),
   possibleLanguageMismatch: z.boolean().default(false),
+
+  /**
+   * No small ad on this story. Set by an editor, for the story where an ad
+   * beside it would be wrong — a death toll, a disaster, a funeral. Checked by
+   * the feed when it attaches small ads; the full-card ad sits BETWEEN stories
+   * rather than on one, and is not affected.
+   */
+  adsSuppressed: z.boolean().optional(),
 });
 export type Article = z.infer<typeof Article>;
 

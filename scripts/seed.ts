@@ -11,7 +11,7 @@
 
 import 'dotenv/config';
 import { ObjectId } from 'mongodb';
-import { connect, close, collections } from '@saar/db';
+import { applyValidators, connect, close, collections } from '@saar/db';
 import { MVP_CATEGORIES, DEFAULT_CONFIG } from '@saar/schemas';
 import { countGraphemes, countWords } from '@saar/shared';
 import { hash as argonHash } from '@node-rs/argon2';
@@ -49,6 +49,18 @@ const minsAgo = (m: number) => new Date(NOW - m * 60_000);
 
 async function main(): Promise<void> {
   const db = await connect({ uri: uri! });
+
+  /*
+   * The current validators, before anything is written.
+   *
+   * Seeding inserts a staff account, and a database whose staff validator
+   * predates the removal of roles would refuse one without a `role`. Applying
+   * validators cannot fail on existing data — they govern writes — so this is
+   * safe on any database, unlike a full `db:init`, whose index sync stops on
+   * data an index would reject.
+   */
+  await applyValidators(db);
+
   const c = collections(db);
   console.log(`seeding ${db.databaseName}`);
   console.log(`image base: ${CDN_BASE}`);

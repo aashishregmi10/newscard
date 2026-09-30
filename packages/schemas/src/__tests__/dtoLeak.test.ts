@@ -23,6 +23,12 @@ const INTERNAL_FIELDS = [
   'clusterId',
   'summaryWordCount',
   'summaryCharCount',
+  // Who corrected a live story, when and why: the audit trail's business.
+  'lastEditedAt',
+  'lastEditedBy',
+  'lastEditReason',
+  // An editorial judgement about a story, not a fact about it.
+  'adsSuppressed',
 ];
 
 describe('card DTO does not leak internal fields', () => {

@@ -4,7 +4,7 @@ import { AppError, FEED_PAGE_SIZE } from '@saar/shared';
 import { LanguageEnum } from '@saar/schemas';
 import { getFeed } from '../services/feed.service.js';
 import { injectAds } from '../services/ads.service.js';
-import { DEFAULT_AD_DENSITY } from '@saar/shared';
+import { DEFAULT_AD_DENSITY, DEFAULT_INLINE_ADS } from '@saar/shared';
 import { asyncRoute } from '../middleware/index.js';
 import { loadEnv } from '../config/index.js';
 
@@ -25,8 +25,11 @@ const QuerySchema = z.object({
   /** Content cards the reader has already passed. Ad placement is a function
    *  of ABSOLUTE position, so this keeps spacing consistent across pages. */
   seen: z.coerce.number().int().nonnegative().default(0),
-  /** Ads already shown to this device today, for the daily cap. */
+  /** Full-card ads already shown to this device today, for the daily cap. */
   adsToday: z.coerce.number().int().nonnegative().default(0),
+  /** Small ads shown today. Counted separately: at one per story, sharing the
+   *  full-card counter would spend its allowance of twelve in twelve stories. */
+  inlineToday: z.coerce.number().int().nonnegative().default(0),
 });
 
 export const feedRoutes = Router();
@@ -55,19 +58,25 @@ feedRoutes.get(
 
     // Ads are interleaved AFTER the content page is built, so editorial order
     // and source diversity survive untouched.
-    const { entries, adCount } = await injectAds(result.items, {
+    const { inlineBlocked, ...page } = result;
+    const { entries, adCount, inlineCount } = await injectAds(page.items, {
       languages: lang,
       categorySlug: category,
       pageOffset: parsed.data.seen,
       density: DEFAULT_AD_DENSITY,
       adsShownToday: parsed.data.adsToday,
+      inline: DEFAULT_INLINE_ADS,
+      inlineShownToday: parsed.data.inlineToday,
+      inlineBlocked,
     });
 
     // Personalised by ad allowance, so this response is NOT shared cache-safe.
     res.setHeader(
       'Cache-Control',
-      adCount > 0 ? 'private, max-age=30' : 'public, max-age=60, stale-while-revalidate=300',
+      adCount > 0 || inlineCount > 0
+        ? 'private, max-age=30'
+        : 'public, max-age=60, stale-while-revalidate=300',
     );
-    res.json({ ...result, items: entries, adCount });
+    res.json({ ...page, items: entries, adCount, inlineCount });
   }),
 );
