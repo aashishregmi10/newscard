@@ -56,14 +56,14 @@ export const LINE_HEIGHT = { ne: 1.7, en: 1.55 } as const;
  *
  * Every font size in the app is a base size passed through textSize() — the
  * story type scale below and every size in every component — so none can be
- * left behind. Raised to 1.25 because the app read small; to change it again,
- * change it here.
+ * left behind. Raised to 1.25 because the app read small, then brought down
+ * 15% from there (1.25 × 0.85 = 1.0625). To change it again, change it here.
  *
  * It sits UNDER the reader’s own text-size setting (TEXT_SCALE, below) and
  * the phone’s font scale, which still multiply on top: this is the default
  * size, not a cap.
  */
-export const BASE_TEXT_SCALE = 1.25;
+export const BASE_TEXT_SCALE = 1.0625;
 
 /** A base text size at the app’s text scale, to the nearest half point. */
 export function textSize(base: number): number {

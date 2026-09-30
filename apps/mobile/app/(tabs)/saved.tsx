@@ -90,7 +90,7 @@ export default function SavedScreen() {
                   <Text
                     style={[
                       styles.rowHead,
-                      { color: theme.textPrimary, lineHeight: item.language === 'ne' ? 23 : 20 },
+                      { color: theme.textPrimary, lineHeight: item.language === 'ne' ? textSize(23) : textSize(20) },
                     ]}
                     numberOfLines={3}
                   >
