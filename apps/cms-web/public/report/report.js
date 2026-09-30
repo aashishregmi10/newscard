@@ -57,6 +57,22 @@
     return n;
   }
 
+  /** Paisa to rupees, grouped the way prices are read in Nepal: Rs 1,50,000. */
+  function money(paisa) {
+    if (paisa === null || paisa === undefined) return '—';
+    var rupees = paisa / 100;
+    var whole = rupees === Math.round(rupees);
+    return 'Rs ' + rupees.toLocaleString('en-IN', {
+      minimumFractionDigits: whole ? 0 : 2,
+      maximumFractionDigits: whole ? 0 : 2,
+    });
+  }
+
+  var PLACEMENT = {
+    card: 'Full-card ad — your poster, between stories',
+    inline: 'Small ad — beside the share button on stories',
+  };
+
   function metric(value, label, note) {
     var box = el('div', 'metric');
     box.appendChild(el('div', 'value', value));
@@ -98,6 +114,8 @@
         'muted',
         r.advertiser +
           ' · ' +
+          (PLACEMENT[r.placement] || PLACEMENT.card) +
+          ' · ' +
           shortDate(r.period.from) +
           ' to ' +
           shortDate(r.period.to),
@@ -124,8 +142,12 @@
     );
     c.appendChild(grid);
 
-    // Goal progress. Shown as a bar because "3% of 50,000" is a sentence people
-    // have to decode, and a bar is not.
+    // Goal progress, for a campaign that was sold with a view target. Most are
+    // sold by time and have none, and "12 of null" is not a sentence.
+    if (d.goal === null || d.goal === undefined) return c;
+
+    // Shown as a bar because "3% of 50,000" is a sentence people have to
+    // decode, and a bar is not.
     var goal = el('div');
     goal.style.marginTop = '18px';
     goal.appendChild(
@@ -143,6 +165,55 @@
     goal.appendChild(el('p', 'muted', pct(d.completionRate) + ' of the campaign delivered'));
     c.appendChild(goal);
 
+    return c;
+  }
+
+  /**
+   * What was paid, and what it bought.
+   *
+   * Advertising is sold by time, and how often an ad is shown depends on its
+   * price per day against everyone else running in the same place. So the
+   * page says both: the share of voice the price buys, and the share of views
+   * it actually received — which should match, and is shown so anyone can
+   * check that it does.
+   */
+  function renderPaid(r) {
+    var p = r.paid;
+    var v = r.value;
+    if (!p) return null;
+    var c = card('What you paid for');
+    var grid = el('div', 'grid');
+    grid.appendChild(
+      metric(money(p.pricePaisa), 'Price', p.daysElapsed + ' of ' + p.days + ' days run so far'),
+    );
+    grid.appendChild(metric(money(p.pricePerDayPaisa), 'Per day', 'The price divided by the days booked'));
+    grid.appendChild(
+      metric(
+        p.shareOfVoiceNow === null ? '—' : pct(p.shareOfVoiceNow),
+        'Share of voice now',
+        p.shareOfVoiceNow === null
+          ? 'Your campaign is not running today'
+          : 'Of this placement’s ads, what your price per day buys today',
+      ),
+    );
+    grid.appendChild(
+      metric(
+        pct(r.delivery.deliveredShare),
+        'Share delivered',
+        'Of every view in this placement over the period, how many were yours',
+      ),
+    );
+    if (v) {
+      grid.appendChild(
+        metric(
+          money(v.costPerThousandViewsPaisa),
+          'Cost per 1,000 views',
+          money(v.spentToDatePaisa) + ' of the price has run',
+        ),
+      );
+      grid.appendChild(metric(money(v.costPerClickPaisa), 'Cost per click', 'The price so far ÷ clicks'));
+    }
+    c.appendChild(grid);
     return c;
   }
 
@@ -320,8 +391,24 @@
         'Distinct devices, which is not the same as distinct people — one person with two phones counts twice, and a shared phone counts once. We do not track individuals, so this is the honest upper bound.',
       ],
       [
-        'How often your ad can appear',
-        'At most one ad per ten cards, never before the fourth card of a session, and a fixed daily limit per reader. This is a fixed policy rather than a setting, which is why delivery is steady rather than spiky.',
+        'Share of voice',
+        'Ads are sold by time. Your share of a placement is your price per day divided by the total per day of every campaign running there, so paying twice as much per day means being shown twice as often. It changes as other campaigns start and end, which is why it is shown for today.',
+      ],
+      [
+        'Share delivered',
+        'Of every view of that placement over the period, the share that was yours. It should track your share of voice; where it is lower, it is usually because your campaign targets a language or section that some readers do not open.',
+      ],
+      [
+        'Cost per 1,000 views',
+        'The part of your price for the days that have run, divided by the views so far. The same figure advertisers compare between publications.',
+      ],
+      [
+        'Where a full-card ad appears',
+        'Between stories: at most one in every ten cards, never before the fourth card of a session, and a fixed daily limit per reader. This is a fixed policy rather than a setting, which is why delivery is steady rather than spiky.',
+      ],
+      [
+        'Where a small ad appears',
+        'On stories themselves, beside the share button, always labelled as an ad. Editors can keep it off a story where an ad would be out of place — a disaster, a death — and publishers can keep it off their reporting.',
       ],
     ];
 
@@ -338,6 +425,7 @@
     reportEl.textContent = '';
     [
       renderHeader(r),
+      renderPaid(r),
       renderDelivery(r),
       renderEngagement(r),
       renderReach(r),

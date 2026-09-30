@@ -129,9 +129,16 @@ function Home() {
       <section className="site-panel">
         <h2>For advertisers</h2>
         <p>
-          At most one sponsored card in ten, never before the fourth card of a session, and twelve
-          a day. Those limits are enforced on our servers, so no future release can quietly raise
-          them.
+          Two formats, sold by time. A <strong>full-card ad</strong> puts your poster on a card of
+          its own between stories: at most one card in ten, never before the fourth card of a
+          session, and twelve a day. A <strong>small ad</strong> sits on stories themselves,
+          beside the share button, always labelled as an ad. Those limits are enforced on our
+          servers, so no future release can quietly raise them.
+        </p>
+        <p>
+          How often your ad is shown follows what you pay per day: twice the price per day means
+          twice the share of that format. Your report shows the share you paid for beside the
+          share you received.
         </p>
         <p>
           Campaign reporting is open to you without an account:{' '}

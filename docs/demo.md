@@ -95,16 +95,34 @@ That last beat is the demo. Everything before it is description.
 cover frame while you write the title, then saves as a draft and publishes.
 Withdrawing it removes it from the reader's feed immediately.
 
-### 5 · Advertising (2 minutes)
+### 5 · Advertising (3 minutes)
 
-- Scroll the feed until a **sponsored card** appears. Labelled, tinted, with the
-  advertiser named — and at most one in ten cards, never before the fourth card
-  of a session, twelve a day. Those limits are enforced on the server, so a
-  future build cannot quietly raise them.
-- Open the **advertiser report** at `http://localhost:5173/report/`. Delivery,
-  viewability against a one-second threshold, click-through, and dwell — broken
-  down by section and day. It opens on a per-campaign token, so an advertiser
-  gets a link rather than an account, and sees nothing about any reader.
+**Advertising** in the sidebar.
+
+- The two panels at the top are the two things we sell: the **full-card ad**
+  (a poster between stories) and the **small ad** (beside share, on stories).
+  Each bar is a campaign's **share of voice** — its price per day over the
+  total per day of everyone running in that placement. Pay twice as much per
+  day, get shown twice as often.
+- **New campaign**: type a price and the share of voice it would buy appears
+  beside it, before anything is saved. The phone preview on the right is drawn
+  from the same fields the app receives.
+- Open a running campaign: what it paid, the share it paid for beside the share
+  it actually got, views, clicks, and cost per 1,000 views. **Issue a report
+  link** shows the advertiser's token once.
+- On the phone: a **small ad** sits beside share on every story, labelled
+  "Ad" / "विज्ञापन"; the **poster card** appears at most one card in ten,
+  never before the fourth, twelve a day. Tap either and it opens outside the app.
+  Those limits are enforced on the server, so a future build cannot quietly
+  raise them.
+- Open the **advertiser report** at `http://localhost:5173/report/` with that
+  campaign ID and token. What they paid for, delivery, viewability against a
+  one-second threshold, click-through, reach and cost — an advertiser gets a
+  link rather than an account, and sees nothing about any reader.
+
+Seeded demo data has both placements. On a database you did not seed, create a
+small-ad campaign from **New campaign** before showing it — without one,
+stories carry no small ad.
 
 ### 6 · Notifications (2 minutes) — *needs a development build*
 
@@ -140,9 +158,9 @@ Say these plainly if asked; none of them is a defect.
   cannot receive remote push on Android since SDK 53. Until a build is installed
   and permission granted, `demo:check` will warn that no device holds a token,
   and the CMS Reach panel will read 0.
-- **Search, automated ingestion, the advertiser portal, editorial analytics,
-  personalised ordering, the home-screen widget and iOS** are Phase 2 and are
-  not built. The clustering you can see in the queue is seeded rather than
+- **Search, editorial analytics, personalised ordering, the home-screen widget
+  and iOS** are Phase 2 and are not built. (Advertisers deliberately have no
+  account: their report is the public page above.) The clustering you can see in the queue is seeded rather than
   computed from live feeds.
 - **Quiet hours.** Between 21:30 and 06:30 Nepal time a live send is held or
   suppressed by design. Demonstrating push in the evening means using the

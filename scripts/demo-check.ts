@@ -182,10 +182,27 @@ async function main(): Promise<void> {
   // condition a casual check misses.
   const adFeed = await get(`${API}/v1/feed?category=top&lang=ne,en&limit=20&seen=10&adsToday=0`);
   if (adFeed?.ok) {
-    const body = (await adFeed.json()) as { items: Array<{ kind?: string }> };
+    const body = (await adFeed.json()) as {
+      items: Array<{ kind?: string; inlineAd?: { advertiser?: string } }>;
+    };
     const ads = body.items.filter((i) => i.kind === 'ad').length;
     if (ads > 0) ok('sponsored cards appear in the feed', `${ads} in 20`);
     else warn('no sponsored card in a 20-card page', 'check campaign flight dates and daily cap');
+
+    /* The small ad rides on stories, beside share. Absent is not a fault — it
+       means no small-ad campaign is running — but it is the one thing a demo of
+       advertising would otherwise discover in front of the client. */
+    const stories = body.items.filter((i) => i.kind !== 'ad');
+    const carrying = stories.filter((i) => i.inlineAd).length;
+    if (carrying > 0) {
+      const who = [...new Set(stories.map((i) => i.inlineAd?.advertiser).filter(Boolean))];
+      ok('small ads ride on stories', `${carrying} of ${stories.length} · ${who.join(', ')}`);
+    } else {
+      warn(
+        'no story carries a small ad',
+        'no small-ad campaign is running — create one in Advertising → New campaign',
+      );
+    }
   } else bad('the ad-bearing feed request failed');
 
   const vids = await get(`${API}/v1/videos?limit=5`);

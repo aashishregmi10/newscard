@@ -9,7 +9,17 @@
  *
  * Creative images are the same synthetic gradients used for articles, tinted
  * differently so an ad is visually distinguishable at a glance even before the
- * "Sponsored" label is read.
+ * "Sponsored" label is read. They are landscape, where a real advertiser would
+ * supply a portrait poster; the card shows either whole.
+ *
+ * ── Both placements, sold by time ──
+ *
+ * Every campaign runs the same 37 days, so its share of voice is simply its
+ * price over the placement’s total: the full-card shares come out 43/29/17/11,
+ * and the small ads 40/40/20 across the placement — enough spread to see the
+ * weighting work on a phone. Each reader draws only from campaigns in their own
+ * languages, so an English-only reader sees the two English small ads at 67/33.
+ * The house ads (price 0) appear only where no paying small ad is eligible.
  *
  * Run: npm run db:seed  (invoked automatically)
  */
@@ -22,15 +32,16 @@ interface DemoCampaign {
   advertiser: string;
   advertiserDisplay: string;
   name: string;
+  placement: 'card' | 'inline';
   language: 'ne' | 'en';
   categories: string[];
+  /** Full card: the one-line description. Small ad: the words on the pill,
+   *  24 characters at most. */
   headline: string;
-  body: string;
+  body: string | null;
   cta: { ne: string; en: string };
-  impressionGoal: number;
-  dailyCap: number;
+  /** For the whole flight. The weight is this per day. */
   pricePaisa: number;
-  weight: number;
 }
 
 const CAMPAIGNS: DemoCampaign[] = [
@@ -38,57 +49,111 @@ const CAMPAIGNS: DemoCampaign[] = [
     advertiser: 'namuna-bank',
     advertiserDisplay: 'नमुना बैंक',
     name: 'Savings account — Dashain',
+    placement: 'card',
     language: 'ne',
     categories: ['business', 'nepal'],
     headline: 'बचत खातामा नयाँ ब्याजदर',
     body: 'नमुना बैंकले बचत खाताको ब्याजदर पुनरावलोकन गरेको छ। नयाँ दर यही महिनादेखि लागू हुनेछ। विस्तृत जानकारीका लागि नजिकैको शाखामा सम्पर्क गर्नुहोस्।',
     cta: { ne: 'थप जान्नुहोस्', en: 'Learn more' },
-    impressionGoal: 50_000,
-    dailyCap: 2_000,
     pricePaisa: 4_500_00,
-    weight: 30,
   },
   {
     advertiser: 'sample-telecom',
     advertiserDisplay: 'Sample Telecom',
     name: 'Data pack launch',
+    placement: 'card',
     language: 'en',
     categories: ['tech'],
     headline: 'A data pack sized for a month of reading',
     body: 'Sample Telecom has introduced a monthly data pack aimed at light users. It covers messaging, browsing and news, and carries over unused data for thirty days.',
     cta: { ne: 'हेर्नुहोस्', en: 'See the pack' },
-    impressionGoal: 30_000,
-    dailyCap: 1_500,
     pricePaisa: 3_000_00,
-    weight: 20,
   },
   {
     advertiser: 'namuna-shikshya',
     advertiserDisplay: 'नमुना शिक्षा केन्द्र',
     name: 'Exam preparation intake',
+    placement: 'card',
     language: 'ne',
     categories: [], // all categories
     headline: 'लोक सेवा तयारी कक्षा सुरु',
     body: 'नमुना शिक्षा केन्द्रले लोक सेवा तयारी कक्षाको नयाँ समूह सुरु गर्दैछ। बिहान र साँझ दुवै समयमा कक्षा सञ्चालन हुनेछ। सीमित सिट उपलब्ध छ।',
     cta: { ne: 'भर्ना खुल्यो', en: 'Enrol now' },
-    impressionGoal: 20_000,
-    dailyCap: 800,
     pricePaisa: 1_800_00,
-    weight: 15,
   },
   {
     advertiser: 'sample-trek',
     advertiserDisplay: 'Sample Trekking Co.',
     name: 'Autumn season',
+    placement: 'card',
     language: 'en',
     categories: ['sports', 'world'],
     headline: 'Autumn routes are open for booking',
     body: 'Sample Trekking Co. has opened bookings for the autumn season. Permits, guides and porters are arranged in advance, and group departures run weekly from Kathmandu.',
     cta: { ne: 'बुक गर्नुहोस्', en: 'Book a trip' },
-    impressionGoal: 15_000,
-    dailyCap: 600,
     pricePaisa: 1_200_00,
-    weight: 10,
+  },
+
+  /* ---- small ads, beside share on every story ---------------------------- */
+  {
+    advertiser: 'namuna-bank',
+    advertiserDisplay: 'नमुना बैंक',
+    name: 'Savings — small ad',
+    placement: 'inline',
+    language: 'ne',
+    categories: [],
+    headline: 'नमुना बैंक · नयाँ ब्याजदर',
+    body: null,
+    cta: { ne: '', en: '' },
+    pricePaisa: 3_700_00,
+  },
+  {
+    advertiser: 'sample-telecom',
+    advertiserDisplay: 'Sample Telecom',
+    name: 'Data pack — small ad',
+    placement: 'inline',
+    language: 'en',
+    categories: [],
+    headline: 'Telecom · Data pack',
+    body: null,
+    cta: { ne: '', en: '' },
+    pricePaisa: 3_700_00,
+  },
+  {
+    advertiser: 'sample-trek',
+    advertiserDisplay: 'Sample Trekking Co.',
+    name: 'Autumn — small ad',
+    placement: 'inline',
+    language: 'en',
+    categories: [],
+    headline: 'Autumn treks · Book now',
+    body: null,
+    cta: { ne: '', en: '' },
+    pricePaisa: 1_850_00,
+  },
+  {
+    advertiser: 'saar-house',
+    advertiserDisplay: 'SAAR',
+    name: 'House — advertise with us (ne)',
+    placement: 'inline',
+    language: 'ne',
+    categories: [],
+    headline: 'यहाँ विज्ञापन गर्नुहोस्',
+    body: null,
+    cta: { ne: '', en: '' },
+    pricePaisa: 0,
+  },
+  {
+    advertiser: 'saar-house',
+    advertiserDisplay: 'SAAR',
+    name: 'House — advertise with us (en)',
+    placement: 'inline',
+    language: 'en',
+    categories: [],
+    headline: 'Advertise with SAAR',
+    body: null,
+    cta: { ne: '', en: '' },
+    pricePaisa: 0,
   },
 ];
 
@@ -133,8 +198,11 @@ export async function seedAds(
     }
 
     // Ad creatives get their own tint so an ad is distinguishable from a story
-    // at a glance, before the "Sponsored" label is even read.
-    const img = generateFor(`ad-${c.advertiser}-${c.name}`, 'business', cdnBase);
+    // at a glance, before the "Sponsored" label is even read. Small ads carry no
+    // logo here: a generated gradient at 14px is noise, not a logo.
+    const img = c.placement === 'card'
+      ? generateFor(`ad-${c.advertiser}-${c.name}`, 'business', cdnBase)
+      : null;
 
     // Issued once, handed to the advertiser, stored only as a hash — the same
     // rule as device tokens. A database dump yields no working report links.
@@ -149,26 +217,26 @@ export async function seedAds(
       advertiserName: c.advertiserDisplay,
       name: c.name,
       status: 'live',
+      placement: c.placement,
       language: c.language,
       categories: c.categories,
       startsAt,
       endsAt,
-      impressionGoal: c.impressionGoal,
-      dailyImpressionCap: c.dailyCap,
       pricePaisa: c.pricePaisa,
-      weight: c.weight,
       creative: {
         headline: c.headline,
         body: c.body,
         callToAction: c.cta,
         landingUrl: `https://example.invalid/${c.advertiser}`,
-        image: {
-          credit: null,
-          blurHash: img.blurHash,
-          width: img.width,
-          height: img.height,
-          urls: img.urls,
-        },
+        image: img
+          ? {
+              credit: null,
+              blurHash: img.blurHash,
+              width: img.width,
+              height: img.height,
+              urls: img.urls,
+            }
+          : null,
       },
       stats: { impressions: 0, viewableImpressions: 0, clicks: 0 },
       reportTokenHash: createHash('sha256').update(reportToken).digest('hex'),
