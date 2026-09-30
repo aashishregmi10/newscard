@@ -46,6 +46,15 @@ import { Banner, Button, Field, FileDrop, Icon, Listbox } from '../ui';
  * right trade against the alternative, an image that is wrong for a year on
  * every phone that cached it. The attached picture stays attached until the new
  * upload succeeds, so a replacement the editor abandons changes nothing.
+ *
+ * -- Why the parent is told about a chosen, unsent file ----------------------
+ *
+ * The chosen state shows the picture full size, which looks exactly like a
+ * picture that is on the story. An editor chose one, went on to Submit,
+ * Approve and Publish, and the story went live with no image: the file was
+ * never uploaded, and nothing said so. `onPendingChange` lets the screen
+ * refuse to move the story on while a file is waiting, and the chosen state
+ * now says "Not attached yet" in words.
  */
 
 /** The server's floor, in packages/media/src/images.ts. See the note above. */
@@ -63,10 +72,19 @@ interface Props {
   image: ArticleImageData | null;
   disabled: boolean;
   onChange: (image: ArticleImageData | null) => void;
+  /** True while a file is chosen but not yet uploaded and attached. */
+  onPendingChange?: (pending: boolean) => void;
 }
 
-export function ImagePicker({ image, disabled, onChange }: Props) {
+export function ImagePicker({ image, disabled, onChange, onPendingChange }: Props) {
   const [picked, setPicked] = useState<Picked | null>(null);
+
+  const pending = picked !== null;
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [pending, onPendingChange]);
+  // A picker that has gone away is holding nothing back.
+  useEffect(() => () => onPendingChange?.(false), [onPendingChange]);
   const [replacing, setReplacing] = useState(false);
   const [credit, setCredit] = useState('');
   const [licence, setLicence] = useState<ImageLicence>('agency');
@@ -175,6 +193,9 @@ export function ImagePicker({ image, disabled, onChange }: Props) {
           <figure className="media-edit-figure">
             <img className="media-preview" src={picked.url} alt="" />
             <figcaption className="meta-line">
+              <span className="media-pending">
+                <Icon name="alertCircle" /> Not attached yet
+              </span>
               <span>{picked.file.name}</span>
               <span>{fileSize(picked.file.size)}</span>
               {picked.width !== null && picked.height !== null && (

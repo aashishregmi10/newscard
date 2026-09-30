@@ -95,6 +95,8 @@ export function EditPublished({ id }: { id: string }) {
   const [summary, setSummary] = useState('');
   const [image, setImage] = useState<ArticleImageData | null>(null);
   const [reason, setReason] = useState('');
+  /** A picture chosen but not yet uploaded, which Save would otherwise leave off. */
+  const [imagePending, setImagePending] = useState(false);
   const [confirmingWithdraw, setConfirmingWithdraw] = useState(false);
 
   const action = useAsyncAction();
@@ -208,11 +210,14 @@ export function EditPublished({ id }: { id: string }) {
   const headlineShort = headline.trim().length < HEADLINE_MIN;
   const reasonReady = reason.trim().length >= REASON_MIN;
 
-  const canSave = dirty && reasonReady && state === 'ok' && !headlineShort && !action.busy;
+  const canSave =
+    dirty && reasonReady && state === 'ok' && !headlineShort && !imagePending && !action.busy;
 
   /* Why Save is unavailable, in words — the same rule the composer follows
      rather than a tooltip on a disabled button. */
-  const blocker = !dirty
+  const blocker = imagePending
+    ? 'A picture is chosen but not attached. Press "Upload and attach", or Cancel it.'
+    : !dirty
     ? 'Nothing has changed yet.'
     : headlineShort
       ? `The headline needs at least ${HEADLINE_MIN} characters.`
@@ -339,7 +344,12 @@ export function EditPublished({ id }: { id: string }) {
           {/* Held on this screen until Save, unlike the composer, which attaches
               an upload the moment it finishes. A picture swapped on a live
               story is a correction like any other, and needs the same reason. */}
-          <ImagePicker image={image} disabled={action.busy} onChange={setImage} />
+          <ImagePicker
+            image={image}
+            disabled={action.busy}
+            onChange={setImage}
+            onPendingChange={setImagePending}
+          />
 
           <div className="edit-reason">
             <h3 className="edit-reason-title">Reason for this change</h3>

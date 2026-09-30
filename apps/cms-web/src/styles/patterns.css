@@ -797,6 +797,21 @@
   margin-bottom: var(--s4);
 }
 
+/* A chosen picture that is not on the story yet — the same place and shape
+   as "Attached", so the difference between the two is the words and colour. */
+.media-pending {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--bad);
+  font-weight: 600;
+}
+
+.media-pending svg {
+  width: 14px;
+  height: 14px;
+}
+
 .media-attached {
   display: inline-flex;
   align-items: center;

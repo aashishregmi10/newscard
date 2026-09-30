@@ -129,6 +129,11 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
   const [summary, setSummary] = useState('');
   const [image, setImage] = useState<ArticleImageData | null>(null);
   const [save, setSave] = useState<SaveState>('idle');
+  /** A picture chosen in the picker but not yet uploaded — see ImagePicker. */
+  const imagePending = useRef(false);
+  const setImagePending = useCallback((p: boolean) => {
+    imagePending.current = p;
+  }, []);
 
   const action = useAsyncAction();
 
@@ -252,6 +257,15 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
    */
   const act = useCallback(
     async (work: () => Promise<unknown>, okMessage: string) => {
+      // A chosen picture that was never uploaded would be silently left off
+      // the story. Say so and move nothing, rather than publish without it.
+      if (imagePending.current) {
+        action.setError(
+          'You chose a picture but it is not attached yet. Fill in its credit and press "Upload and attach", or press Cancel to go on without it.',
+        );
+        return;
+      }
+
       if (timer.current !== null) {
         clearTimeout(timer.current);
         timer.current = null;
@@ -454,6 +468,7 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
           <ImagePicker
             image={image}
             disabled={action.busy || locked}
+            onPendingChange={setImagePending}
             onChange={(next) => {
               setImage(next);
               void persist({ image: next });
