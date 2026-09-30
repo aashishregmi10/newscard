@@ -105,6 +105,17 @@ export const SOURCES_PER_PAGE: PerPage = 10;
 export const SHORTS_PER_PAGE: PerPage = 10;
 
 /**
+ * The campaign list’s tabs. A campaign’s place among them follows from its
+ * status and its dates — see ads.routes.ts — rather than a stored label that
+ * would go stale at midnight.
+ */
+export const AD_TABS = ['running', 'scheduled', 'paused', 'finished', 'draft'] as const;
+export type AdTab = (typeof AD_TABS)[number];
+
+/** Ten, like every other list here. */
+export const ADS_PER_PAGE: PerPage = 10;
+
+/**
  * The tabs on the publishers list.
  *
  * Licence status is not an attribute of a publisher — it is the question you
@@ -157,6 +168,10 @@ export type Route =
   | { name: 'article'; id: string; tab: ArticleTab }
   | { name: 'shorts'; page: number }
   | { name: 'shortEdit'; id: string }
+  | { name: 'ads'; tab: AdTab; page: number }
+  | { name: 'adNew' }
+  | { name: 'ad'; id: string }
+  | { name: 'advertisers' }
   | { name: 'shortNew' }
   | { name: 'sources'; tab: LicenceTab; page: number; q: string }
   | { name: 'sourceNew' }
@@ -167,7 +182,14 @@ export type Route =
   | { name: 'notifications'; tab: NotifyTab };
 
 /** The top-level sections the rail offers. Every route belongs to one. */
-export type Section = 'queue' | 'published' | 'leads' | 'shorts' | 'sources' | 'notifications';
+export type Section =
+  | 'queue'
+  | 'published'
+  | 'leads'
+  | 'shorts'
+  | 'sources'
+  | 'ads'
+  | 'notifications';
 
 /**
  * Constructors, so a caller never has to remember the defaults.
@@ -195,6 +217,14 @@ export const Routes = {
   }),
   shortNew: (): Route => ({ name: 'shortNew' }),
   shortEdit: (id: string): Route => ({ name: 'shortEdit', id }),
+  ads: (params: { tab?: AdTab; page?: number } = {}): Route => ({
+    name: 'ads',
+    tab: params.tab ?? 'running',
+    page: params.page ?? 1,
+  }),
+  adNew: (): Route => ({ name: 'adNew' }),
+  ad: (id: string): Route => ({ name: 'ad', id }),
+  advertisers: (): Route => ({ name: 'advertisers' }),
   sources: (params: { tab?: LicenceTab; page?: number; q?: string } = {}): Route => ({
     name: 'sources',
     tab: params.tab ?? 'all',
@@ -298,6 +328,21 @@ export function parseRoute(hash: string): Route {
     }
   }
 
+  if (section === 'ads') {
+    return Routes.ads({ tab: readAdTab(query), page: readPage(query) });
+  }
+  /* Both before the generic id branch, as `queue/new` is — a campaign can
+     never be called "new" or "advertisers", but the order makes that moot. */
+  if (section === 'ads/new') return Routes.adNew();
+  if (section === 'ads/advertisers') return Routes.advertisers();
+  if (section.startsWith('ads/')) {
+    const rest = path.slice('ads/'.length);
+    if (rest !== '' && !rest.includes('/')) {
+      const id = decodeSegment(rest);
+      if (id !== '') return Routes.ad(id);
+    }
+  }
+
   if (section === 'published') {
     return Routes.published({ tab: readPublishedTab(query), page: readPage(query) });
   }
@@ -396,6 +441,17 @@ export function routeToHash(route: Route): string {
       return `#/sources/${encodeURIComponent(route.slug)}`;
     case 'publishedEdit':
       return `#/published/${encodeURIComponent(route.id)}`;
+    case 'ads':
+      return withQuery('#/ads', {
+        tab: route.tab === 'running' ? null : route.tab,
+        page: route.page === 1 ? null : String(route.page),
+      });
+    case 'adNew':
+      return '#/ads/new';
+    case 'ad':
+      return `#/ads/${encodeURIComponent(route.id)}`;
+    case 'advertisers':
+      return '#/ads/advertisers';
     case 'published':
       return withQuery('#/published', {
         tab: route.tab === 'published' ? null : route.tab,
@@ -442,6 +498,11 @@ export function sectionOf(route: Route): Section {
     case 'published':
     case 'publishedEdit':
       return 'published';
+    case 'ads':
+    case 'adNew':
+    case 'ad':
+    case 'advertisers':
+      return 'ads';
     case 'leads':
       return 'leads';
     case 'notifications':
@@ -487,6 +548,14 @@ export function screenKeyOf(route: Route): string {
       return `published:${route.tab}`;
     case 'publishedEdit':
       return `publishedEdit:${route.id}`;
+    case 'ads':
+      return `ads:${route.tab}`;
+    case 'adNew':
+      return 'adNew';
+    case 'ad':
+      return `ad:${route.id}`;
+    case 'advertisers':
+      return 'advertisers';
     case 'leads':
       return `leads:${route.tab}`;
     case 'notifications':
@@ -572,6 +641,11 @@ function readQuery(query: URLSearchParams): string {
 function readTab(query: URLSearchParams): ArticleTab {
   const raw = (query.get('tab') ?? '').toLowerCase();
   return ARTICLE_TABS.find((tab) => tab === raw) ?? 'source';
+}
+
+function readAdTab(query: URLSearchParams): AdTab {
+  const raw = (query.get('tab') ?? '').toLowerCase();
+  return AD_TABS.find((tab) => tab === raw) ?? 'running';
 }
 
 function readPublishedTab(query: URLSearchParams): PublishedTab {

@@ -54,6 +54,7 @@ const SECTIONS: readonly RailSection[] = [
   { section: 'published', route: Routes.published(), label: 'Published', icon: 'checkCircle' },
   { section: 'shorts', route: Routes.shorts(), label: 'Shorts', icon: 'video' },
   { section: 'sources', route: Routes.sources(), label: 'Publishers', icon: 'newspaper' },
+  { section: 'ads', route: Routes.ads(), label: 'Advertising', icon: 'megaphone' },
   {
     section: 'notifications',
     route: Routes.notifications(),

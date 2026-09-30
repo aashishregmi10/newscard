@@ -38,8 +38,7 @@
     "test:mobile": "npm test --prefix apps/mobile",
     "demo:check": "tsx scripts/demo-check.ts",
     "demo:seed": "tsx scripts/seed-demo-queue.ts",
-    "demo": "node scripts/demo.mjs",
-    "ads:link": "tsx scripts/ads-report-link.ts"
+    "demo": "node scripts/demo.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",

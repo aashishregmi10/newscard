@@ -6,6 +6,7 @@ import multer from 'multer';
 import { AppError } from '@saar/shared';
 import { ImageLicenceEnum } from '@saar/schemas';
 import {
+  processAdImage,
   processImage,
   storeImage,
   transcodeShort,
@@ -128,6 +129,62 @@ mediaRoutes.post(
       image: {
         credit,
         licence: parsedLicence.data,
+        blurHash: stored.blurHash,
+        width: stored.width,
+        height: stored.height,
+        urls: stored.urls,
+      },
+    });
+  }),
+);
+
+/**
+ * POST /cms/media/ad-image?kind=poster|logo
+ *
+ * An advertiser's poster or logo. Not the photograph route, for two reasons:
+ *
+ *   It must not be cropped. processImage cuts everything to the story card's
+ *   16:9; a poster keeps its own shape and a logo is squared (processAdImage).
+ *
+ *   It carries no credit or licence question. Those exist because a news
+ *   photograph is someone else's work we are licensed to print; an advertiser's
+ *   own artwork is supplied by them, for their ad, under the agreement that
+ *   sold them the space.
+ */
+mediaRoutes.post(
+  '/cms/media/ad-image',
+  uploadLimit,
+  imageUpload.single('file'),
+  asyncRoute(async (req, res) => {
+    const file = req.file;
+    if (!file) throw new AppError('BAD_REQUEST', 'No file was uploaded.');
+
+    const kind = String(req.query.kind ?? '');
+    if (kind !== 'poster' && kind !== 'logo') {
+      throw new AppError('BAD_REQUEST', 'Say whether this is a poster or a logo.');
+    }
+
+    let stored;
+    try {
+      stored = await storeImage(await processAdImage(file.buffer, kind));
+    } catch (e) {
+      if (e instanceof ImageRejected) throw new AppError('VALIDATION_FAILED', e.message);
+      throw e;
+    }
+
+    await writeAudit({
+      action: 'media.adImage.upload',
+      entityType: 'media',
+      entityId: stored.key,
+      actorId: req.staff!.staffId,
+      actorEmail: req.staff!.email,
+      before: null,
+      after: { kind, bytes: file.size, originalName: file.originalname },
+      ip: req.ip ?? null,
+    });
+
+    res.status(201).json({
+      image: {
         blurHash: stored.blurHash,
         width: stored.width,
         height: stored.height,

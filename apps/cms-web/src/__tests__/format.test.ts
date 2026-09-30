@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { explainFailure, fileSize, humanise, plural, relativeTime } from '../lib/format';
+import { percent, rupees, explainFailure, fileSize, humanise, plural, relativeTime } from '../lib/format';
 
 /**
  * Formatting, at the boundaries.
@@ -130,5 +130,27 @@ describe('explainFailure', () => {
     expect(explainFailure('Plain.', { issues: [] })).toBe('Plain.');
     expect(explainFailure('Plain.', { issues: 'not an array' })).toBe('Plain.');
     expect(explainFailure('Plain.', { issues: [null, 7, { path: 'x' }] })).toBe('Plain.');
+  });
+});
+
+describe('rupees', () => {
+  it('groups in lakhs, the way a Kathmandu business reads a price', () => {
+    expect(rupees(150_000_00)).toBe('Rs 1,50,000');
+    expect(rupees(5_000_00)).toBe('Rs 5,000');
+    expect(rupees(0)).toBe('Rs 0');
+  });
+
+  it('shows paisa only when there are some', () => {
+    expect(rupees(142_857)).toBe('Rs 1,428.57');
+    expect(rupees(142_800)).toBe('Rs 1,428');
+  });
+});
+
+describe('percent', () => {
+  it('rounds large shares and keeps a decimal on small ones', () => {
+    expect(percent(0.619)).toBe('62%');
+    expect(percent(0.072)).toBe('7.2%');
+    expect(percent(0)).toBe('0%');
+    expect(percent(1)).toBe('100%');
   });
 });

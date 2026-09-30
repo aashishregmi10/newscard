@@ -144,6 +144,119 @@ export interface ShortItem {
   retractionReason: string | null;
 }
 
+/* ------------------------------------------------------------ advertising */
+
+export type AdPlacement = 'card' | 'inline';
+export type AdTabName = 'running' | 'scheduled' | 'paused' | 'finished' | 'draft';
+
+/** An advertiser’s poster or logo, as the upload returns and the campaign stores it. */
+export interface AdImage {
+  blurHash: string | null;
+  width: number | null;
+  height: number | null;
+  urls: { sm: string | null; md: string | null; lg: string | null };
+}
+
+export interface AdCampaignRow {
+  id: string;
+  name: string;
+  advertiser: string;
+  placement: AdPlacement;
+  language: 'ne' | 'en';
+  state: AdTabName;
+  startsAt: string;
+  endsAt: string;
+  pricePaisa: number;
+  pricePerDayPaisa: number;
+  /** 0–1 while running; null otherwise, when it has no share. */
+  shareOfVoice: number | null;
+  impressions: number;
+  clicks: number;
+  hasReportLink: boolean;
+}
+
+export interface AdOverviewPlacement {
+  placement: AdPlacement;
+  running: Array<{
+    id: string;
+    name: string;
+    advertiser: string;
+    pricePerDayPaisa: number;
+    shareOfVoice: number;
+  }>;
+  totalPerDayPaisa: number;
+  today: { views: number; clicks: number };
+}
+
+/** What the campaign form sends. Money in paisa, dates as ISO. */
+export interface AdCampaignInput {
+  advertiserId: string;
+  name: string;
+  placement: AdPlacement;
+  language: 'ne' | 'en';
+  categories: string[];
+  startsAt: string;
+  endsAt: string;
+  pricePaisa: number;
+  status: 'draft' | 'live' | 'paused';
+  creative: {
+    headline: string;
+    body: string | null;
+    callToAction: { ne: string; en: string };
+    landingUrl: string;
+    image: AdImage | null;
+  };
+}
+
+export interface AdCampaignDetail extends AdCampaignInput {
+  id: string;
+  advertiser: string;
+  state: AdTabName;
+  hasReportLink: boolean;
+}
+
+/** The advertiser’s report — the same builder serves the public /report/ page. */
+export interface AdReport {
+  placement: AdPlacement;
+  paid: {
+    pricePaisa: number;
+    days: number;
+    daysElapsed: number;
+    pricePerDayPaisa: number;
+    shareOfVoiceNow: number | null;
+  };
+  delivery: {
+    impressions: number;
+    viewableImpressions: number;
+    viewabilityRate: number;
+    deliveredShare: number;
+  };
+  engagement: { clicks: number; clickThroughRate: number; medianDwellSeconds: number };
+  value: {
+    spentToDatePaisa: number;
+    costPerThousandViewsPaisa: number | null;
+    costPerClickPaisa: number | null;
+  };
+  reach: { devices: number; averageFrequency: number };
+  byCategory: Array<{ category: string; impressions: number; clicks: number }>;
+  daily: Array<{ date: string; impressions: number; viewable: number; clicks: number }>;
+}
+
+export interface AdvertiserRow {
+  id: string;
+  name: string;
+  displayName: string;
+  contactEmail: string;
+  isActive: boolean;
+  campaigns: number;
+}
+
+export interface AdvertiserInput {
+  name: string;
+  displayName: string;
+  contactEmail: string;
+  isActive: boolean;
+}
 /** One short, with everything the edit screen needs. */
 export interface ShortDetail {
   id: string;
@@ -605,6 +718,75 @@ export const api = {
     },
   ) =>
     req<{ ok: true; lastEditedAt: string | null }>(`/cms/shorts/${id}/edit`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /* ------------------------------------------------------------ advertising */
+
+  adsOverview: (signal?: AbortSignal) =>
+    req<{ placements: AdOverviewPlacement[] }>('/cms/ads/overview', { signal }),
+
+  adCampaigns: (tab: AdTabName, page: number, perPage: number, signal?: AbortSignal) =>
+    req<{ items: AdCampaignRow[]; total: number; counts: Record<AdTabName, number> }>(
+      `/cms/ads/campaigns?tab=${tab}&page=${page}&perPage=${perPage}`,
+      { signal },
+    ),
+
+  adCampaign: (id: string, signal?: AbortSignal) =>
+    req<{ campaign: AdCampaignDetail; report: AdReport | null }>(
+      `/cms/ads/campaigns/${encodeURIComponent(id)}`,
+      { signal },
+    ),
+
+  createAdCampaign: (body: AdCampaignInput) =>
+    req<{ id: string }>('/cms/ads/campaigns', { method: 'POST', body: JSON.stringify(body) }),
+
+  editAdCampaign: (id: string, body: AdCampaignInput) =>
+    req<{ ok: true }>(`/cms/ads/campaigns/${id}/edit`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  /** The share of voice a price would buy, computed by the same functions serving draws with. */
+  adSharePreview: (
+    q: { placement: AdPlacement; pricePaisa: number; startsAt: string; endsAt: string; excludeId?: string },
+    signal?: AbortSignal,
+  ) => {
+    const params = new URLSearchParams({
+      placement: q.placement,
+      pricePaisa: String(q.pricePaisa),
+      startsAt: q.startsAt,
+      endsAt: q.endsAt,
+      ...(q.excludeId ? { excludeId: q.excludeId } : {}),
+    });
+    return req<{ at: string; pricePerDayPaisa: number; shareOfVoice: number; alongside: number }>(
+      `/cms/ads/share-preview?${params.toString()}`,
+      { signal },
+    );
+  },
+
+  /** Issues — or replaces, which revokes the old one — a report token. Shown once. */
+  issueReportLink: (id: string) =>
+    req<{ campaignId: string; token: string; replaced: boolean }>(
+      `/cms/ads/campaigns/${id}/report-link`,
+      { method: 'POST', body: JSON.stringify({}) },
+    ),
+
+  uploadAdImage: (file: File, kind: 'poster' | 'logo') => {
+    const form = new FormData();
+    form.append('file', file);
+    return upload<{ image: AdImage }>(`/cms/media/ad-image?kind=${kind}`, form);
+  },
+
+  advertisers: (signal?: AbortSignal) =>
+    req<{ items: AdvertiserRow[] }>('/cms/ads/advertisers', { signal }),
+
+  createAdvertiser: (body: AdvertiserInput) =>
+    req<{ id: string }>('/cms/ads/advertisers', { method: 'POST', body: JSON.stringify(body) }),
+
+  editAdvertiser: (id: string, body: AdvertiserInput) =>
+    req<{ ok: true }>(`/cms/ads/advertisers/${id}/edit`, {
       method: 'POST',
       body: JSON.stringify(body),
     }),

@@ -2,12 +2,11 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { ObjectId } from 'mongodb';
 import { Router } from 'express';
 import { z } from 'zod';
-import { getDb } from '@saar/db';
+import { buildCampaignReport, getDb } from '@saar/db';
 import { AppError, clampClientTimestamp } from '@saar/shared';
 import { AdEventTypeEnum, AdPlacementEnum, VIEWABLE_THRESHOLD_MS } from '@saar/schemas';
 import { asyncRoute } from '../middleware/index.js';
 import { adEventsLimit } from '../middleware/rateLimit.js';
-import { buildCampaignReport } from '../services/adReport.service.js';
 
 export const adRoutes = Router();
 
@@ -156,7 +155,7 @@ adRoutes.get(
     const to = q.data.to ?? new Date();
     const from = q.data.from ?? new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const report = await buildCampaignReport(id, from, to);
+    const report = await buildCampaignReport(getDb(), id, from, to);
     if (!report) throw new AppError('NOT_FOUND', 'No such campaign.');
 
     res.setHeader('Cache-Control', 'no-store');

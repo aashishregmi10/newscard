@@ -8,7 +8,7 @@ import { postAdEvents, type AdCard, type AdEventInput } from '../api/client';
  * are the same fact seen from two sides:
  *
  *   1. What the ADVERTISER is told  — impressions, how long each was actually
- *      on screen, and clicks. Reported in aggregate; see adReport.service.ts.
+ *      on screen, and clicks. Reported in aggregate; see packages/db/src/adReport.ts.
  *   2. What the READER is protected from — the daily ad count, which the next
  *      feed request sends back so the server can stop serving once the cap is
  *      reached. The count lives on the device because the device is the only

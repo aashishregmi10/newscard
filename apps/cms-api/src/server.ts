@@ -32,6 +32,7 @@ import { clientErrorRoutes } from './routes/clientErrors.routes.js';
 import { mediaRoutes } from './routes/media.routes.js';
 import { shortRoutes } from './routes/shorts.routes.js';
 import { sourceRoutes } from './routes/sources.routes.js';
+import { adRoutes } from './routes/ads.routes.js';
 import { createLogger, drainHttpServer } from '@saar/shared';
 import { startDeferredSweep, startIngestion, startReceiptReconciliation } from '@saar/worker';
 import { ensureSessionIndexes } from './auth/session.js';
@@ -80,6 +81,7 @@ export function createCmsApp(ORIGIN = 'http://localhost:5173') {
   app.use('/api', mediaRoutes);
   app.use('/api', shortRoutes);
   app.use('/api', sourceRoutes);
+  app.use('/api', adRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

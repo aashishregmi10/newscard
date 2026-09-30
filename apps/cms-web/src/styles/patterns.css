@@ -1731,3 +1731,384 @@
 .panel-body > .banner + .field {
   margin-top: var(--s4);
 }
+
+/* ========================================================================
+ * Advertising
+ *
+ * The overview's bars are shares of voice: each running campaign's price
+ * per day over the placement's total. They are drawn as bars because the
+ * question the screen answers — "who is getting how much of this" — is a
+ * comparison of lengths, and a column of percentages makes the reader do
+ * the comparing.
+ * ====================================================================== */
+
+.ads-explainer {
+  margin: 0 0 var(--s4);
+}
+
+.sov-list {
+  display: grid;
+  gap: var(--s2);
+  margin: var(--s3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sov-row {
+  display: grid;
+  grid-template-columns: minmax(0, 12rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.sov-name {
+  display: grid;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.sov-name:hover .sov-advertiser,
+.sov-name:focus-visible .sov-advertiser {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.sov-advertiser {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--ink);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sov-campaign {
+  overflow: hidden;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sov-track {
+  height: 8px;
+  border-radius: var(--r-pill);
+  background: var(--surface-sunk);
+  overflow: hidden;
+}
+
+.sov-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.sov-figures {
+  display: grid;
+  justify-items: end;
+  min-width: 5.5rem;
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.sov-figures strong {
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+/* The share a price would buy, beside the price field. */
+.sov-preview {
+  display: grid;
+  gap: 2px;
+  height: 100%;
+  padding: var(--s2) var(--s3);
+  border: 1px dashed var(--accent-line);
+  border-radius: var(--r-sm);
+  background: var(--accent-soft);
+}
+
+.sov-preview-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.sov-preview-value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.sov-preview-note {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+/* An uploaded poster or logo, with its controls beside it. */
+.ad-image {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s4);
+}
+
+.ad-image img {
+  display: block;
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface-sunk);
+}
+
+.ad-image-poster img {
+  width: 180px;
+  max-height: 320px;
+  object-fit: contain;
+}
+
+.ad-image-logo img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+}
+
+.ad-image-actions {
+  display: grid;
+  gap: var(--s2);
+  justify-items: start;
+}
+
+/* ---- The phone ---------------------------------------------------------
+ * A sketch of the card at phone width, drawn from the same fields the app
+ * receives. Deliberately plain: it answers "does this fit and read", not
+ * "what will every pixel be".
+ * ----------------------------------------------------------------------- */
+
+.phone {
+  width: 100%;
+  max-width: 260px;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 6px solid #1d2024;
+  border-radius: 22px;
+  background: #16181b;
+  color: #e9ebee;
+  font-size: 12px;
+}
+
+.phone-photo {
+  height: 118px;
+  background: linear-gradient(135deg, #3b4450, #262b32);
+}
+
+.phone-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 8px;
+  border-bottom: 1px solid #2a2e33;
+}
+
+/* The publisher keeps its room: crediting them is what the licence requires,
+   so the ad shortens before their name does. The app follows the same rule. */
+.phone-source {
+  flex: 0 0 auto;
+  max-width: 45%;
+  min-width: 0;
+  overflow: hidden;
+  color: #6ea8ff;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The small ad itself: outlined, labelled, and never the publisher's colour,
+   so it cannot be read as part of the byline. */
+.phone-pill {
+  display: inline-flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 2px 6px;
+  border: 1px solid #f0b54a;
+  border-radius: 999px;
+  color: #f5d596;
+  white-space: nowrap;
+}
+
+.phone-pill img {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  object-fit: contain;
+}
+
+.phone-pill-label {
+  font-weight: 700;
+  color: #f0b54a;
+}
+
+.phone-pill-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.phone-icons {
+  flex: none;
+  color: #9aa1a9;
+  letter-spacing: 6px;
+}
+
+.phone-body {
+  display: grid;
+  gap: 6px;
+  padding: 10px 8px 14px;
+}
+
+.phone-line {
+  display: block;
+  height: 7px;
+  border-radius: 4px;
+  background: #2f343a;
+}
+
+.phone-poster {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  aspect-ratio: 9 / 17;
+}
+
+.phone-sponsor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px;
+  border-bottom: 1px solid #2a2e33;
+  color: #b8bec6;
+}
+
+.phone-sponsor-badge {
+  padding: 1px 5px;
+  border: 1px solid #6ea8ff;
+  border-radius: 4px;
+  color: #6ea8ff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.phone-poster-frame {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  background: #0f1113;
+}
+
+.phone-poster-frame img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.phone-poster-empty {
+  color: #5c636b;
+}
+
+.phone-cta {
+  margin: 8px;
+  padding: 8px;
+  border-radius: 999px;
+  background: #3b82f6;
+  color: #fff;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* ---- Figures ------------------------------------------------------------ */
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--s3);
+  margin: 0;
+}
+
+.stat {
+  padding: var(--s3);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+}
+
+.stat dt {
+  font-size: var(--text-xs);
+  color: var(--ink-faint);
+}
+
+.stat dd {
+  display: grid;
+  gap: 2px;
+  margin: 4px 0 0;
+}
+
+.stat dd strong {
+  font-size: var(--text-lg);
+  color: var(--ink);
+}
+
+.stat dd span {
+  font-size: var(--text-xs);
+  color: var(--ink-soft);
+}
+
+/* The report token, shown once. */
+.token-box {
+  margin-top: var(--s3);
+  padding: var(--s3);
+  border: 1px solid var(--ok-line);
+  border-radius: var(--r-sm);
+  background: var(--ok-soft);
+}
+
+.token-box p {
+  margin: 0 0 var(--s2);
+}
+
+.token-box pre {
+  margin: 0;
+  padding: var(--s3);
+  overflow-x: auto;
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+  white-space: pre;
+}
+
+/* A plain checkbox with its sentence, for the one yes/no on a form. */
+.check-row {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-top: var(--s4);
+  font-size: var(--text-sm);
+  color: var(--ink);
+}
+
+@media (max-width: 720px) {
+  .sov-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .sov-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

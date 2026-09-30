@@ -13,6 +13,9 @@ import { Booting, Login } from './components/Login';
 import { Composer } from './components/Composer';
 import { NewShort } from './components/NewShort';
 import { EditShort } from './components/EditShort';
+import { Ads } from './components/Ads';
+import { AdCampaign } from './components/AdCampaign';
+import { Advertisers } from './components/Advertisers';
 import { NewSource } from './components/NewSource';
 import { NewStory } from './components/NewStory';
 import { Leads } from './components/Leads';
@@ -187,6 +190,15 @@ function Screen({
       );
     case 'sourceNew':
       return <NewSource />;
+    case 'ads':
+      return <Ads tab={route.tab} page={route.page} />;
+    case 'adNew':
+      return <AdCampaign key="new" id={null} />;
+    case 'ad':
+      /* Keyed by id so moving between two campaigns rebuilds the form. */
+      return <AdCampaign key={route.id} id={route.id} />;
+    case 'advertisers':
+      return <Advertisers />;
     case 'source':
       /* Keyed by slug so moving between two publishers rebuilds the form
          rather than leaving the previous one's values in the fields. */

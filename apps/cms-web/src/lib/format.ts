@@ -77,6 +77,36 @@ export function dateTime(iso: string | null): string | null {
   });
 }
 
+/**
+ * Money, from paisa, the way it is written in Nepal: Rs 1,50,000.
+ *
+ * Lakh grouping (en-IN) rather than thousands, because that is how a
+ * Kathmandu business reads a price, and a figure grouped the other way is a
+ * figure someone misreads by a factor of ten. Whole rupees unless there are
+ * paisa to show.
+ */
+export function rupees(paisa: number): string {
+  const value = paisa / 100;
+  const whole = Number.isInteger(value);
+  return `Rs ${value.toLocaleString('en-IN', {
+    minimumFractionDigits: whole ? 0 : 2,
+    maximumFractionDigits: whole ? 0 : 2,
+  })}`;
+}
+
+/** A share, 0–1, as a percentage people can compare at a glance: 62%, 7.4%. */
+export function percent(fraction: number): string {
+  const p = fraction * 100;
+  if (p === 0) return '0%';
+  if (p < 10) return `${p.toFixed(1)}%`;
+  return `${Math.round(p)}%`;
+}
+
+/** A count with its noun, grouped in lakhs: "1 view", "1,25,000 views". */
+export function countOf(n: number, one: string, many: string = `${one}s`): string {
+  return `${n.toLocaleString('en-IN')} ${n === 1 ? one : many}`;
+}
+
 /** `1 device` / `2 devices`, without a stray "(s)". */
 export function plural(count: number, one: string, many: string = `${one}s`): string {
   return `${count} ${count === 1 ? one : many}`;

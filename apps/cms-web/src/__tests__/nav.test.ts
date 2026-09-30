@@ -46,6 +46,11 @@ const ALL_ROUTES: readonly Route[] = [
   Routes.published({ tab: 'retracted', page: 2 }),
   Routes.publishedEdit('65f1c2a4b8e9d0123456789a'),
   Routes.shortEdit('65f1c2a4b8e9d0123456789b'),
+  Routes.ads(),
+  Routes.ads({ tab: 'draft', page: 3 }),
+  Routes.adNew(),
+  Routes.ad('65f1c2a4b8e9d0123456789c'),
+  Routes.advertisers(),
 ];
 
 describe('parseRoute and routeToHash', () => {
@@ -209,6 +214,19 @@ describe('the tab in the URL', () => {
        ordering rule as #/queue/new against a story id. */
     expect(parseRoute('#/shorts/new')).toEqual(Routes.shortNew());
     expect(parseRoute('#/shorts/abc/def')).toEqual(DEFAULT_ROUTE);
+  });
+
+  it('separates the campaign list, the new form, advertisers and one campaign', () => {
+    expect(parseRoute('#/ads')).toEqual(Routes.ads());
+    expect(parseRoute('#/ads?tab=scheduled&page=2')).toEqual(Routes.ads({ tab: 'scheduled', page: 2 }));
+    expect(parseRoute('#/ads?tab=nonsense')).toEqual(Routes.ads());
+    expect(parseRoute('#/ads/new')).toEqual(Routes.adNew());
+    expect(parseRoute('#/ads/advertisers')).toEqual(Routes.advertisers());
+    expect(parseRoute('#/ads/65f1c2a4b8e9d0123456789c')).toEqual(Routes.ad('65f1c2a4b8e9d0123456789c'));
+    expect(parseRoute('#/ads/a/b')).toEqual(DEFAULT_ROUTE);
+    for (const r of [Routes.ads(), Routes.adNew(), Routes.ad('x'), Routes.advertisers()]) {
+      expect(sectionOf(r)).toBe('ads');
+    }
   });
 
   it('opens the edit screen for one published story', () => {

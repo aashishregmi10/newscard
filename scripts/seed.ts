@@ -257,7 +257,8 @@ async function main(): Promise<void> {
   console.log(`\nCMS login (development only):\n  ${DEV_EMAIL}\n  ${DEV_PASSWORD}`);
 
   // Printed rather than stored: the campaign holds only a sha256 of this, so
-  // there is nowhere to look it up afterwards. Re-seed to issue a new one.
+  // there is nowhere to look it up afterwards. A lost one is replaced from
+  // the campaign’s screen in Advertising (Issue a report link).
   console.log('\nAdvertiser reports (development only) — each token is shown once:');
   for (const s of ads.seeded) {
     console.log(`  ${s.advertiser}`);

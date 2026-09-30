@@ -52,6 +52,7 @@ export type IconName =
   | 'info'
   | 'layers'
   | 'logout'
+  | 'megaphone'
   | 'newspaper'
   | 'pencil'
   | 'plus'
@@ -96,6 +97,13 @@ const SHAPES: Record<IconName, ReactNode> = {
     <>
       <circle cx="12" cy="12" r="8.4" />
       <path d="m6.1 6.1 11.8 11.8" />
+    </>
+  ),
+  megaphone: (
+    <>
+      <path d="M4 10.2v3.6a1 1 0 0 0 1 1h2.3L14 19V5L7.3 9.2H5a1 1 0 0 0-1 1z" />
+      <path d="M17 9a4.2 4.2 0 0 1 0 6" />
+      <path d="m7.6 14.8 1.5 4.4a1 1 0 0 0 1 .7h.6a.9.9 0 0 0 .9-1.2l-1.2-3.9" />
     </>
   ),
   bell: (
