@@ -286,3 +286,31 @@ describe('withdrawing a live story', () => {
     expect(doc?.status).toBe('published');
   });
 });
+
+describe('no small ad on this story', () => {
+  it('can be set on a live story without a reason, and changes nothing readers read', async () => {
+    const id = await insertArticle('published');
+    const res = await post(`/api/cms/articles/${id.toString()}/ads`, adminCookie).send({ suppressed: true });
+    expect(res.status).toBe(200);
+    const doc = await collections(getDb()).articles.findOne({ _id: id });
+    expect(doc?.adsSuppressed).toBe(true);
+    expect(doc?.headline).toBe('First tranche of flood relief fund released');
+    expect(doc?.lastEditedAt ?? null).toBeNull();
+
+    const detail = await get(`/api/cms/articles/${id.toString()}`, adminCookie);
+    expect(detail.body.article.adsSuppressed).toBe(true);
+  });
+
+  it('is audited both ways', async () => {
+    const id = await insertArticle('draft');
+    await post(`/api/cms/articles/${id.toString()}/ads`, adminCookie).send({ suppressed: true });
+    await post(`/api/cms/articles/${id.toString()}/ads`, adminCookie).send({ suppressed: false });
+    const rows = await collections(getDb()).audit.find({ action: 'article.ads' }).sort({ at: 1 }).toArray();
+    expect(rows.map((r) => (r.after as { adsSuppressed: boolean }).adsSuppressed)).toEqual([true, false]);
+  });
+
+  it('refuses anything but a yes or no', async () => {
+    const id = await insertArticle('draft');
+    expect((await post(`/api/cms/articles/${id.toString()}/ads`, adminCookie).send({ suppressed: 'yes' })).status).toBe(400);
+  });
+});

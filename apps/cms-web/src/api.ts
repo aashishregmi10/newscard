@@ -336,6 +336,8 @@ export interface ArticleDetail {
   publisherUrl: string;
   publisherAuthor: string | null;
   editorialNotes: string | null;
+  /** No small ad on this story, by an editor’s choice. */
+  adsSuppressed: boolean;
   revisionCount: number;
   measured: number;
   image: ArticleImageData | null;
@@ -500,6 +502,8 @@ export interface SourceRow {
   language: 'ne' | 'en';
   priority: number;
   isActive: boolean;
+  /** Whether small ads may sit on this publisher’s stories. */
+  inlineAds: boolean;
   licence: SourceLicenceData;
   ingest: SourceIngestData;
   /** The server's own `isPollable()` answer, so the UI does not restate it. */
@@ -530,6 +534,7 @@ export interface SourcePatch {
   ingest?: { method?: IngestMethod; feedUrl?: string | null; pollIntervalMin?: number };
   priority?: number;
   isActive?: boolean;
+  inlineAds?: boolean;
 }
 
 export interface LicenceResult {
@@ -601,6 +606,13 @@ export const api = {
     req<{ status: string }>(`/cms/articles/${id}/transition`, {
       method: 'POST',
       body: JSON.stringify({ to, note }),
+    }),
+
+  /** Whether a story may carry a small ad. Any status; no reason needed. */
+  setArticleAds: (id: string, suppressed: boolean) =>
+    req<{ ok: true; adsSuppressed: boolean }>(`/cms/articles/${id}/ads`, {
+      method: 'POST',
+      body: JSON.stringify({ suppressed }),
     }),
 
   /** Pull a live story. The reason is required and is kept. */

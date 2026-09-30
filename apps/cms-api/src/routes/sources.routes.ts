@@ -114,6 +114,9 @@ const PatchSchema = z.object({
   ingest: IngestPatch.optional(),
   priority: z.number().int().min(0).max(999).optional(),
   isActive: z.boolean().optional(),
+  /** Whether small ads may sit on this publisher’s stories — a question for
+   *  their agreement. The feed reads it within a minute (see feed.service). */
+  inlineAds: z.boolean().optional(),
 });
 
 const LicenceSchema = z.object({
@@ -169,6 +172,8 @@ interface SourceDoc {
   } | null;
   priority?: number;
   isActive?: boolean;
+  /** Absent means allowed. */
+  inlineAds?: boolean;
 }
 
 function toRow(s: SourceDoc) {
@@ -180,6 +185,8 @@ function toRow(s: SourceDoc) {
     language: s.language,
     priority: s.priority ?? 50,
     isActive: s.isActive ?? true,
+    /* Whether small ads may sit on this publisher’s stories. Absent is yes. */
+    inlineAds: s.inlineAds !== false,
     licence: {
       status: s.licence?.status ?? 'unknown',
       agreementRef: s.licence?.agreementRef ?? null,
@@ -446,6 +453,7 @@ sourceRoutes.patch(
     if (parsed.data.language !== undefined) set.language = parsed.data.language;
     if (parsed.data.priority !== undefined) set.priority = parsed.data.priority;
     if (parsed.data.isActive !== undefined) set.isActive = parsed.data.isActive;
+    if (parsed.data.inlineAds !== undefined) set.inlineAds = parsed.data.inlineAds;
     if (parsed.data.ingest?.method !== undefined) set['ingest.method'] = mergedIngest.method;
     if (parsed.data.ingest?.feedUrl !== undefined) set['ingest.feedUrl'] = mergedIngest.feedUrl;
     if (parsed.data.ingest?.pollIntervalMin !== undefined) {
@@ -466,6 +474,7 @@ sourceRoutes.patch(
         language: before.language,
         priority: before.priority ?? 50,
         isActive: before.isActive ?? true,
+        inlineAds: before.inlineAds !== false,
         ingest: {
           method: before.ingest?.method ?? 'manual',
           feedUrl: before.ingest?.feedUrl ?? null,

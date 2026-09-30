@@ -2112,3 +2112,15 @@
     grid-row: 2;
   }
 }
+
+/* The no-ads switch on a story: set apart from the story’s own controls,
+   because it is about the advertising beside the story, not the story. */
+.ads-on-story {
+  margin-top: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--line);
+}
+
+.ads-on-story .check-row {
+  margin-top: 0;
+}

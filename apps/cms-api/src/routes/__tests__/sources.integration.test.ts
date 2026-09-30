@@ -393,3 +393,18 @@ describe('what the list reports', () => {
     ]);
   });
 });
+
+describe('small ads on a publisher’s stories', () => {
+  it('are allowed until switched off, and the switch is saved and audited', async () => {
+    const before = await get('/api/cms/sources/namuna-khabar', adminCookie);
+    expect(before.body.source.inlineAds).toBe(true);
+
+    const res = await patch('/api/cms/sources/namuna-khabar', adminCookie).send({ inlineAds: false });
+    expect(res.status).toBe(200);
+    const after = await get('/api/cms/sources/namuna-khabar', adminCookie);
+    expect(after.body.source.inlineAds).toBe(false);
+
+    const row = await collections(getDb()).audit.findOne({ action: 'source.update' });
+    expect((row?.after as { inlineAds?: boolean }).inlineAds).toBe(false);
+  });
+});

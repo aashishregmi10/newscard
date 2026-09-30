@@ -31,6 +31,7 @@ import {
   type TabDef,
 } from '../ui';
 import { ImagePicker } from './ImagePicker';
+import { AdsOnStory } from './AdsOnStory';
 
 /**
  * The composer.  Spec Ch. 5.4.
@@ -570,6 +571,10 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
           </p>
             </>
           )}
+
+          {/* Settable whatever the status — it is about the advertising, not the
+              story — so it sits outside the draft-only controls above. */}
+          <AdsOnStory key={article.id} id={article.id} suppressed={article.adsSuppressed} />
         </Panel>
 
         <div className="panel sticky-aside">

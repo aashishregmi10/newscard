@@ -52,6 +52,7 @@ export function SourceDetail({ slug }: { slug: string }) {
   const [language, setLanguage] = useState<'ne' | 'en'>('ne');
   const [priority, setPriority] = useState(50);
   const [active, setActive] = useState<'active' | 'inactive'>('active');
+  const [inlineAds, setInlineAds] = useState<'allowed' | 'blocked'>('allowed');
 
   // Ingestion panel
   const [method, setMethod] = useState<'manual' | 'rss' | 'api'>('manual');
@@ -77,6 +78,7 @@ export function SourceDetail({ slug }: { slug: string }) {
     setLanguage(data.language);
     setPriority(data.priority);
     setActive(data.isActive ? 'active' : 'inactive');
+    setInlineAds(data.inlineAds ? 'allowed' : 'blocked');
     setMethod(data.ingest.method);
     setFeedUrl(data.ingest.feedUrl ?? '');
     setPollIntervalMin(data.ingest.pollIntervalMin);
@@ -153,6 +155,7 @@ export function SourceDetail({ slug }: { slug: string }) {
           language,
           priority,
           isActive: active === 'active',
+          inlineAds: inlineAds === 'allowed',
           ingest: {
             method,
             feedUrl: feedUrl.trim() === '' ? null : feedUrl.trim(),
@@ -496,6 +499,26 @@ export function SourceDetail({ slug }: { slug: string }) {
                   options={[
                     { value: 'active', label: 'Active' },
                     { value: 'inactive', label: 'Inactive' },
+                  ]}
+                />
+              )}
+            </Fieldset>
+          </div>
+
+          <div className="col-12">
+            <Fieldset
+              legend="Small ads on their stories"
+              note="The small ad sits on a story that carries this publisher’s name. Turn it off if their agreement does not allow advertising on their reporting. Full-card ads sit between stories and are not affected."
+            >
+              {(g) => (
+                <Segmented
+                  {...g}
+                  aria-label="Small ads on this publisher’s stories"
+                  value={inlineAds}
+                  onChange={setInlineAds}
+                  options={[
+                    { value: 'allowed', label: 'Allowed' },
+                    { value: 'blocked', label: 'Not allowed' },
                   ]}
                 />
               )}

@@ -19,6 +19,7 @@ import {
   Skeleton,
 } from '../ui';
 import { ImagePicker } from './ImagePicker';
+import { AdsOnStory } from './AdsOnStory';
 
 /**
  * Correcting a story that is already live.
@@ -441,6 +442,8 @@ export function EditPublished({ id }: { id: string }) {
                 {article.summary}
               </p>
             </figure>
+
+            <AdsOnStory key={article.id} id={article.id} suppressed={article.adsSuppressed} />
 
             <dl className="edit-record">
               <dt>Publisher</dt>

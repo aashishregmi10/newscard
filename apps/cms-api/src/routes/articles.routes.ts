@@ -203,6 +203,7 @@ articleRoutes.get(
         image: d.image,
         editorialNotes: d.editorialNotes ?? null,
         revisionCount: d.revisionCount,
+        adsSuppressed: d.adsSuppressed === true,
         publishedAt: d.publishedAt?.toISOString() ?? null,
         retractedAt: d.retractedAt?.toISOString() ?? null,
         retractionReason: d.retractionReason ?? null,
@@ -362,6 +363,51 @@ articleRoutes.post(
     });
 
     res.json(result);
+  }),
+);
+
+/**
+ * POST /cms/articles/:id/ads — whether this story may carry a small ad.
+ *
+ * An editorial judgement, not an edit: a hotel offer beside a death toll is
+ * wrong for the reader, the publisher and the advertiser alike. So it is its
+ * own route, settable at any status — a live story included — without the
+ * reason a correction to the TEXT requires, and it touches nothing a reader
+ * reads. It is audited all the same: which stories were kept ad-free, and by
+ * whom, is a question someone will ask.
+ *
+ * The full-card ad sits BETWEEN stories rather than on one, and is not
+ * affected.
+ */
+articleRoutes.post(
+  '/cms/articles/:id/ads',
+  asyncRoute(async (req, res) => {
+    const id = String(req.params.id ?? '');
+    if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
+    const parsed = z.object({ suppressed: z.boolean() }).safeParse(req.body);
+    if (!parsed.success) throw new AppError('BAD_REQUEST', 'Say whether ads are suppressed.');
+
+    const c = collections(getDb());
+    const existing = await c.articles.findOne({ _id: new ObjectId(id) }, { projection: { adsSuppressed: 1 } });
+    if (!existing) throw new AppError('NOT_FOUND');
+
+    await c.articles.updateOne(
+      { _id: existing._id },
+      { $set: { adsSuppressed: parsed.data.suppressed, updatedAt: new Date() } },
+    );
+
+    await writeAudit({
+      action: 'article.ads',
+      entityType: 'article',
+      entityId: id,
+      actorId: req.staff!.staffId,
+      actorEmail: req.staff!.email,
+      before: { adsSuppressed: existing.adsSuppressed === true },
+      after: { adsSuppressed: parsed.data.suppressed },
+      ip: req.ip ?? null,
+    });
+
+    res.json({ ok: true, adsSuppressed: parsed.data.suppressed });
   }),
 );
 
