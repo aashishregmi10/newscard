@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { postAdEvents, type AdCard, type AdEventInput } from '../api/client';
+import { postAdEvents, type AdEventInput, type AdPlacement } from '../api/client';
 
 /**
  * Ad measurement on the device.
@@ -34,13 +34,23 @@ import { postAdEvents, type AdCard, type AdEventInput } from '../api/client';
  *   content it measures.
  */
 
-const BUDGET_KEY = 'saar.adBudget.v1';
+/* v2: the budget counts the two placements apart. A v1 value (full-card only)
+   is read as today’s full-card count, so an update mid-day does not reset it. */
+const BUDGET_KEY = 'saar.adBudget.v2';
+const BUDGET_KEY_V1 = 'saar.adBudget.v1';
 const FLUSH_INTERVAL_MS = 20_000;
 const MAX_BATCH = 50;
+
+/** What the tracker needs of an ad, whichever placement it is. */
+export interface TrackedAd {
+  id: string;
+  campaignId: string;
+}
 
 interface AdState {
   campaignId: string;
   categorySlug: string;
+  placement: AdPlacement;
   /** Timestamp the ad became visible, or null while it is off screen. */
   since: number | null;
   dwellMs: number;
@@ -54,7 +64,7 @@ let timer: ReturnType<typeof setInterval> | null = null;
 
 /* -------------------------------------------------------------- daily budget */
 
-let budget = { date: '', count: 0 };
+let budget = { date: '', count: 0, inline: 0 };
 let budgetLoaded = false;
 
 /** Local calendar day. The cap is a reader-experience limit, so it has to turn
@@ -70,28 +80,46 @@ export async function loadAdBudget(): Promise<void> {
   if (budgetLoaded) return;
   budgetLoaded = true;
   try {
-    const raw = await AsyncStorage.getItem(BUDGET_KEY);
-    const parsed = raw ? (JSON.parse(raw) as { date?: string; count?: number }) : null;
+    const raw =
+      (await AsyncStorage.getItem(BUDGET_KEY)) ?? (await AsyncStorage.getItem(BUDGET_KEY_V1));
+    const parsed = raw
+      ? (JSON.parse(raw) as { date?: string; count?: number; inline?: number })
+      : null;
     if (parsed?.date === today() && typeof parsed.count === 'number') {
-      budget = { date: parsed.date, count: parsed.count };
+      budget = {
+        date: parsed.date,
+        count: parsed.count,
+        inline: typeof parsed.inline === 'number' ? parsed.inline : 0,
+      };
       return;
     }
   } catch {
     // A corrupt or missing budget means "none shown yet", which errs towards
     // the reader rather than towards revenue.
   }
-  budget = { date: today(), count: 0 };
+  budget = { date: today(), count: 0, inline: 0 };
 }
 
-/** Ads shown to this device today. Sent with every feed request. */
+/** Full-card ads shown to this device today. Sent with every feed request. */
 export function adsShownToday(): number {
-  if (budget.date !== today()) budget = { date: today(), count: 0 };
+  rollOver();
   return budget.count;
 }
 
-function spendOne(): void {
-  if (budget.date !== today()) budget = { date: today(), count: 0 };
-  budget.count += 1;
+/** Small ads shown today. Counted apart from the full card — see fetchFeed. */
+export function inlineShownToday(): number {
+  rollOver();
+  return budget.inline;
+}
+
+function rollOver(): void {
+  if (budget.date !== today()) budget = { date: today(), count: 0, inline: 0 };
+}
+
+function spendOne(placement: AdPlacement): void {
+  rollOver();
+  if (placement === 'inline') budget.inline += 1;
+  else budget.count += 1;
   void AsyncStorage.setItem(BUDGET_KEY, JSON.stringify(budget)).catch(() => undefined);
 }
 
@@ -106,8 +134,15 @@ function ensureTimer(): void {
   timer = setInterval(() => void flushAdEvents(), FLUSH_INTERVAL_MS);
 }
 
-/** The ad scrolled into view. */
-export function noteAdVisible(ad: AdCard, categorySlug: string): void {
+/**
+ * The ad scrolled into view. For the small ad, "into view" means the story
+ * carrying it became the card on screen.
+ */
+export function noteAdVisible(
+  ad: TrackedAd,
+  categorySlug: string,
+  placement: AdPlacement = 'card',
+): void {
   const s = states.get(ad.id);
   if (s) {
     if (s.since === null && !s.reported) s.since = Date.now();
@@ -116,6 +151,7 @@ export function noteAdVisible(ad: AdCard, categorySlug: string): void {
   states.set(ad.id, {
     campaignId: ad.campaignId,
     categorySlug,
+    placement,
     since: Date.now(),
     dwellMs: 0,
     reported: false,
@@ -141,11 +177,12 @@ function report(s: AdState): void {
   queue.push({
     campaignId: s.campaignId,
     type: 'impression',
+    placement: s.placement,
     dwellMs: Math.round(s.dwellMs),
     categorySlug: s.categorySlug,
     occurredAt: new Date().toISOString(),
   });
-  spendOne();
+  spendOne(s.placement);
 }
 
 /**
@@ -156,12 +193,17 @@ function report(s: AdState): void {
  * never fire at all. A click is the event an advertiser cares most about and
  * the one most likely to be lost.
  */
-export function noteAdClick(ad: AdCard, categorySlug: string): void {
+export function noteAdClick(
+  ad: TrackedAd,
+  categorySlug: string,
+  placement: AdPlacement = 'card',
+): void {
   const s = states.get(ad.id);
   const dwell = s ? s.dwellMs + (s.since ? Date.now() - s.since : 0) : 0;
   queue.push({
     campaignId: ad.campaignId,
     type: 'click',
+    placement,
     dwellMs: Math.round(dwell),
     categorySlug,
     occurredAt: new Date().toISOString(),
@@ -194,7 +236,7 @@ export async function flushAdEvents(): Promise<void> {
 export function __resetAdTracker(): void {
   queue = [];
   states.clear();
-  budget = { date: today(), count: 0 };
+  budget = { date: today(), count: 0, inline: 0 };
   budgetLoaded = false;
   if (timer) {
     clearInterval(timer);

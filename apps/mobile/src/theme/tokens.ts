@@ -14,6 +14,10 @@ export const light = {
   divider: '#BFCDD9',
   strip: '#111417',
   stripText: '#F2F2F2',
+  /** Marks advertising, and only advertising: the small ad's outline and label.
+   *  Amber, never the accent blue the publisher's name is set in, so an ad can
+   *  not be read as part of the credit. 5.4:1 on white. */
+  adMark: '#9A5B00',
 } as const;
 
 export const dark = {
@@ -25,6 +29,8 @@ export const dark = {
   divider: '#2B3038',
   strip: '#000000',
   stripText: '#F2F2F2',
+  /** 10:1 on the dark surface. */
+  adMark: '#F0B54A',
 } as const;
 
 /** Widened to `string` deliberately: `as const` above gives each palette its own

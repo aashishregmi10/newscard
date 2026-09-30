@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { runFeedLoad, appendPage, type FeedLoadDeps, type FeedState } from '../feedLoad.js';
+import { runFeedLoad, appendPage, cacheable, type FeedLoadDeps, type FeedState } from '../feedLoad.js';
 import { INITIAL_FEED_STATE } from '../feedLoad.js';
 import type { Card, FeedEntry, FeedPage } from '../../api/client';
 
@@ -54,6 +54,7 @@ function deps(over: Partial<FeedLoadDeps> = {}): FeedLoadDeps {
     fetchPage: async () => page([]),
     loadAdBudget: async () => {},
     adsShownToday: () => 0,
+    inlineShownToday: () => 0,
     persist: () => {},
     ...over,
   };
@@ -236,5 +237,54 @@ describe('appendPage — the page boundary', () => {
 
   it('is a no-op for an empty page', () => {
     expect(appendPage([card('a')], []).map((c) => c.id)).toEqual(['a']);
+  });
+});
+
+describe('what may be cached for offline reading', () => {
+  const smallAd = {
+    kind: 'inlineAd' as const,
+    id: 'inl_c1_a1',
+    campaignId: 'c1',
+    language: 'ne' as const,
+    advertiser: 'Hotel X',
+    text: 'Hotel X',
+    landingUrl: 'https://example.invalid/',
+    logo: null,
+  };
+  const fullCardAd = { ...card('ad-1'), kind: 'ad' } as unknown as FeedEntry;
+
+  it('drops full-card ads and strips the small ad from every story', () => {
+    /* Both have a flight window and a budget. Replayed from a cache they would be
+       shown after their campaign ended, and every view would be one nobody paid
+       for. */
+    const withSmallAd = { ...card('a1'), kind: 'article' as const, inlineAd: smallAd };
+    const cached = cacheable([withSmallAd, fullCardAd, card('a2')]);
+    expect(cached.map((c) => c.id)).toEqual(['a1', 'a2']);
+    expect(cached[0]).not.toHaveProperty('inlineAd');
+  });
+
+  it('is what the first page persists, and the request carries both ad counts', async () => {
+    const persisted: string[] = [];
+    const asked: Array<{ adsToday: number; inlineToday: number }> = [];
+    const { emit } = recorder();
+    await runFeedLoad(
+      params,
+      deps({
+        adsShownToday: () => 3,
+        inlineShownToday: () => 40,
+        fetchPage: async (args) => {
+          asked.push({ adsToday: args.adsToday, inlineToday: args.inlineToday });
+          return page([{ ...card('a1'), inlineAd: smallAd }, fullCardAd]);
+        },
+        persist: (articles) => {
+          persisted.push(JSON.stringify(articles));
+        },
+      }),
+      emit,
+    );
+    expect(asked).toEqual([{ adsToday: 3, inlineToday: 40 }]);
+    expect(persisted).toHaveLength(1);
+    expect(persisted[0]).not.toContain('inlineAd');
+    expect(persisted[0]).toContain('story-a1');
   });
 });

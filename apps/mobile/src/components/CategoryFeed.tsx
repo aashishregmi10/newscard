@@ -19,7 +19,7 @@ import { SponsoredCard } from './SponsoredCard';
 import { useFeed } from '../hooks/useFeed';
 import { useFilters } from '../state/FiltersContext';
 import { useDevice } from '../state/DeviceContext';
-import { isAd, type AdCard, type Card, type FeedEntry } from '../api/client';
+import { isAd, type AdCard, type Card, type FeedEntry, type InlineAd } from '../api/client';
 import {
   noteAdVisible,
   noteAdHidden,
@@ -199,7 +199,14 @@ function CategoryFeedInner({
 
   const handleAdClick = useCallback(
     (ad: AdCard) => {
-      noteAdClick(ad, category);
+      noteAdClick(ad, category, 'card');
+    },
+    [category],
+  );
+
+  const handleInlineAdClick = useCallback(
+    (ad: InlineAd) => {
+      noteAdClick(ad, category, 'inline');
     },
     [category],
   );
@@ -224,9 +231,11 @@ function CategoryFeedInner({
           textScale={textScale}
           dataSaver={dataSaver}
           onMenu={onMenu}
+          inlineAd={item.inlineAd}
+          onInlineAd={handleInlineAdClick}
         />
       ),
-    [theme, height, textScale, dataSaver, handleAdClick, onMenu],
+    [theme, height, textScale, dataSaver, handleAdClick, handleInlineAdClick, onMenu],
   );
 
   const getItemLayout = useCallback(
@@ -257,8 +266,19 @@ function CategoryFeedInner({
         // signal that decides when to ask for notification permission.
         // Counting it would let advertising buy its way to a prompt.
         nowVisible.add(item.id);
-        noteAdVisible(item, categoryRef.current);
+        noteAdVisible(item, categoryRef.current, 'card');
         continue;
+      }
+
+      /*
+       * The small ad on this story is on screen exactly when the story is — it
+       * sits in the story’s own action row. Tracked under its own id, so it
+       * is one impression however often the reader scrolls back to it, and
+       * closed out by the same hidden-check below as a full-card ad.
+       */
+      if (item.inlineAd) {
+        nowVisible.add(item.inlineAd.id);
+        noteAdVisible(item.inlineAd, categoryRef.current, 'inline');
       }
 
       nowVisibleArticles.add(item.id);

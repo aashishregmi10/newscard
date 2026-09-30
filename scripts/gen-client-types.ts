@@ -2,7 +2,7 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { ArticleCardDto, AdCardDto, VideoCardDto, VideoRendition } from '@saar/schemas';
+import { ArticleCardDto, AdCardDto, InlineAdDto, VideoCardDto, VideoRendition } from '@saar/schemas';
 
 /**
  * Generate the mobile app's DTO types from the Zod schemas.
@@ -59,6 +59,7 @@ const NAMED = new Map<z.ZodTypeAny, string>([
   [VideoRendition, 'VideoRendition'],
   [ArticleCardDto, 'ArticleCardDto'],
   [AdCardDto, 'AdCardDto'],
+  [InlineAdDto, 'InlineAdDto'],
   [VideoCardDto, 'VideoCardDto'],
 ]);
 
@@ -162,6 +163,11 @@ const body = [
     'AdCardDto',
     AdCardDto,
     '/** A sponsored card. Discriminated from editorial on `kind`. */',
+  ),
+  declare(
+    'InlineAdDto',
+    InlineAdDto,
+    '/** The small ad carried on a story, beside save and share. On the feed entry, never the card. */',
   ),
   declare('VideoCardDto', VideoCardDto, '/** A short, as GET /v1/videos returns it. */'),
 ].join('\n');

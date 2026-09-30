@@ -78,6 +78,25 @@ export interface AdCardDto {
   } | null;
 }
 
+/** The small ad carried on a story, beside save and share. On the feed entry, never the card. */
+export interface InlineAdDto {
+  kind: "inlineAd";
+  id: string;
+  campaignId: string;
+  language: "ne" | "en";
+  advertiser: string;
+  text: string;
+  landingUrl: string;
+  logo: {
+    blurHash: string | null;
+    urls: {
+      sm: string | null;
+      md: string | null;
+      lg: string | null;
+    };
+  } | null;
+}
+
 /** A short, as GET /v1/videos returns it. */
 export interface VideoCardDto {
   kind: "video";

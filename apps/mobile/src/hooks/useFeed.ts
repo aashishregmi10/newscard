@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchFeed, isAd, type Card } from '../api/client';
+import { fetchFeed, isAd } from '../api/client';
 import { putCards, getCards, evict } from '../db/cache';
-import { adsShownToday, loadAdBudget } from '../lib/adTracker';
+import { adsShownToday, inlineShownToday, loadAdBudget } from '../lib/adTracker';
 import {
   appendPage,
+  cacheable,
   runFeedLoad,
   INITIAL_FEED_STATE,
   type FeedLoadDeps,
@@ -43,6 +44,7 @@ export function useFeed(languages: Array<'ne' | 'en'>, category: string) {
     fetchPage: (args) => fetchFeed(args),
     loadAdBudget,
     adsShownToday,
+    inlineShownToday,
     persist: (articles, cat) => {
       void putCards(articles, cat)
         .then(() => evict())
@@ -85,6 +87,7 @@ export function useFeed(languages: Array<'ne' | 'en'>, category: string) {
         limit: 20,
         seen: contentSeen.current,
         adsToday: adsShownToday(),
+        inlineToday: inlineShownToday(),
       });
       // Deduplicated on append — see appendPage for why the cursor alone is not
       // the same guarantee.
@@ -92,10 +95,7 @@ export function useFeed(languages: Array<'ne' | 'en'>, category: string) {
       contentSeen.current += page.items.filter((i) => !isAd(i)).length;
       cursor.current = page.nextCursor;
       hasMore.current = page.hasMore;
-      void putCards(
-        page.items.filter((i): i is Card => !isAd(i)),
-        category,
-      ).catch(() => undefined);
+      void putCards(cacheable(page.items), category).catch(() => undefined);
     } catch {
       // Silent. The reader still has everything above; a toast would interrupt
       // reading to report something they never asked for.

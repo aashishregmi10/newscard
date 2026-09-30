@@ -53,6 +53,24 @@ export const INITIAL_FEED_STATE: FeedState = {
 export const isAdEntry = (e: FeedEntry): boolean =>
   (e as { kind?: string }).kind === 'ad';
 
+/**
+ * The part of a page that may be cached for offline reading: the stories,
+ * without any ad.
+ *
+ * Full-card ads are dropped, as they always were, and the small ad riding on
+ * a story is stripped from it. Both have a flight window and a budget; replayed
+ * from a cache they would be shown after their campaign ended, and every view
+ * of them would be one nobody paid for.
+ */
+export function cacheable(entries: FeedEntry[]): Card[] {
+  return entries
+    .filter((e) => !isAdEntry(e))
+    .map((e) => {
+      const { inlineAd: _dropped, ...card } = e as Card & { inlineAd?: unknown };
+      return card as Card;
+    });
+}
+
 export interface FeedLoadDeps {
   getCached(category: string, languages: Array<'ne' | 'en'>): Promise<FeedEntry[]>;
   fetchPage(args: {
@@ -61,10 +79,12 @@ export interface FeedLoadDeps {
     limit: number;
     seen: number;
     adsToday: number;
+    inlineToday: number;
     cursor?: string;
   }): Promise<FeedPage>;
   loadAdBudget(): Promise<void>;
   adsShownToday(): number;
+  inlineShownToday(): number;
   /** Fire-and-forget. Caching must never delay what is on screen. */
   persist(articles: Card[], category: string): void;
 }
@@ -154,6 +174,7 @@ export async function runFeedLoad(
       limit: 20,
       seen: 0,
       adsToday: deps.adsShownToday(),
+      inlineToday: deps.inlineShownToday(),
     });
     if (!isCurrent()) return null;
 
@@ -165,10 +186,8 @@ export async function runFeedLoad(
       refreshing: false,
     });
 
-    // Only editorial is cached. An ad has a flight window and a budget; serving
-    // one from a stale cache would bill nobody and mislead the reader after the
-    // campaign has ended.
-    deps.persist(page.items.filter((i): i is Card => !isAdEntry(i)), category);
+    // Only editorial is cached, and without its small ad — see cacheable.
+    deps.persist(cacheable(page.items), category);
 
     return {
       nextCursor: page.nextCursor,

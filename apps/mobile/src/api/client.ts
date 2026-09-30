@@ -7,7 +7,7 @@
  */
 
 import Constants from 'expo-constants';
-import type { AdCardDto, ArticleCardDto, VideoCardDto, VideoRendition } from './generated/dto';
+import type { AdCardDto, ArticleCardDto, InlineAdDto, VideoCardDto, VideoRendition } from './generated/dto';
 
 /**
  * Where the API lives.
@@ -66,12 +66,21 @@ export function resolveMediaUrl(url: string | null | undefined): string | null {
 export type Card = ArticleCardDto;
 export type CardImage = NonNullable<ArticleCardDto['image']>;
 export type AdCard = AdCardDto;
+export type InlineAd = InlineAdDto;
+export type AdPlacement = 'card' | 'inline';
 export type VideoCard = VideoCardDto;
 export type { VideoRendition } from './generated/dto';
 
-/** A feed entry is either editorial or an ad. Discriminated on `kind` so the
- *  two can never be confused at a call site. */
-export type FeedEntry = (Card & { kind?: 'article' }) | AdCard;
+/**
+ * A feed entry is either editorial or an ad. Discriminated on `kind` so the
+ * two can never be confused at a call site.
+ *
+ * A story may carry a small ad of its own, `inlineAd`, shown beside save and
+ * share. It rides on the entry and never on the card itself, and it is
+ * stripped before a story is cached (cacheable, in hooks/feedLoad) so an
+ * ended campaign is never replayed offline.
+ */
+export type FeedEntry = (Card & { kind?: 'article'; inlineAd?: InlineAd }) | AdCard;
 
 export const isAd = (e: FeedEntry): e is AdCard => (e as AdCard).kind === 'ad';
 
@@ -101,8 +110,11 @@ export async function fetchFeed(opts: {
    *  of ABSOLUTE position, so without this every page would restart the count
    *  and the reader would meet an ad every few cards at each page boundary. */
   seen?: number;
-  /** Ads this device has already been shown today, for the daily cap. */
+  /** Full-card ads this device has already been shown today, for the daily cap. */
   adsToday?: number;
+  /** Small ads shown today, counted apart: at one per story, sharing the
+   *  full-card count would spend its daily allowance in a dozen stories. */
+  inlineToday?: number;
 }): Promise<FeedPage> {
   const params = new URLSearchParams({
     lang: opts.languages.join(','),
@@ -110,6 +122,7 @@ export async function fetchFeed(opts: {
     limit: String(opts.limit ?? 20),
     seen: String(opts.seen ?? 0),
     adsToday: String(opts.adsToday ?? 0),
+    inlineToday: String(opts.inlineToday ?? 0),
   });
   if (opts.cursor) params.set('cursor', opts.cursor);
 
@@ -226,6 +239,8 @@ export function blurHashAverageColor(hash: string | null | undefined): string | 
 export interface AdEventInput {
   campaignId: string;
   type: 'impression' | 'click';
+  /** Which product delivered it: the full card, or the small ad on a story. */
+  placement: AdPlacement;
   dwellMs: number;
   categorySlug: string;
   occurredAt: string;

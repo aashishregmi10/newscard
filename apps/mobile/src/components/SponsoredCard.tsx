@@ -1,31 +1,42 @@
-import { memo } from 'react';
-import { View, Text, StyleSheet, Pressable, Linking } from 'react-native';
+import { memo, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, Linking, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { CardImage } from './CardImage';
-import type { AdCard } from '../api/client';
+import { blurHashAverageColor, resolveMediaUrl, type AdCard } from '../api/client';
 import { LINE_HEIGHT, TYPE, fontFor, type Theme } from '../theme/tokens';
 
 /**
- * A sponsored card.
+ * A sponsored card: the advertiser's poster, filling the card.
  *
- * ── Why it deliberately does NOT look like a story ──────────────────────────
+ * ── Why a poster, and why it is shown whole ─────────────────────────────────
+ * Most local businesses already have a designed poster, and it says what they
+ * want said better than a headline and a paragraph would. It is shown at its
+ * own shape, letterboxed on a dark ground, never cropped: a poster's price and
+ * phone number sit at its edges, which is exactly what a crop removes.
+ *
+ * ── Why it still cannot be mistaken for a story ─────────────────────────────
  * The commercial temptation is to make an ad indistinguishable from editorial,
  * because it performs better. It is also the fastest way to destroy the thing
  * being sold: a reader who discovers they were fooled stops trusting every
- * card, including the real ones.
+ * card, including the real ones. So:
  *
- * So this card shares the story LAYOUT — same rhythm, same proportions, so the
- * feed does not jolt — while being unmistakably marked:
+ *   • a "Sponsored" chip in the reader's language, top of the card
+ *   • the advertiser's real name beside it, where a publisher's would sit
+ *   • a tinted leading edge
+ *   • a button, which no story has
  *
- *   • a "Sponsored" chip in the accent colour, top of the card, before the
- *     headline is read
- *   • the advertiser's real name where a publisher's name would sit
- *   • a tinted edge down the leading side
- *   • an explicit call-to-action button, which no story has
+ * It is excluded from "cards read" for the notification prompt, and from the
+ * bookmark and share actions. An ad is not a story and should not behave like
+ * one anywhere.
  *
- * It is also excluded from "cards read" for the notification prompt, and from
- * the bookmark and share actions. An ad is not a story and should not behave
- * like one anywhere.
+ * ── Where a tap goes ────────────────────────────────────────────────────────
+ * Anywhere on the card opens the advertiser's page OUTSIDE the app, in the
+ * phone's browser. The click is reported first: once the browser takes over,
+ * the app may be backgrounded before a queued event is ever sent.
+ *
+ * ── On data saver ───────────────────────────────────────────────────────────
+ * The poster is the heaviest thing on the card, and a reader who asked to save
+ * data did not ask to spend it on advertising. They get the advertiser's
+ * one-line description and the button instead.
  */
 
 interface Props {
@@ -39,12 +50,21 @@ interface Props {
 }
 
 const SPONSORED = { ne: 'प्रायोजित', en: 'Sponsored' } as const;
+const DISCLOSURE = {
+  ne: 'यो विज्ञापन हो। सम्पादकीय सामग्री होइन।',
+  en: 'This is an advertisement, not editorial content.',
+} as const;
 
 function SponsoredCardInner({ ad, theme, height, textScale, dataSaver, lang, onClick }: Props) {
+  const [failed, setFailed] = useState(false);
+  const poster = resolveMediaUrl(ad.image?.urls.lg ?? ad.image?.urls.md ?? ad.image?.urls.sm ?? null);
+  const showPoster = !dataSaver && poster !== null && !failed;
+
   const lh = LINE_HEIGHT[ad.language];
   const fontFamily = fontFor(ad.language);
-  const bodySize = TYPE.summary.size * textScale;
   const headlineSize = TYPE.headline.size * textScale;
+  const bodySize = TYPE.summary.size * textScale;
+  const ground = blurHashAverageColor(ad.image?.blurHash ?? null) ?? '#0f1113';
 
   const open = () => {
     onClick(ad);
@@ -52,7 +72,12 @@ function SponsoredCardInner({ ad, theme, height, textScale, dataSaver, lang, onC
   };
 
   return (
-    <View style={[styles.card, { height, backgroundColor: theme.surface }]}>
+    <Pressable
+      onPress={open}
+      style={[styles.card, { height, backgroundColor: theme.surface }]}
+      accessibilityRole="link"
+      accessibilityLabel={`${SPONSORED[lang]}: ${ad.advertiser}. ${ad.headline}. ${ad.callToAction[lang]}`}
+    >
       {/* Tinted leading edge — a second, non-textual signal that this is not
           editorial, visible even at a glance while scrolling. */}
       <View style={[styles.edge, { backgroundColor: theme.accent }]} />
@@ -67,61 +92,56 @@ function SponsoredCardInner({ ad, theme, height, textScale, dataSaver, lang, onC
         </Text>
       </View>
 
-      <CardImage
-        image={
-          ad.image
-            ? { credit: '', blurHash: ad.image.blurHash, width: null, height: null, urls: ad.image.urls }
-            : null
-        }
-        theme={theme}
-        height={height * 0.34}
-        dataSaver={dataSaver}
-      />
+      {showPoster ? (
+        <View style={[styles.posterFrame, { backgroundColor: ground }]}>
+          <Image
+            source={{ uri: poster }}
+            style={styles.poster}
+            resizeMode="contain"
+            onError={() => setFailed(true)}
+            accessibilityIgnoresInvertColors
+          />
+        </View>
+      ) : (
+        /* No poster to show — data saver, a failed load, or an ad without one.
+           The description stands in for it, in the ad's own language. */
+        <View style={styles.textBody}>
+          <Text
+            style={[
+              styles.headline,
+              {
+                color: theme.textPrimary,
+                fontSize: headlineSize,
+                lineHeight: headlineSize * TYPE.headline.lineHeight,
+                fontFamily,
+              },
+            ]}
+            numberOfLines={4}
+          >
+            {ad.headline}
+          </Text>
+          {ad.body !== '' && (
+            <Text
+              style={[
+                styles.text,
+                { color: theme.textSecondary, fontSize: bodySize, lineHeight: bodySize * lh, fontFamily },
+              ]}
+            >
+              {ad.body}
+            </Text>
+          )}
+        </View>
+      )}
 
-      <View style={styles.body}>
-        <Text
-          style={[
-            styles.headline,
-            {
-              color: theme.textPrimary,
-              fontSize: headlineSize,
-              lineHeight: headlineSize * TYPE.headline.lineHeight,
-              fontFamily,
-            },
-          ]}
-          numberOfLines={3}
-        >
-          {ad.headline}
-        </Text>
+      <Text style={[styles.disclosure, { color: theme.textSecondary }]}>{DISCLOSURE[lang]}</Text>
 
-        <Text
-          style={[
-            styles.text,
-            { color: theme.textSecondary, fontSize: bodySize, lineHeight: bodySize * lh, fontFamily },
-          ]}
-        >
-          {ad.body}
-        </Text>
-
-        <Text style={[styles.disclosure, { color: theme.textSecondary }]}>
-          {lang === 'ne'
-            ? 'यो विज्ञापन हो। सम्पादकीय सामग्री होइन।'
-            : 'This is an advertisement, not editorial content.'}
-        </Text>
-      </View>
-
-      {/* An explicit button, which no story has — the affordance itself
-          distinguishes the card. */}
-      <Pressable
-        style={[styles.cta, { backgroundColor: theme.accent }]}
-        onPress={open}
-        accessibilityRole="link"
-        accessibilityLabel={`${SPONSORED[lang]}: ${ad.callToAction[lang]}`}
-      >
+      {/* The button is part of the one tap target, not a second one: the whole
+          card opens the page, and this is the affordance that says so. */}
+      <View style={[styles.cta, { backgroundColor: theme.accent }]}>
         <Text style={styles.ctaText}>{ad.callToAction[lang]}</Text>
-        <MaterialCommunityIcons name="arrow-right" size={17} color="#fff" />
-      </Pressable>
-    </View>
+        <MaterialCommunityIcons name="open-in-new" size={16} color="#fff" />
+      </View>
+    </Pressable>
   );
 }
 
@@ -150,16 +170,19 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.6 },
   advertiser: { fontSize: 12.5, fontWeight: '600', flexShrink: 1, marginLeft: 10 },
-  body: { flex: 1, paddingHorizontal: 18, paddingTop: 18 },
-  headline: { fontWeight: '600', marginBottom: 10 },
+  posterFrame: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  poster: { width: '100%', height: '100%' },
+  textBody: { flex: 1, paddingHorizontal: 18, paddingTop: 22, justifyContent: 'center' },
+  headline: { fontWeight: '600', marginBottom: 12 },
   text: { marginBottom: 14 },
-  disclosure: { fontSize: 11, marginTop: 'auto', marginBottom: 14, opacity: 0.8 },
+  disclosure: { fontSize: 11, marginTop: 10, marginHorizontal: 18, opacity: 0.8 },
   cta: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     marginHorizontal: 18,
+    marginTop: 10,
     marginBottom: 22,
     paddingVertical: 14,
     borderRadius: 26,

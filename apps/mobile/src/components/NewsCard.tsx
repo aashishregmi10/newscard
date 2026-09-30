@@ -3,7 +3,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useRef, memo } from 'react';
 import { Animated } from 'react-native';
-import type { Card } from '../api/client';
+import type { Card, InlineAd as InlineAdData } from '../api/client';
+import { InlineAd } from './InlineAd';
 import { CardImage } from './CardImage';
 import { relativeTime } from '../lib/relativeTime';
 import { useBookmarks } from '../state/BookmarksContext';
@@ -29,9 +30,22 @@ interface Props {
   isDark?: boolean;
   /** Opens the overflow menu (Ch. 7.8). */
   onMenu?: (card: Card) => void;
+  /** The small ad this story carries, if the feed attached one. */
+  inlineAd?: InlineAdData | undefined;
+  /** Reported before the ad’s page opens. */
+  onInlineAd?: (ad: InlineAdData) => void;
 }
 
-function NewsCardInner({ card, theme, height, textScale, dataSaver, onMenu }: Props) {
+function NewsCardInner({
+  card,
+  theme,
+  height,
+  textScale,
+  dataSaver,
+  onMenu,
+  inlineAd,
+  onInlineAd,
+}: Props) {
   const bookmarks = useBookmarks();
   const saved = bookmarks.has(card.id);
 
@@ -94,9 +108,25 @@ function NewsCardInner({ card, theme, height, textScale, dataSaver, onMenu }: Pr
       />
 
       <View style={[styles.actionRow, { borderBottomColor: theme.divider }]}>
-        <Text style={[styles.sourceChip, { color: theme.accent }]} numberOfLines={1}>
+        {/*
+          * With a small ad, the publisher’s name keeps up to 45% of the row and
+          * the ad takes what is left, centred between the name and the icons,
+          * shortening before the name ever does. Without one, the name has the
+          * row as before.
+          */}
+        <Text
+          style={[inlineAd ? styles.sourceChipWithAd : styles.sourceChip, { color: theme.accent }]}
+          numberOfLines={1}
+        >
           {card.source.name}
         </Text>
+        {inlineAd && onInlineAd && (
+          <>
+            <View style={styles.spacer} />
+            <InlineAd ad={inlineAd} theme={theme} lang={card.language} onPress={onInlineAd} />
+            <View style={styles.spacer} />
+          </>
+        )}
         <View style={styles.actions}>
           {/* Optimistic and instant — nothing leaves the device, so there is
               nothing to fail and no spinner to show (Ch. 9.4). */}
@@ -226,6 +256,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sourceChip: { fontSize: TYPE.chip.size, fontWeight: TYPE.chip.weight, flex: 1 },
+  sourceChipWithAd: {
+    fontSize: TYPE.chip.size,
+    fontWeight: TYPE.chip.weight,
+    flexShrink: 0,
+    maxWidth: '45%',
+  },
+  spacer: { flex: 1, minWidth: 0 },
   actions: { flexDirection: 'row', gap: 20 },
   actionIcon: { fontSize: 18, width: 24, textAlign: 'center' },
   body: { flex: 1, paddingHorizontal: 18, paddingTop: 16 },
