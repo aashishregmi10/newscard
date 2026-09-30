@@ -28,7 +28,7 @@ body,
  * the `!important` that one needs to stay ahead of what it is fighting.
  */
 html {
-  font-size: 16px;
+  font-size: calc(16px * var(--text-scale));
 }
 
 body {

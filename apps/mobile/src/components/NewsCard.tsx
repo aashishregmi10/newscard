@@ -8,7 +8,7 @@ import { InlineAd } from './InlineAd';
 import { CardImage } from './CardImage';
 import { relativeTime } from '../lib/relativeTime';
 import { useBookmarks } from '../state/BookmarksContext';
-import { LINE_HEIGHT, TYPE, fontFor, type Theme } from '../theme/tokens';
+import { LINE_HEIGHT, TYPE, fontFor, type Theme, textSize } from '../theme/tokens';
 import { notePublisherOpen } from '../lib/telemetry';
 import { openArticleInApp } from '../lib/openArticle';
 
@@ -246,13 +246,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
-  overflowIcon: { fontSize: 19, lineHeight: 21, fontWeight: '700' },
+  overflowIcon: { fontSize: textSize(19), lineHeight: textSize(21), fontWeight: '700' },
   actionRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    height: 40,
+    /* A minimum, not a height: the publisher’s name and the small ad are
+       text, and text grows with BASE_TEXT_SCALE and the reader’s own setting. */
+    minHeight: 46,
+    paddingVertical: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   sourceChip: { fontSize: TYPE.chip.size, fontWeight: TYPE.chip.weight, flex: 1 },
@@ -264,13 +267,13 @@ const styles = StyleSheet.create({
   },
   spacer: { flex: 1, minWidth: 0 },
   actions: { flexDirection: 'row', gap: 20 },
-  actionIcon: { fontSize: 18, width: 24, textAlign: 'center' },
+  actionIcon: { fontSize: textSize(18), width: 24, textAlign: 'center' },
   body: { flex: 1, paddingHorizontal: 18, paddingTop: 16 },
   headline: { fontWeight: TYPE.headline.weight, marginBottom: 10 },
   summary: { marginBottom: 14 },
   attribution: { marginTop: 'auto', marginBottom: 12 },
   strip: { paddingHorizontal: 18, paddingVertical: 12, minHeight: 64, justifyContent: 'center' },
-  pullQuote: { fontSize: 15, fontWeight: '600', marginBottom: 3 },
-  stripCta: { fontSize: 13, opacity: 0.8 },
+  pullQuote: { fontSize: textSize(15), fontWeight: '600', marginBottom: 3 },
+  stripCta: { fontSize: textSize(13), opacity: 0.8 },
   stripRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

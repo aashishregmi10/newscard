@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { Image, Linking, Pressable, StyleSheet, Text } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveMediaUrl, type InlineAd as InlineAdData } from '../api/client';
-import { fontFor, type Theme } from '../theme/tokens';
+import { fontFor, type Theme, textSize } from '../theme/tokens';
 
 /**
  * The small ad on a story: one line, in the row with save and share.
@@ -84,6 +84,6 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   logo: { width: 14, height: 14, borderRadius: 3 },
-  label: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.3 },
-  text: { flexShrink: 1, fontSize: 12, fontWeight: '500' },
+  label: { fontSize: textSize(10.5), fontWeight: '800', letterSpacing: 0.3 },
+  text: { flexShrink: 1, fontSize: textSize(12), fontWeight: '500' },
 });

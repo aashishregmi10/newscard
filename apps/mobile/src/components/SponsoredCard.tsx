@@ -2,7 +2,7 @@ import { memo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Linking, Image } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { blurHashAverageColor, resolveMediaUrl, type AdCard } from '../api/client';
-import { LINE_HEIGHT, TYPE, fontFor, type Theme } from '../theme/tokens';
+import { LINE_HEIGHT, TYPE, fontFor, type Theme, textSize } from '../theme/tokens';
 
 /**
  * A sponsored card: the advertiser's poster, filling the card.
@@ -156,7 +156,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 18,
-    height: 42,
+    minHeight: 48,
+    paddingVertical: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   badge: {
@@ -168,14 +169,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 7,
     paddingVertical: 3,
   },
-  badgeText: { fontSize: 10.5, fontWeight: '800', letterSpacing: 0.6 },
-  advertiser: { fontSize: 12.5, fontWeight: '600', flexShrink: 1, marginLeft: 10 },
+  badgeText: { fontSize: textSize(10.5), fontWeight: '800', letterSpacing: 0.6 },
+  advertiser: { fontSize: textSize(12.5), fontWeight: '600', flexShrink: 1, marginLeft: 10 },
   posterFrame: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   poster: { width: '100%', height: '100%' },
   textBody: { flex: 1, paddingHorizontal: 18, paddingTop: 22, justifyContent: 'center' },
   headline: { fontWeight: '600', marginBottom: 12 },
   text: { marginBottom: 14 },
-  disclosure: { fontSize: 11, marginTop: 10, marginHorizontal: 18, opacity: 0.8 },
+  disclosure: { fontSize: textSize(11), marginTop: 10, marginHorizontal: 18, opacity: 0.8 },
   cta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -187,5 +188,5 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 26,
   },
-  ctaText: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
+  ctaText: { color: '#fff', fontSize: textSize(15.5), fontWeight: '700' },
 });

@@ -2,6 +2,7 @@ import { Modal, View, Text, Pressable, StyleSheet, Share, Linking } from 'react-
 import * as Clipboard from 'expo-clipboard';
 import type { Card } from '../api/client';
 import type { Theme } from '../theme/tokens';
+import { textSize } from '../theme/tokens';
 
 /**
  * The card overflow menu.  Spec Ch. 7.8.
@@ -65,7 +66,7 @@ export function CardMenu({
       }}
       accessibilityRole="button"
     >
-      <Text style={{ fontSize: 15.5, color: destructive ? '#C0392B' : theme.textPrimary }}>
+      <Text style={{ fontSize: textSize(15.5), color: destructive ? '#C0392B' : theme.textPrimary }}>
         {label}
       </Text>
     </Pressable>
@@ -116,7 +117,7 @@ export function CardMenu({
         <Item label={T.report[lang]} onPress={() => undefined} destructive />
 
         <Pressable style={styles.cancel} onPress={onClose}>
-          <Text style={{ fontSize: 15.5, fontWeight: '600', color: theme.accent }}>
+          <Text style={{ fontSize: textSize(15.5), fontWeight: '600', color: theme.accent }}>
             {T.cancel[lang]}
           </Text>
         </Pressable>
@@ -134,7 +135,7 @@ const styles = StyleSheet.create({
     paddingBottom: 28,
   },
   grabber: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 9, marginBottom: 6 },
-  title: { fontSize: 12.5, paddingHorizontal: 20, paddingVertical: 10 },
+  title: { fontSize: textSize(12.5), paddingHorizontal: 20, paddingVertical: 10 },
   item: { paddingHorizontal: 20, paddingVertical: 15, borderBottomWidth: StyleSheet.hairlineWidth },
   cancel: { paddingVertical: 15, alignItems: 'center' },
 });

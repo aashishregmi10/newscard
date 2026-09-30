@@ -3,6 +3,7 @@ import { View, StyleSheet, type ColorValue } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSettings } from '../../src/state/SettingsContext';
 import { emitFeedTabPress } from '../../src/lib/feedTabSignal';
+import { textSize } from '../../src/theme/tokens';
 
 /**
  * Bottom navigation.  Spec Ch. 7.9.
@@ -80,11 +81,12 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: theme.surface,
           borderTopColor: theme.divider,
-          height: 58,
+          /* Room for an icon and a label at BASE_TEXT_SCALE. */
+          height: 64,
           paddingBottom: 6,
           paddingTop: 6,
         },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: textSize(11), fontWeight: '600' },
       }}
     >
       <Tabs.Screen

@@ -48,11 +48,32 @@ export type Theme = { readonly [K in keyof typeof light]: string };
  */
 export const LINE_HEIGHT = { ne: 1.7, en: 1.55 } as const;
 
+/**
+ * How large all text in the app is, as one number.
+ *
+ * Every font size in the app is a base size passed through textSize() — the
+ * story type scale below and every size in every component — so none can be
+ * left behind. Raised to 1.25 because the app read small; to change it again,
+ * change it here.
+ *
+ * It sits UNDER the reader’s own text-size setting (TEXT_SCALE, below) and
+ * the phone’s font scale, which still multiply on top: this is the default
+ * size, not a cap.
+ */
+export const BASE_TEXT_SCALE = 1.25;
+
+/** A base text size at the app’s text scale, to the nearest half point. */
+export function textSize(base: number): number {
+  return Math.round(base * BASE_TEXT_SCALE * 2) / 2;
+}
+
+/* Base sizes: headline 20, summary 16, attribution 12, chip 13. The line
+   heights here are multipliers of the size, so they scale with it. */
 export const TYPE = {
-  headline: { size: 20, weight: '600' as const, lineHeight: 1.3, maxLines: 3 },
-  summary: { size: 16, weight: '400' as const },
-  attribution: { size: 12, weight: '400' as const, lineHeight: 1.4 },
-  chip: { size: 13, weight: '600' as const },
+  headline: { size: textSize(20), weight: '600' as const, lineHeight: 1.3, maxLines: 3 },
+  summary: { size: textSize(16), weight: '400' as const },
+  attribution: { size: textSize(12), weight: '400' as const, lineHeight: 1.4 },
+  chip: { size: textSize(13), weight: '600' as const },
 } as const;
 
 /** Ch. 11.6.1 — multiplies with the OS font scale, capped at a combined 1.8. */

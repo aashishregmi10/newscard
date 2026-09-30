@@ -2,6 +2,7 @@ import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { reportError } from '../lib/telemetry';
 import { View, Text, ScrollView, Pressable, StyleSheet, Platform } from 'react-native';
 import Constants from 'expo-constants';
+import { textSize } from '../theme/tokens';
 
 /**
  * Catches render errors and SHOWS them.
@@ -144,11 +145,11 @@ export class ErrorBoundary extends Component<Props, State> {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#12141a' },
   body: { padding: 22, paddingTop: 64, paddingBottom: 48 },
-  title: { color: '#fff', fontSize: 21, fontWeight: '700', marginBottom: 6 },
-  sub: { color: '#9aa3ad', fontSize: 13.5, lineHeight: 19, marginBottom: 22 },
+  title: { color: '#fff', fontSize: textSize(21), fontWeight: '700', marginBottom: 6 },
+  sub: { color: '#9aa3ad', fontSize: textSize(13.5), lineHeight: textSize(19), marginBottom: 22 },
   label: {
     color: '#6f7883',
-    fontSize: 10.5,
+    fontSize: textSize(10.5),
     fontWeight: '700',
     letterSpacing: 1,
     marginBottom: 6,
@@ -163,8 +164,8 @@ const styles = StyleSheet.create({
   },
   mono: {
     color: '#e6eaf0',
-    fontSize: 11.5,
-    lineHeight: 17,
+    fontSize: textSize(11.5),
+    lineHeight: textSize(17),
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
   },
   btn: {
@@ -174,6 +175,6 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     alignItems: 'center',
   },
-  btnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  detailsLink: { color: '#7fa8d4', fontSize: 13, marginTop: 8, textDecorationLine: 'underline' },
+  btnText: { color: '#fff', fontWeight: '700', fontSize: textSize(15) },
+  detailsLink: { color: '#7fa8d4', fontSize: textSize(13), marginTop: 8, textDecorationLine: 'underline' },
 });

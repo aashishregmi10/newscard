@@ -6,6 +6,7 @@ import { NewsCard } from '../../src/components/NewsCard';
 import { CardSkeleton } from '../../src/components/CardSkeleton';
 import { fetchArticle, ArticleGoneError, type Card } from '../../src/api/client';
 import { useSettings } from '../../src/state/SettingsContext';
+import { textSize } from '../../src/theme/tokens';
 
 /**
  * Deep-link target.  Spec Ch. 10.7, tested as N-09 in Ch. 16.10.
@@ -55,7 +56,7 @@ export default function ArticleScreen() {
     <View style={[styles.root, { backgroundColor: theme.surface, paddingTop: insets.top }]}>
       <View style={[styles.bar, { borderBottomColor: theme.divider }]}>
         <Pressable onPress={back} hitSlop={12} accessibilityRole="button">
-          <Text style={{ color: theme.accent, fontSize: 15, fontWeight: '600' }}>
+          <Text style={{ color: theme.accent, fontSize: textSize(15), fontWeight: '600' }}>
             {lang === 'ne' ? '← फिड' : '← Feed'}
           </Text>
         </Pressable>
@@ -113,7 +114,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   centre: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  title: { fontSize: 17, fontWeight: '600', marginBottom: 8, textAlign: 'center' },
-  body: { fontSize: 14, textAlign: 'center', marginBottom: 20, lineHeight: 20 },
+  title: { fontSize: textSize(17), fontWeight: '600', marginBottom: 8, textAlign: 'center' },
+  body: { fontSize: textSize(14), textAlign: 'center', marginBottom: 20, lineHeight: textSize(20) },
   btn: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22, borderWidth: 1 },
 });

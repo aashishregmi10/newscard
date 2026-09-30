@@ -179,9 +179,9 @@
   border-radius: var(--r-pill);
   background: var(--action-selected);
   color: var(--ink-faint);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   font-weight: 500;
-  line-height: 20px;
+  line-height: calc(20px * var(--text-scale));
   letter-spacing: 0;
   text-align: center;
 }
@@ -257,8 +257,8 @@
 
 /* Material's PaginationItem: a 32px circle, not a square. */
 .pager-page {
-  min-width: 32px;
-  height: 32px;
+  min-width: calc(32px * var(--text-scale));
+  height: calc(32px * var(--text-scale));
   padding: 0 6px;
   border: 0;
   border-radius: var(--r-pill);
@@ -842,7 +842,7 @@
   counter-increment: step;
   padding-left: var(--s6);
   color: var(--ink-faint);
-  font-size: 13px;
+  font-size: calc(13px * var(--text-scale));
   line-height: 1.55;
 }
 
@@ -862,7 +862,7 @@
   border-radius: 50%;
   background: var(--accent-soft);
   color: var(--accent);
-  font-size: 11px;
+  font-size: calc(11px * var(--text-scale));
   font-weight: 600;
 }
 
@@ -1901,7 +1901,7 @@
   border-radius: 22px;
   background: #16181b;
   color: #e9ebee;
-  font-size: 12px;
+  font-size: calc(12px * var(--text-scale));
 }
 
 .phone-photo {
@@ -2001,7 +2001,7 @@
   border: 1px solid #6ea8ff;
   border-radius: 4px;
   color: #6ea8ff;
-  font-size: 10px;
+  font-size: calc(10px * var(--text-scale));
   font-weight: 800;
   letter-spacing: 0.04em;
 }

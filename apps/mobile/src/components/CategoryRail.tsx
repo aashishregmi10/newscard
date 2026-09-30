@@ -1,6 +1,7 @@
 import { useEffect, useRef, memo } from 'react';
 import { ScrollView, Pressable, Text, StyleSheet, View } from 'react-native';
 import type { Theme } from '../theme/tokens';
+import { textSize } from '../theme/tokens';
 
 /**
  * Category rail.  Spec Ch. 7.9.
@@ -104,6 +105,6 @@ const styles = StyleSheet.create({
   wrap: { borderBottomWidth: StyleSheet.hairlineWidth },
   content: { paddingHorizontal: 14, gap: 20, alignItems: 'flex-end' },
   item: { paddingTop: 13, alignItems: 'center', minHeight: 44, justifyContent: 'flex-end' },
-  label: { fontSize: 15, letterSpacing: 0.1 },
+  label: { fontSize: textSize(15), letterSpacing: 0.1 },
   underline: { height: 2.5, borderRadius: 2, alignSelf: 'stretch', marginTop: 8 },
 });

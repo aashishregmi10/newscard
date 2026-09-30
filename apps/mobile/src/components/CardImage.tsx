@@ -6,6 +6,7 @@ import {
   type CardImage as CardImageData,
 } from '../api/client';
 import type { Theme } from '../theme/tokens';
+import { textSize } from '../theme/tokens';
 
 /**
  * The card's image region.  Spec Ch. 7.2.1 and Ch. 12.2.
@@ -122,7 +123,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  loadBtnText: { color: '#fff', fontSize: 14, fontWeight: '600' },
-  loadBtnSize: { color: 'rgba(255,255,255,0.75)', fontSize: 11, marginTop: 1 },
-  failText: { color: 'rgba(255,255,255,0.7)', fontSize: 12 },
+  loadBtnText: { color: '#fff', fontSize: textSize(14), fontWeight: '600' },
+  loadBtnSize: { color: 'rgba(255,255,255,0.75)', fontSize: textSize(11), marginTop: 1 },
+  failText: { color: 'rgba(255,255,255,0.7)', fontSize: textSize(12) },
 });

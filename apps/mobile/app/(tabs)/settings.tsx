@@ -5,7 +5,7 @@ import { useSettings, type ThemeMode } from '../../src/state/SettingsContext';
 import { useBookmarks } from '../../src/state/BookmarksContext';
 import { useFilters } from '../../src/state/FiltersContext';
 import { useDevice } from '../../src/state/DeviceContext';
-import { TEXT_SCALE, type TextSizeSetting } from '../../src/theme/tokens';
+import { TEXT_SCALE, type TextSizeSetting, textSize } from '../../src/theme/tokens';
 import type { Theme } from '../../src/theme/tokens';
 
 /**
@@ -107,7 +107,7 @@ function Segmented<T extends string>({
           >
             <Text
               style={{
-                fontSize: 12.5,
+                fontSize: textSize(12.5),
                 fontWeight: '600',
                 color: on ? '#fff' : theme.textSecondary,
               }}
@@ -480,10 +480,10 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: { paddingHorizontal: 18, paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth },
-  title: { fontSize: 20, fontWeight: '700' },
+  title: { fontSize: textSize(20), fontWeight: '700' },
   section: { marginBottom: 20 },
   sectionTitle: {
-    fontSize: 11,
+    fontSize: textSize(11),
     fontWeight: '700',
     letterSpacing: 0.8,
     marginBottom: 7,
@@ -500,9 +500,9 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowLabel: { flex: 1 },
-  rowText: { fontSize: 15, fontWeight: '500' },
-  rowHint: { fontSize: 12, marginTop: 2, lineHeight: 16 },
-  note: { fontSize: 12, lineHeight: 17, marginTop: -12, marginBottom: 20, marginHorizontal: 4 },
+  rowText: { fontSize: textSize(15), fontWeight: '500' },
+  rowHint: { fontSize: textSize(12), marginTop: 2, lineHeight: textSize(16) },
+  note: { fontSize: textSize(12), lineHeight: textSize(17), marginTop: -12, marginBottom: 20, marginHorizontal: 4 },
   seg: { flexDirection: 'row', borderRadius: 8, borderWidth: 1, overflow: 'hidden' },
   segItem: { paddingHorizontal: 11, paddingVertical: 6 },
 });

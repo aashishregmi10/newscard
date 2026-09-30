@@ -116,15 +116,27 @@
     'Noto Sans Devanagari', 'Noto Sans', Roboto, Helvetica, Arial, sans-serif;
   --mono: ui-monospace, SFMono-Regular, 'Cascadia Mono', Consolas, monospace;
 
-  /* Material's type scale, at the sizes a dense screen actually uses:
-     caption 12, body2 14, body1/subtitle1 16, h6 20, h5 24. */
-  --text-xs: 12px;
-  --text-sm: 13px;
-  --text-base: 14px;
-  --text-md: 16px;
-  --text-lg: 20px;
-  --text-xl: 24px;
-  --text-2xl: 34px;
+  /*
+   * How large all text is, as one number.
+   *
+   * Every font size in the editorial site, the public pages and the advertiser
+   * report is a base size times this — the tokens below, and the handful of
+   * literal sizes elsewhere, which are written as calc(Npx * var(--text-scale))
+   * so none of them can be left behind. Raised to 1.25 because the site read
+   * small; to change it again, change it here.
+   *
+   * The base sizes are Material’s type scale at the sizes a dense screen uses:
+   * caption 12, body2 14, body1/subtitle1 16, h6 20, h5 24.
+   */
+  --text-scale: 1.25;
+
+  --text-xs: calc(12px * var(--text-scale));
+  --text-sm: calc(13px * var(--text-scale));
+  --text-base: calc(14px * var(--text-scale));
+  --text-md: calc(16px * var(--text-scale));
+  --text-lg: calc(20px * var(--text-scale));
+  --text-xl: calc(24px * var(--text-scale));
+  --text-2xl: calc(34px * var(--text-scale));
 
   /* Material's button tracking. Small uppercase without it sets solid. */
   --track-button: 0.02857em;

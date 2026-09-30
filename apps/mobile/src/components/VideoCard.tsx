@@ -9,7 +9,7 @@ import {
   blurHashAverageColor,
   type VideoCard as VideoCardType,
 } from '../api/client';
-import { LINE_HEIGHT, fontFor, type Theme } from '../theme/tokens';
+import { LINE_HEIGHT, fontFor, type Theme, textSize } from '../theme/tokens';
 
 /**
  * One short, full screen.
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
   },
   playCost: {
     color: '#fff',
-    fontSize: 12.5,
+    fontSize: textSize(12.5),
     marginTop: 12,
     opacity: 0.9,
     letterSpacing: 0.3,
@@ -446,12 +446,12 @@ const styles = StyleSheet.create({
   text: { paddingHorizontal: 20, paddingBottom: 26 },
   meta: {
     color: 'rgba(255,255,255,0.78)',
-    fontSize: 11.5,
+    fontSize: textSize(11.5),
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: 8,
   },
   title: { color: '#fff', fontWeight: '700', marginBottom: 8 },
   caption: { color: 'rgba(255,255,255,0.9)' },
-  credit: { color: 'rgba(255,255,255,0.55)', fontSize: 10.5, marginTop: 10 },
+  credit: { color: 'rgba(255,255,255,0.55)', fontSize: textSize(10.5), marginTop: 10 },
 });

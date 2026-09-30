@@ -1,6 +1,6 @@
 import { View, Text, Pressable, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { FONT_DEVANAGARI, type Theme } from '../theme/tokens';
+import { FONT_DEVANAGARI, type Theme, textSize } from '../theme/tokens';
 
 /**
  * The first launch.
@@ -98,17 +98,17 @@ export function FirstRun({ theme, onChoose }: Props) {
 const styles = StyleSheet.create({
   root: { flex: 1, paddingHorizontal: 28, justifyContent: 'space-between' },
   top: { paddingTop: 72 },
-  brand: { fontSize: 15, fontWeight: '800', letterSpacing: 3.5 },
+  brand: { fontSize: textSize(15), fontWeight: '800', letterSpacing: 3.5 },
   tag: {
     fontFamily: FONT_DEVANAGARI,
-    fontSize: 26,
-    lineHeight: 26 * 1.7,
+    fontSize: textSize(26),
+    lineHeight: textSize(26) * 1.7,
     marginTop: 14,
   },
-  tagEn: { fontFamily: undefined, fontSize: 17, lineHeight: 17 * 1.55 },
+  tagEn: { fontFamily: undefined, fontSize: textSize(17), lineHeight: textSize(17) * 1.55 },
 
   choices: { paddingBottom: 8 },
-  ask: { fontSize: 13, marginBottom: 14, letterSpacing: 0.2 },
+  ask: { fontSize: textSize(13), marginBottom: 14, letterSpacing: 0.2 },
   choice: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -119,9 +119,9 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   choiceText: { flex: 1 },
-  choiceLabel: { fontSize: 19, fontWeight: '600', fontFamily: FONT_DEVANAGARI },
-  choiceSub: { fontSize: 13, marginTop: 3 },
-  later: { fontSize: 12, textAlign: 'center', marginTop: 6 },
+  choiceLabel: { fontSize: textSize(19), fontWeight: '600', fontFamily: FONT_DEVANAGARI },
+  choiceSub: { fontSize: textSize(13), marginTop: 3 },
+  later: { fontSize: textSize(12), textAlign: 'center', marginTop: 6 },
 
   hints: {
     borderTopWidth: StyleSheet.hairlineWidth,
@@ -130,6 +130,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   hint: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  hintText: { fontFamily: FONT_DEVANAGARI, fontSize: 14, lineHeight: 14 * 1.6, flex: 1 },
-  hintEn: { fontFamily: undefined, fontSize: 12.5 },
+  hintText: { fontFamily: FONT_DEVANAGARI, fontSize: textSize(14), lineHeight: textSize(14) * 1.6, flex: 1 },
+  hintEn: { fontFamily: undefined, fontSize: textSize(12.5) },
 });

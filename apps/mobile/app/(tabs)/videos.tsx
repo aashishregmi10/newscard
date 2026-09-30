@@ -18,6 +18,7 @@ import { VideoCard } from '../../src/components/VideoCard';
 import { fetchVideos, FeedError, type VideoCard as VideoCardType } from '../../src/api/client';
 import { useSettings } from '../../src/state/SettingsContext';
 import { useNetwork } from '../../src/state/NetworkContext';
+import { textSize } from '../../src/theme/tokens';
 
 /**
  * The shorts tab.
@@ -213,8 +214,8 @@ export default function VideosScreen() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   centre: { alignItems: 'center', justifyContent: 'center' },
-  emptyTitle: { fontSize: 17, fontWeight: '600', marginTop: 14, marginBottom: 6 },
-  emptyBody: { fontSize: 14, textAlign: 'center', marginBottom: 18 },
+  emptyTitle: { fontSize: textSize(17), fontWeight: '600', marginTop: 14, marginBottom: 6 },
+  emptyBody: { fontSize: textSize(14), textAlign: 'center', marginBottom: 18 },
   retry: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22, borderWidth: 1 },
 
   dataNote: {
@@ -230,5 +231,5 @@ const styles = StyleSheet.create({
     paddingVertical: 7,
     backgroundColor: 'rgba(0,0,0,0.55)',
   },
-  dataNoteText: { color: 'rgba(255,255,255,0.85)', fontSize: 12 },
+  dataNoteText: { color: 'rgba(255,255,255,0.85)', fontSize: textSize(12) },
 });

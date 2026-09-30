@@ -1,6 +1,7 @@
 import { View, Text, Pressable, StyleSheet, Modal } from 'react-native';
 import { useDevice } from '../state/DeviceContext';
 import type { Theme } from '../theme/tokens';
+import { textSize } from '../theme/tokens';
 
 /**
  * The notification permission prompt.  Spec Ch. 15.2.
@@ -47,7 +48,7 @@ export function NotifPrompt({ theme, lang }: { theme: Theme; lang: 'ne' | 'en' }
           </Pressable>
 
           <Pressable style={styles.secondary} onPress={dismissPrompt}>
-            <Text style={{ color: theme.textSecondary, fontSize: 15 }}>{T.later[lang]}</Text>
+            <Text style={{ color: theme.textSecondary, fontSize: textSize(15) }}>{T.later[lang]}</Text>
           </Pressable>
         </View>
       </View>
@@ -64,9 +65,9 @@ const styles = StyleSheet.create({
     padding: 28,
   },
   card: { width: '100%', maxWidth: 360, borderRadius: 16, padding: 24 },
-  title: { fontSize: 19, fontWeight: '700', marginBottom: 10 },
-  body: { fontSize: 14.5, lineHeight: 21, marginBottom: 22 },
+  title: { fontSize: textSize(19), fontWeight: '700', marginBottom: 10 },
+  body: { fontSize: textSize(14.5), lineHeight: textSize(21), marginBottom: 22 },
   primary: { borderRadius: 24, paddingVertical: 13, alignItems: 'center' },
-  primaryText: { color: '#fff', fontSize: 15.5, fontWeight: '700' },
+  primaryText: { color: '#fff', fontSize: textSize(15.5), fontWeight: '700' },
   secondary: { paddingVertical: 13, alignItems: 'center' },
 });

@@ -5,6 +5,7 @@ import { useBookmarks } from '../../src/state/BookmarksContext';
 import { blurHashAverageColor } from '../../src/api/client';
 import { relativeTime } from '../../src/lib/relativeTime';
 import { openArticleInApp } from '../../src/lib/openArticle';
+import { textSize } from '../../src/theme/tokens';
 
 /**
  * Saved stories.  Spec Ch. 9.4.
@@ -88,7 +89,7 @@ export default function SavedScreen() {
                   onPress={() => remove(item.id)}
                   accessibilityLabel="Remove from saved"
                 >
-                  <Text style={{ color: theme.textSecondary, fontSize: 17 }}>✕</Text>
+                  <Text style={{ color: theme.textSecondary, fontSize: textSize(17) }}>✕</Text>
                 </Pressable>
               </Pressable>
             );
@@ -109,12 +110,12 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  title: { fontSize: 20, fontWeight: '700' },
-  count: { fontSize: 14 },
+  title: { fontSize: textSize(20), fontWeight: '700' },
+  count: { fontSize: textSize(14) },
   centre: { flex: 1 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 36 },
-  emptyTitle: { fontSize: 17, fontWeight: '600', marginBottom: 8 },
-  emptyBody: { fontSize: 14, textAlign: 'center', lineHeight: 21 },
+  emptyTitle: { fontSize: textSize(17), fontWeight: '600', marginBottom: 8 },
+  emptyBody: { fontSize: textSize(14), textAlign: 'center', lineHeight: textSize(21) },
   row: {
     flexDirection: 'row',
     gap: 12,
@@ -125,6 +126,6 @@ const styles = StyleSheet.create({
   },
   thumb: { width: 58, height: 58, borderRadius: 8 },
   rowBody: { flex: 1 },
-  rowHead: { fontSize: 14.5, fontWeight: '600', lineHeight: 20, marginBottom: 4 },
-  rowMeta: { fontSize: 12 },
+  rowHead: { fontSize: textSize(14.5), fontWeight: '600', lineHeight: textSize(20), marginBottom: 4 },
+  rowMeta: { fontSize: textSize(12) },
 });

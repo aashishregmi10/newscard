@@ -30,6 +30,7 @@ import {
 import { onFeedTabPress } from '../lib/feedTabSignal';
 import { noteRead, flushEvents, setTelemetryDeviceId } from '../lib/telemetry';
 import type { Theme } from '../theme/tokens';
+import { textSize } from '../theme/tokens';
 
 /**
  * One category's vertical card feed — a single page inside the horizontal
@@ -369,7 +370,7 @@ function CategoryFeedInner({
     <View style={styles.fill}>
       {banner && (
         <View style={[styles.banner, { backgroundColor: theme.surfaceRaised }]}>
-          <Text style={{ color: theme.textSecondary, fontSize: 12.5 }}>{banner}</Text>
+          <Text style={{ color: theme.textSecondary, fontSize: textSize(12.5) }}>{banner}</Text>
         </View>
       )}
 
@@ -424,7 +425,7 @@ const styles = StyleSheet.create({
   fill: { flex: 1 },
   banner: { paddingHorizontal: 16, paddingVertical: 7 },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
-  emptyTitle: { fontSize: 17, fontWeight: '600', marginBottom: 6 },
-  emptyBody: { fontSize: 14, textAlign: 'center', marginBottom: 18 },
+  emptyTitle: { fontSize: textSize(17), fontWeight: '600', marginBottom: 6 },
+  emptyBody: { fontSize: textSize(14), textAlign: 'center', marginBottom: 18 },
   retry: { paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22, borderWidth: 1 },
 });
