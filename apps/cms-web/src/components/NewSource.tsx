@@ -22,10 +22,9 @@ import {
  * -- Why there is no licence on this screen ----------------------------------
  *
  * Recording that a publisher exists and asserting that they agreed to something
- * are two different acts. The permission matrix already separates them —
- * `source.write` and `source.setLicence` are distinct rows — and the server
- * enforces it by ignoring any licence in a create request: a new publisher
- * always starts `pending`, whatever is sent.
+ * are two different acts, and the server keeps them apart by ignoring any
+ * licence in a create request: a new publisher always starts `pending`,
+ * whatever is sent.
  *
  * So the screen does not offer the field at all, and says why. Offering a
  * control the server will overrule is worse than offering nothing.

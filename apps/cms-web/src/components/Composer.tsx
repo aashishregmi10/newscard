@@ -334,7 +334,7 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
     },
     {
       value: 'notes',
-      label: 'Reviewer note',
+      label: 'Review note',
       icon: 'pencil',
       badge: article.editorialNotes !== null ? 1 : undefined,
     },
@@ -560,9 +560,8 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
           )}
           {article.status === 'in_review' && (
             <p className="field-note">
-              Waiting for a reviewer. While yours is the only active account you may approve it
-              yourself — which is recorded as a self-approval, and stops being permitted the moment
-              a second editor is activated.
+              Submitted. Approve it to make Publish available — or send it back to draft with a
+              note if it needs more work.
             </p>
           )}
 
@@ -648,8 +647,8 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
 
             <TabPanel value="notes" current={tab} idBase={idBase}>
               {article.editorialNotes === null ? (
-                <EmptyState icon="pencil" title="No reviewer note" compact>
-                  A reviewer can leave a note when they send a story back. There is none on this
+                <EmptyState icon="pencil" title="No review note" compact>
+                  A note is kept here when a story is sent back to draft. There is none on this
                   one.
                 </EmptyState>
               ) : (

@@ -23,7 +23,7 @@
     "db:up": "docker compose -f infra/docker-compose.dev.yml up -d",
     "db:down": "docker compose -f infra/docker-compose.dev.yml down",
     "db:init": "tsx scripts/init-db.ts",
-    "db:seed": "tsx scripts/gen-images.ts && tsx scripts/seed.ts",
+    "db:seed": "tsx scripts/init-db.ts && tsx scripts/gen-images.ts && tsx scripts/seed.ts",
     "dev:api": "tsx watch apps/api/src/server.ts",
     "dev:cms": "tsx watch apps/cms-api/src/server.ts",
     "dev:cms-web": "npm --prefix apps/cms-web run dev",

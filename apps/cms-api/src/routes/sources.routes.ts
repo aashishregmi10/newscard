@@ -10,7 +10,7 @@ import {
   Source,
   isPollable,
 } from '@saar/schemas';
-import { requireAuth, requireRole } from '../auth/requireRole.js';
+import { requireAuth } from '../auth/requireAuth.js';
 import { asyncRoute } from '../middleware/index.js';
 import { setSourceLicence } from '../services/sources.service.js';
 import { writeAudit } from '../audit/writeAudit.js';
@@ -22,9 +22,7 @@ import { writeAudit } from '../audit/writeAudit.js';
  *
  * The `sources` collection was writable only by `scripts/seed.ts`. Adding a
  * publisher, recording their feed URL or changing their licence status meant
- * editing a script and re-seeding the database. Meanwhile `source.read`,
- * `source.write` and `source.setLicence` had been in the permission matrix from
- * the beginning with no route behind any of them.
+ * editing a script and re-seeding the database.
  *
  * This is also the tool for running Gate 1: five licensing conversations, what
  * each publisher agreed to, and who to contact for a takedown.
@@ -32,9 +30,8 @@ import { writeAudit } from '../audit/writeAudit.js';
  * -- Why the licence is a separate endpoint ---------------------------------
  *
  * Adding a publisher to the list and asserting that we have their agreement are
- * two different acts, and the permission matrix already says so — `source.write`
- * is admin, `source.setLicence` is admin, but they are separate rows and can be
- * separated later. Creation therefore CANNOT set a licence: a new publisher
+ * two different acts, with different weight in the audit trail. Creation
+ * therefore CANNOT set a licence: a new publisher
  * always starts `pending`, whatever the request body says. Folding the licence
  * into POST or PATCH would make a change of legal position indistinguishable
  * from swapping a logo in the audit trail.
@@ -217,10 +214,10 @@ function toRow(s: SourceDoc) {
 /**
  * GET /cms/sources — every publisher.
  *
- * Readable by every role. An author who cannot find a publisher in the composer
- * needs somewhere to discover that it is a licensing question rather than a
- * bug; `GET /cms/options` already returns unlicensed publishers marked rather
- * than hidden for the same reason.
+ * Unlicensed publishers included. An editor who cannot find a publisher in the
+ * composer needs somewhere to discover that it is a licensing question rather
+ * than a bug; `GET /cms/options` already returns them marked rather than
+ * hidden for the same reason.
  *
  * No article counts here. A `$group` over `articles` with no `$match` is the
  * collection scan the index file opens by warning about — and the count is only
@@ -228,7 +225,6 @@ function toRow(s: SourceDoc) {
  */
 sourceRoutes.get(
   '/cms/sources',
-  requireRole('source.read'),
   asyncRoute(async (_req, res) => {
     const c = collections(getDb());
     const docs = await c.sources
@@ -243,7 +239,6 @@ sourceRoutes.get(
 /** GET /cms/sources/:slug — one publisher, with what is filed against them. */
 sourceRoutes.get(
   '/cms/sources/:slug',
-  requireRole('source.read'),
   asyncRoute(async (req, res) => {
     const slug = String(req.params.slug ?? '');
     const c = collections(getDb());
@@ -267,7 +262,6 @@ sourceRoutes.get(
 /** POST /cms/sources — add a publisher. Always starts unlicensed. */
 sourceRoutes.post(
   '/cms/sources',
-  requireRole('source.write'),
   asyncRoute(async (req, res) => {
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -370,7 +364,6 @@ sourceRoutes.post(
 /** PATCH /cms/sources/:slug — everything except the slug and the licence. */
 sourceRoutes.patch(
   '/cms/sources/:slug',
-  requireRole('source.write'),
   asyncRoute(async (req, res) => {
     const slug = String(req.params.slug ?? '');
 
@@ -490,7 +483,6 @@ sourceRoutes.patch(
 /** POST /cms/sources/:slug/licence — the legal gate. Admin only. */
 sourceRoutes.post(
   '/cms/sources/:slug/licence',
-  requireRole('source.setLicence'),
   asyncRoute(async (req, res) => {
     const slug = String(req.params.slug ?? '');
     const parsed = LicenceSchema.safeParse(req.body);

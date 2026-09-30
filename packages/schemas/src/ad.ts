@@ -32,9 +32,6 @@ export const Advertiser = z.object({
   /** Shown on the card. Readers are owed the real name of who paid. */
   displayName: z.string().min(1),
   isActive: z.boolean().default(true),
-  /** Login for the advertiser's own report view. Optional: many will just be
-   *  emailed a PDF, especially small local businesses. */
-  portalPasswordHash: z.string().nullable().optional(),
 });
 export type Advertiser = z.infer<typeof Advertiser>;
 

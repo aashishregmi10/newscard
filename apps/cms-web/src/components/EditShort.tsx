@@ -14,7 +14,7 @@ import { dateTime, fileSize, relativeTime } from '../lib/format';
 import { LICENCES } from '../lib/licences';
 import { mediaUrl } from '../lib/media';
 import { shortStatus } from '../lib/status';
-import { Routes, type Role } from '../nav';
+import { Routes } from '../nav';
 import { navigate } from '../useRoute';
 import {
   Badge,
@@ -36,13 +36,12 @@ import {
  *
  * -- One screen, three sets of rules -----------------------------------------
  *
- * A DRAFT is the newsroom's own business: anyone who may write can change it,
- * nothing is asked of them, and Publish sits beside Save.
+ * A DRAFT is the newsroom's own business: nothing is asked when it changes, and
+ * Publish sits beside Save.
  *
  * A LIVE short is what readers are being shown, so it follows the rule a live
- * story follows: only someone who may publish can change it, every change needs
- * a reason, and the time and reason are stamped on the record. Withdraw sits
- * beside Save and shares that reason.
+ * story follows: every change needs a reason, and the time and reason are
+ * stamped on the record. Withdraw sits beside Save and shares that reason.
  *
  * A WITHDRAWN short is final. It is shown, and can be watched, but not changed.
  *
@@ -105,7 +104,7 @@ function previewSrc(renditions: ShortDetail['renditions']): string | null {
   return pick === undefined ? null : mediaUrl(pick.url);
 }
 
-export function EditShort({ id, role }: { id: string; role: Role }) {
+export function EditShort({ id }: { id: string }) {
   const { data, error: loadError, loading, reload } = useResource<Data>(
     (signal) => api.short(id, signal),
     `short:${id}`,
@@ -197,10 +196,7 @@ export function EditShort({ id, role }: { id: string; role: Role }) {
   const isDraft = short.status === 'draft';
   const live = short.status === 'published';
   const withdrawn = short.status === 'retracted';
-  /* Publishing, editing a live short and withdrawing one all belong to the
-     same two roles on the server. */
-  const mayPublish = role !== 'author';
-  const readOnly = withdrawn || (live && !mayPublish) || action.busy;
+  const readOnly = withdrawn || action.busy;
 
   const categories = options?.categories ?? [];
   const reasonReady = reason.trim().length >= REASON_MIN;
@@ -442,16 +438,11 @@ export function EditShort({ id, role }: { id: string; role: Role }) {
                 withdrawal is final, so it is shown here but not edited.
               </Banner>
             )}
-            {live && mayPublish && (
+            {live && (
               <Banner tone="info" live={false}>
                 Readers can see this short now. Nothing is saved until you press{' '}
                 <strong>Save changes</strong>, and every change is recorded with your reason and
                 the time.
-              </Banner>
-            )}
-            {live && !mayPublish && (
-              <Banner tone="info" live={false}>
-                This short is live. Changing it needs a reviewer or an admin, as publishing it did.
               </Banner>
             )}
 
@@ -581,7 +572,7 @@ export function EditShort({ id, role }: { id: string; role: Role }) {
             {/* Only a live short asks why. A draft is the newsroom's own
                 business until it is published, and asking for a reason to fix a
                 typo nobody outside has seen is friction with no record to serve. */}
-            {live && mayPublish && (
+            {live && (
               <div className="edit-reason">
                 <h3 className="edit-reason-title">Reason for this change</h3>
                 <Field
@@ -610,7 +601,7 @@ export function EditShort({ id, role }: { id: string; role: Role }) {
               </div>
             )}
 
-            {!withdrawn && !(live && !mayPublish) && (
+            {!withdrawn && (
               <>
                 <div className="actions">
                   <Button
@@ -622,7 +613,7 @@ export function EditShort({ id, role }: { id: string; role: Role }) {
                   >
                     Save changes
                   </Button>
-                  {isDraft && mayPublish && (
+                  {isDraft && (
                     <Button
                       icon="send"
                       disabled={dirty || action.busy || uploading}
@@ -655,7 +646,7 @@ export function EditShort({ id, role }: { id: string; role: Role }) {
                 {blocker !== null && !confirmingWithdraw && (
                   <p className="field-note">{blocker}</p>
                 )}
-                {isDraft && mayPublish && dirty && (
+                {isDraft && dirty && (
                   <p className="field-note">Save your changes before publishing.</p>
                 )}
                 {live && !reasonReady && !confirmingWithdraw && (
@@ -690,7 +681,7 @@ export function EditShort({ id, role }: { id: string; role: Role }) {
               </>
             )}
 
-            {(withdrawn || (live && !mayPublish)) && (
+            {withdrawn && (
               <div className="actions">
                 <Button icon="arrowLeft" onClick={() => navigate(Routes.shorts())}>
                   Back to shorts

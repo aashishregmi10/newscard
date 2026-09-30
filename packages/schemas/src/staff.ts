@@ -1,14 +1,16 @@
 import { z } from 'zod';
-import { LanguageEnum, StaffRoleEnum } from './enums.js';
 
-/** The `staff` collection.  Spec Ch. 3.10. */
+/**
+ * The `staff` collection.  Spec Ch. 3.10.
+ *
+ * Every account is an admin of the editorial site, so there is no role, and
+ * no per-person language list — that existed only so a reviewer could be
+ * refused copy in a language they did not read, and there are no reviewers.
+ * Documents written before this keep those two fields; nothing reads them.
+ */
 export const Staff = z.object({
   email: z.string().email(),
   name: z.string().min(1),
-  role: StaffRoleEnum,
-  /** A reviewer must not approve a summary in a language they cannot read
-   *  (Ch. 3.10). Enforced by checkReviewGuards in @saar/shared. */
-  languages: z.array(LanguageEnum).min(1),
   /** Deactivation preserves the audit trail; deletion would orphan it. */
   isActive: z.boolean().default(true),
   passwordHash: z.string().min(1),

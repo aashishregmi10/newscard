@@ -5,7 +5,7 @@ import { useResource } from '../hooks/useResource';
 import { crumbs } from '../lib/crumbs';
 import { dateTime, plural } from '../lib/format';
 import { ingestHealth, licenceLook, looksLikeEmail } from '../lib/sources';
-import { Routes, type Role } from '../nav';
+import { Routes } from '../nav';
 import { navigate } from '../useRoute';
 import {
   Badge,
@@ -26,12 +26,6 @@ import {
  * Three panels rather than tabs. The licence is the reason the screen exists —
  * it is the legal gate that decides whether a story may be written or published
  * at all — and putting it behind a click would be the opposite of the point.
- *
- * Read-only for anyone who is not an admin. The server holds the same line
- * (`source.write` and `source.setLicence` are admin-only), but disabled fields
- * with a sentence saying why are a better answer than mysteriously absent ones:
- * an author is here precisely because a publisher was missing from the composer
- * and they want to know what happened.
  */
 
 const POLL_INTERVALS = [5, 15, 30, 60] as const;
@@ -41,7 +35,7 @@ function toDateInput(iso: string | null): string {
   return iso === null ? '' : (iso.slice(0, 10) ?? '');
 }
 
-export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
+export function SourceDetail({ slug }: { slug: string }) {
   const { data, error: loadError, loading, reload } = useResource<SourceDetailData>(
     async (signal) => (await api.source(slug, signal)).source,
     `source:${slug}`,
@@ -50,7 +44,6 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
 
   const details = useAsyncAction('Could not save the publisher.');
   const licence = useAsyncAction('Could not change the licence.');
-  const isAdmin = role === 'admin';
 
   // Details panel
   const [displayName, setDisplayName] = useState('');
@@ -208,13 +201,6 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
         </div>
       </div>
 
-      {!isAdmin && (
-        <Banner tone="info" live={false}>
-          Publishers are managed by an administrator. This is the record of who we may file
-          stories against, and why.
-        </Banner>
-      )}
-
       {/* ------------------------------------------------------- licence */}
 
       <Panel title="Licence">
@@ -236,165 +222,158 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
 
         {licence.error !== null && <Banner tone="error">{licence.error}</Banner>}
 
-        {isAdmin ? (
-          <>
-            <div className="grid">
-              <div className="col-6">
-                <Fieldset legend="Status">
-                  {(g) => (
-                    <Segmented
-                      {...g}
-                      aria-label="Licence status"
-                      value={status}
-                      onChange={(next) => {
-                        setStatus(next);
-                        setConfirming(false);
-                      }}
-                      options={[
-                        { value: 'unknown', label: 'Not asked' },
-                        { value: 'pending', label: 'Pending' },
-                        { value: 'agreed', label: 'Agreed' },
-                        { value: 'refused', label: 'Refused' },
-                      ]}
-                    />
-                  )}
-                </Fieldset>
-              </div>
-
-              {/* The evidence for the status beside it, because one is the
-                  claim and the other is what backs it up. */}
-              <div className="col-6">
-                <Field label="Agreement reference" optional="optional">
-                  {(f) => (
-                    <input
-                      {...f}
-                      className="input"
-                      placeholder="Signed MOU, 12 Sept 2026"
-                      value={agreementRef}
-                      onChange={(e) => setAgreementRef(e.target.value)}
-                    />
-                  )}
-                </Field>
-              </div>
-
-              {/*
-                * Three columns, not six.
-                *
-                * This is the principle the removed page cap was the wrong way
-                * of expressing: a date is eight characters and a native date
-                * control is a fixed width, so at half of a 1900px row it is a
-                * 180px control sitting in an 800px box. The field takes less
-                * of the grid rather than the page taking less of the screen.
-                */}
-              <div className="col-3">
-                <Field label="Agreed on" optional="optional">
-                  {(f) => (
-                    <input
-                      {...f}
-                      className="input"
-                      type="date"
-                      value={agreedAt}
-                      onChange={(e) => setAgreedAt(e.target.value)}
-                    />
-                  )}
-                </Field>
-              </div>
-
-              <div className="col-9">
-                <Field
-                  label="Takedown contact"
-                  invalid={needsContact}
-                  note={
-                    contactMalformed
-                      ? `“${contactEmail.trim()}” is not an email address. A takedown demand has to be able to reach somebody.`
-                      : contactMissing
-                        ? 'A licensed publisher needs a takedown contact — we promise a 24-hour response and cannot meet it without one.'
-                        : 'The email address a takedown demand goes to. Required once a licence is agreed.'
-                  }
-                  noteTone={needsContact ? 'bad' : 'default'}
-                >
-                  {(f) => (
-                    <input
-                      {...f}
-                      className="input"
-                      type="email"
-                      placeholder="legal@publisher.example.invalid"
-                      value={contactEmail}
-                      onChange={(e) => setContactEmail(e.target.value)}
-                    />
-                  )}
-                </Field>
-              </div>
+        <>
+          <div className="grid">
+            <div className="col-6">
+              <Fieldset legend="Status">
+                {(g) => (
+                  <Segmented
+                    {...g}
+                    aria-label="Licence status"
+                    value={status}
+                    onChange={(next) => {
+                      setStatus(next);
+                      setConfirming(false);
+                    }}
+                    options={[
+                      { value: 'unknown', label: 'Not asked' },
+                      { value: 'pending', label: 'Pending' },
+                      { value: 'agreed', label: 'Agreed' },
+                      { value: 'refused', label: 'Refused' },
+                    ]}
+                  />
+                )}
+              </Fieldset>
             </div>
 
-            {wouldWithdraw && (
-              <Field
-                label="Why"
-                invalid={needsNote && confirming}
-                note="Granting a licence is evidenced by the reference above. Withdrawing one is evidenced by nothing unless you say so here."
-                noteTone={needsNote && confirming ? 'bad' : 'default'}
-              >
+            {/* The evidence for the status beside it, because one is the
+                claim and the other is what backs it up. */}
+            <div className="col-6">
+              <Field label="Agreement reference" optional="optional">
                 {(f) => (
-                  <textarea
+                  <input
                     {...f}
-                    className="textarea"
-                    rows={2}
-                    style={{ minHeight: 'auto' }}
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
+                    className="input"
+                    placeholder="Signed MOU, 12 Sept 2026"
+                    value={agreementRef}
+                    onChange={(e) => setAgreementRef(e.target.value)}
                   />
                 )}
               </Field>
-            )}
+            </div>
 
             {/*
-              * Two steps to withdraw, with the count in the button.
+              * Three columns, not six.
               *
-              * The number comes from the record already loaded, so the
-              * consequence is on screen BEFORE the click rather than in the
-              * response to it.
+              * This is the principle the removed page cap was the wrong way
+              * of expressing: a date is eight characters and a native date
+              * control is a fixed width, so at half of a 1900px row it is a
+              * 180px control sitting in an 800px box. The field takes less
+              * of the grid rather than the page taking less of the screen.
               */}
-            {confirming && wouldWithdraw && (
-              <Banner tone="warn">
-                <strong>Stop using {data.displayName}?</strong>{' '}
-                {plural(data.articles.published, 'published story', 'published stories')} stay live
-                and keep their attribution.{' '}
-                {plural(
-                  data.articles.total - data.articles.published,
-                  'story in progress',
-                  'stories in progress',
-                )}{' '}
-                can no longer be published, and no new ones can be started. This is reversible.
-              </Banner>
-            )}
-
-            <div className="actions">
-              <Button
-                variant={wouldWithdraw ? 'danger' : 'primary'}
-                icon={wouldWithdraw ? 'ban' : 'checkCircle'}
-                busy={licence.busy}
-                disabled={needsContact || (confirming && needsNote)}
-                onClick={saveLicence}
-              >
-                {wouldWithdraw
-                  ? confirming
-                    ? 'Yes, withdraw the licence'
-                    : 'Withdraw the licence'
-                  : 'Save the licence'}
-              </Button>
-              {confirming && (
-                <Button disabled={licence.busy} onClick={() => setConfirming(false)}>
-                  Cancel
-                </Button>
-              )}
+            <div className="col-3">
+              <Field label="Agreed on" optional="optional">
+                {(f) => (
+                  <input
+                    {...f}
+                    className="input"
+                    type="date"
+                    value={agreedAt}
+                    onChange={(e) => setAgreedAt(e.target.value)}
+                  />
+                )}
+              </Field>
             </div>
-          </>
-        ) : (
-          <p className="meta-line">
-            <span>{look.label}</span>
-            {data.licence.contactEmail !== null && <span>{data.licence.contactEmail}</span>}
-          </p>
-        )}
+
+            <div className="col-9">
+              <Field
+                label="Takedown contact"
+                invalid={needsContact}
+                note={
+                  contactMalformed
+                    ? `“${contactEmail.trim()}” is not an email address. A takedown demand has to be able to reach somebody.`
+                    : contactMissing
+                      ? 'A licensed publisher needs a takedown contact — we promise a 24-hour response and cannot meet it without one.'
+                      : 'The email address a takedown demand goes to. Required once a licence is agreed.'
+                }
+                noteTone={needsContact ? 'bad' : 'default'}
+              >
+                {(f) => (
+                  <input
+                    {...f}
+                    className="input"
+                    type="email"
+                    placeholder="legal@publisher.example.invalid"
+                    value={contactEmail}
+                    onChange={(e) => setContactEmail(e.target.value)}
+                  />
+                )}
+              </Field>
+            </div>
+          </div>
+
+          {wouldWithdraw && (
+            <Field
+              label="Why"
+              invalid={needsNote && confirming}
+              note="Granting a licence is evidenced by the reference above. Withdrawing one is evidenced by nothing unless you say so here."
+              noteTone={needsNote && confirming ? 'bad' : 'default'}
+            >
+              {(f) => (
+                <textarea
+                  {...f}
+                  className="textarea"
+                  rows={2}
+                  style={{ minHeight: 'auto' }}
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                />
+              )}
+            </Field>
+          )}
+
+          {/*
+            * Two steps to withdraw, with the count in the button.
+            *
+            * The number comes from the record already loaded, so the
+            * consequence is on screen BEFORE the click rather than in the
+            * response to it.
+            */}
+          {confirming && wouldWithdraw && (
+            <Banner tone="warn">
+              <strong>Stop using {data.displayName}?</strong>{' '}
+              {plural(data.articles.published, 'published story', 'published stories')} stay live
+              and keep their attribution.{' '}
+              {plural(
+                data.articles.total - data.articles.published,
+                'story in progress',
+                'stories in progress',
+              )}{' '}
+              can no longer be published, and no new ones can be started. This is reversible.
+            </Banner>
+          )}
+
+          <div className="actions">
+            <Button
+              variant={wouldWithdraw ? 'danger' : 'primary'}
+              icon={wouldWithdraw ? 'ban' : 'checkCircle'}
+              busy={licence.busy}
+              disabled={needsContact || (confirming && needsNote)}
+              onClick={saveLicence}
+            >
+              {wouldWithdraw
+                ? confirming
+                  ? 'Yes, withdraw the licence'
+                  : 'Withdraw the licence'
+                : 'Save the licence'}
+            </Button>
+            {confirming && (
+              <Button disabled={licence.busy} onClick={() => setConfirming(false)}>
+                Cancel
+              </Button>
+            )}
+          </div>
+        </>
       </Panel>
 
       {/* ------------------------------------------------------- details */}
@@ -431,7 +410,6 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
                   className="input"
                   lang={language}
                   value={displayName}
-                  disabled={!isAdmin}
                   onChange={(e) => setDisplayName(e.target.value)}
                 />
               )}
@@ -448,7 +426,6 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
                   className="input"
                   type="url"
                   value={homepageUrl}
-                  disabled={!isAdmin}
                   onChange={(e) => setHomepageUrl(e.target.value)}
                 />
               )}
@@ -463,7 +440,6 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
                   className="input"
                   type="url"
                   value={logoUrl}
-                  disabled={!isAdmin}
                   onChange={(e) => setLogoUrl(e.target.value)}
                 />
               )}
@@ -476,7 +452,6 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
                 <Segmented
                   {...g}
                   aria-label="Language"
-                  disabled={!isAdmin}
                   value={language}
                   onChange={setLanguage}
                   options={[
@@ -501,7 +476,6 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
                   min={0}
                   max={999}
                   value={priority}
-                  disabled={!isAdmin}
                   onChange={(e) => setPriority(Number(e.target.value))}
                 />
               )}
@@ -517,7 +491,6 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
                 <Segmented
                   {...g}
                   aria-label="Active"
-                  disabled={!isAdmin}
                   value={active}
                   onChange={setActive}
                   options={[
@@ -541,7 +514,6 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
                 <Segmented
                   {...g}
                   aria-label="Ingest method"
-                  disabled={!isAdmin}
                   value={method}
                   onChange={setMethod}
                   options={[
@@ -567,7 +539,6 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
                   <Listbox
                     {...f}
                     value={String(pollIntervalMin)}
-                    disabled={!isAdmin}
                     onChange={(v) => setPollIntervalMin(Number(v))}
                     options={POLL_INTERVALS.map((m) => ({
                       value: String(m),
@@ -594,7 +565,6 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
                     type="url"
                     placeholder="https://publisher.example.invalid/feed"
                     value={feedUrl}
-                    disabled={!isAdmin}
                     onChange={(e) => setFeedUrl(e.target.value)}
                   />
                 )}
@@ -616,22 +586,20 @@ export function SourceDetail({ slug, role }: { slug: string; role: Role }) {
           licensing. These three figures are written by the poller when it exists.
         </p>
 
-        {isAdmin && (
-          <div className="actions">
-            <Button
-              variant="primary"
-              icon="check"
-              busy={details.busy}
-              disabled={feedMissing}
-              onClick={saveDetails}
-            >
-              Save changes
-            </Button>
-            <Button disabled={details.busy} onClick={() => navigate(Routes.sources())}>
-              Back to publishers
-            </Button>
-          </div>
-        )}
+        <div className="actions">
+          <Button
+            variant="primary"
+            icon="check"
+            busy={details.busy}
+            disabled={feedMissing}
+            onClick={saveDetails}
+          >
+            Save changes
+          </Button>
+          <Button disabled={details.busy} onClick={() => navigate(Routes.sources())}>
+            Back to publishers
+          </Button>
+        </div>
       </Panel>
     </div>
   );

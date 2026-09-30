@@ -72,8 +72,6 @@ export type IngestBasis = z.infer<typeof IngestBasisEnum>;
 export const LeadStatusEnum = z.enum(['new', 'promoted', 'dismissed']);
 export type LeadStatus = z.infer<typeof LeadStatusEnum>;
 
-export const StaffRoleEnum = z.enum(['author', 'reviewer', 'admin']);
-export type StaffRole = z.infer<typeof StaffRoleEnum>;
 
 export const NotificationTypeEnum = z.enum([
   'breaking',

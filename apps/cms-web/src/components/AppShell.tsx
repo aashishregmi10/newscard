@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import type { Staff } from '../api';
-import { Routes, canAccess, routeToHash, type Route, type Section } from '../nav';
+import { Routes, routeToHash, type Route, type Section } from '../nav';
 import { usePreventStrayFileDrop } from '../hooks/usePreventStrayFileDrop';
 import { Button, Icon, type IconName } from '../ui';
 
@@ -122,8 +122,7 @@ export function AppShell({
     el.focus({ preventScroll: true });
   }, [routeKey]);
 
-  const visible = SECTIONS.filter((s) => canAccess(s.route, staff.role));
-  const current = visible.find((s) => s.section === section);
+  const current = SECTIONS.find((s) => s.section === section);
 
   return (
     <div className="app">
@@ -134,7 +133,7 @@ export function AppShell({
         </div>
 
         <ul className="rail-nav">
-          {visible.map((item) => {
+          {SECTIONS.map((item) => {
             const isCurrent = item.section === section;
             const count = item.section === 'queue' ? queueCount : null;
 
@@ -183,7 +182,6 @@ export function AppShell({
               <span className="rail-email" title={staff.email}>
                 {staff.email}
               </span>
-              <span className="rail-role">{staff.role}</span>
             </span>
           </div>
 

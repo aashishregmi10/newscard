@@ -2,7 +2,7 @@ import { api, type PublishedRow } from '../api';
 import { useResource } from '../hooks/useResource';
 import { crumbs } from '../lib/crumbs';
 import { dateTime, relativeTime } from '../lib/format';
-import { PUBLISHED_PER_PAGE, Routes, canAccess, type PublishedTab, type Role } from '../nav';
+import { PUBLISHED_PER_PAGE, Routes, type PublishedTab } from '../nav';
 import { navigate } from '../useRoute';
 import {
   Badge,
@@ -69,18 +69,7 @@ interface Data {
   counts: { published: number; retracted: number };
 }
 
-export function Published({
-  tab,
-  page,
-  role,
-}: {
-  tab: PublishedTab;
-  page: number;
-  role: Role;
-}) {
-  /* Asked of the router rather than restated here, so the button and the
-     route can never disagree about who may edit. */
-  const mayEdit = canAccess(Routes.publishedEdit('x'), role);
+export function Published({ tab, page }: { tab: PublishedTab; page: number }) {
   const { data, error: loadError, loading, reload } = useResource<Data>(
     (signal) => api.published(tab, page, PUBLISHED_PER_PAGE, signal),
     `published:${tab}:${page}`,
@@ -163,7 +152,6 @@ export function Published({
             <ul className="list">
               {data.items.map((row) => {
                 const live = row.status === 'published';
-                const canEdit = live && mayEdit;
 
                 return (
                   <li className="item published-item" key={row.id}>
@@ -233,18 +221,12 @@ export function Published({
                           variant="ghost"
                           icon="pencil"
                           aria-label={
-                            canEdit
+                            live
                               ? `Edit “${row.headline}”`
-                              : `“${row.headline}” cannot be edited by you`
+                              : `“${row.headline}” was withdrawn and cannot be edited`
                           }
-                          title={
-                            canEdit
-                              ? 'Edit the live story'
-                              : !live
-                                ? 'A withdrawn story is not edited'
-                                : 'Editing a live story needs a reviewer or an admin'
-                          }
-                          disabled={!canEdit}
+                          title={live ? 'Edit the live story' : 'A withdrawn story is not edited'}
+                          disabled={!live}
                           onClick={() => navigate(Routes.publishedEdit(row.id))}
                         />
                         <Button

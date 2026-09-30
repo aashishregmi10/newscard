@@ -84,8 +84,6 @@ const asEditorB = (articleId: ObjectId) => ({
   articleId: articleId.toString(),
   actorId: editorB.toString(),
   actorEmail: 'b@example.invalid',
-  actorRole: 'reviewer',
-  actorLanguages: ['ne', 'en'],
   ip: null,
 });
 
@@ -150,8 +148,6 @@ beforeAll(async () => {
       _id: id,
       email,
       name: email,
-      role: 'reviewer',
-      languages: ['ne', 'en'],
       isActive: true,
       passwordHash: 'placeholder',
       failedLoginCount: 0,
@@ -324,31 +320,17 @@ describeIfRs('publish — the five preconditions', () => {
     });
   });
 
-  it('5. blocks self-approval while a second editor is active', async () => {
+  it('5. lets an admin publish their own story with another admin active, and records it', async () => {
+    /* The two-person rule is gone: every account is an admin. What stays is
+       the record of who published it, and that it was their own story. */
     const id = await makeArticle({ authoredBy: editorB });
-    await expect(publishArticle(asEditorB(id))).rejects.toMatchObject({
-      code: 'VALIDATION_FAILED',
-    });
-  });
-
-  it('5b. allows self-approval when sole active editor, and stamps it', async () => {
-    await collections(getDb()).staff.updateOne({ _id: editorA }, { $set: { isActive: false } });
-    const id = await makeArticle({ authoredBy: editorB });
-
     const res = await publishArticle(asEditorB(id));
+    expect(res.status).toBe('published');
     expect(res.selfApproved).toBe(true);
 
     const doc = await collections(getDb()).articles.findOne({ _id: id });
     expect(doc!.selfApproved).toBe(true);
-
-    await collections(getDb()).staff.updateOne({ _id: editorA }, { $set: { isActive: true } });
-  });
-
-  it('5c. blocks a reviewer approving a language they cannot read', async () => {
-    const id = await makeArticle({ language: 'ne' });
-    await expect(
-      publishArticle({ ...asEditorB(id), actorLanguages: ['en'] }),
-    ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    expect(doc!.reviewedBy?.toString()).toBe(editorB.toString());
   });
 });
 

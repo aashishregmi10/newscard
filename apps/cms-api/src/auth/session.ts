@@ -1,7 +1,7 @@
 import { randomBytes, createHash } from 'node:crypto';
 import { ObjectId } from 'mongodb';
 import { getDb } from '@saar/db';
-import type { StaffSession } from './requireRole.js';
+import type { StaffSession } from './requireAuth.js';
 
 /**
  * Server-side sessions.  Spec Ch. 13.7.
@@ -24,28 +24,19 @@ interface SessionDoc {
   tokenHash: string;
   staffId: ObjectId;
   email: string;
-  role: string;
-  languages: string[];
   expiresAt: Date;
   createdAt: Date;
 }
 
 const sessions = () => getDb().collection<SessionDoc>('sessions');
 
-export async function createSession(staff: {
-  _id: ObjectId;
-  email: string;
-  role: string;
-  languages: string[];
-}): Promise<string> {
+export async function createSession(staff: { _id: ObjectId; email: string }): Promise<string> {
   const token = randomBytes(32).toString('base64url');
   await sessions().insertOne({
     _id: new ObjectId(),
     tokenHash: sha256(token),
     staffId: staff._id,
     email: staff.email,
-    role: staff.role,
-    languages: staff.languages,
     expiresAt: new Date(Date.now() + SESSION_TTL_MS),
     createdAt: new Date(),
   });
@@ -63,8 +54,6 @@ export async function readSession(token: string | undefined): Promise<StaffSessi
   return {
     staffId: doc.staffId.toString(),
     email: doc.email,
-    role: doc.role as StaffSession['role'],
-    languages: doc.languages,
   };
 }
 

@@ -16,7 +16,7 @@ import {
   VideoRejected,
 } from '@saar/media';
 import { rateLimit, byIp } from '@saar/http';
-import { requireAuth, requireRole } from '../auth/requireRole.js';
+import { requireAuth } from '../auth/requireAuth.js';
 import { asyncRoute } from '../middleware/index.js';
 import { writeAudit } from '../audit/writeAudit.js';
 
@@ -81,7 +81,6 @@ const videoUpload = multer({
  */
 mediaRoutes.post(
   '/cms/media/image',
-  requireRole('article.write'),
   uploadLimit,
   imageUpload.single('file'),
   asyncRoute(async (req, res) => {
@@ -152,7 +151,6 @@ mediaRoutes.post(
  */
 mediaRoutes.post(
   '/cms/media/video',
-  requireRole('article.write'),
   uploadLimit,
   videoUpload.single('file'),
   asyncRoute(async (req, res) => {

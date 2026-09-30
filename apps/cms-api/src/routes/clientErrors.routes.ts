@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { getDb } from '@saar/db';
-import { requireAuth, requireRole } from '../auth/requireRole.js';
+import { requireAuth } from '../auth/requireAuth.js';
 import { asyncRoute } from '../middleware/index.js';
 
 /**
@@ -24,7 +24,6 @@ clientErrorRoutes.use(requireAuth);
 
 clientErrorRoutes.get(
   '/cms/client-errors',
-  requireRole('queue.read'),
   asyncRoute(async (_req, res) => {
     const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
     const rows = await getDb()

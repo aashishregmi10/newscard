@@ -2,9 +2,9 @@ import { Router } from 'express';
 import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { collections, getDb } from '@saar/db';
-import { AppError, can, type StaffRole } from '@saar/shared';
+import { AppError } from '@saar/shared';
 import { LanguageEnum, MAX_VIDEO_DURATION_S } from '@saar/schemas';
-import { requireAuth, requireRole } from '../auth/requireRole.js';
+import { requireAuth } from '../auth/requireAuth.js';
 import { asyncRoute } from '../middleware/index.js';
 import { writeAudit } from '../audit/writeAudit.js';
 
@@ -87,7 +87,6 @@ const ListQuery = z.object({
 
 shortRoutes.get(
   '/cms/shorts',
-  requireRole('queue.read'),
   asyncRoute(async (req, res) => {
     const parsed = ListQuery.safeParse(req.query);
     if (!parsed.success) throw new AppError('BAD_REQUEST', 'Unknown query.');
@@ -131,7 +130,6 @@ shortRoutes.get(
 /** POST /cms/shorts — create a draft from an uploaded, transcoded clip. */
 shortRoutes.post(
   '/cms/shorts',
-  requireRole('article.write'),
   asyncRoute(async (req, res) => {
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -208,7 +206,6 @@ shortRoutes.post(
 /** GET /cms/shorts/:id — everything the edit screen needs. */
 shortRoutes.get(
   '/cms/shorts/:id',
-  requireRole('queue.read'),
   asyncRoute(async (req, res) => {
     const id = String(req.params.id ?? '');
     if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
@@ -249,11 +246,10 @@ shortRoutes.get(
  *
  * ── Draft and live are edited through one route, under different rules ─────
  *
- * A draft is nobody’s business but the newsroom’s, so it is edited freely by
- * anyone who may write. A live short is what readers are being shown, so it
- * follows the article rule exactly: it takes the permission publishing takes,
- * a reason of at least ten characters, and the time and reason are stamped on
- * the record. A withdrawn short is final and is not edited at all.
+ * A draft is nobody’s business but the newsroom’s, so it is edited freely. A
+ * live short is what readers are being shown, so it follows the article rule
+ * exactly: a reason of at least ten characters, and the time and reason are
+ * stamped on the record. A withdrawn short is final and is not edited at all.
  *
  * ── What can change ────────────────────────────────────────────────────────
  *
@@ -289,7 +285,6 @@ const EditSchema = z.object({
 
 shortRoutes.post(
   '/cms/shorts/:id/edit',
-  requireRole('article.write'),
   asyncRoute(async (req, res) => {
     const id = String(req.params.id ?? '');
     if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
@@ -317,12 +312,6 @@ shortRoutes.post(
     const live = v.status === 'published';
     const reason = (d.reason ?? '').trim();
     if (live) {
-      if (!can(req.staff!.role as StaffRole, 'article.publish')) {
-        throw new AppError(
-          'FORBIDDEN',
-          'Editing a live short needs a reviewer or an admin, as publishing one does.',
-        );
-      }
       if (reason.length < 10) {
         throw new AppError(
           'VALIDATION_FAILED',
@@ -413,7 +402,6 @@ shortRoutes.post(
  */
 shortRoutes.post(
   '/cms/shorts/:id/publish',
-  requireRole('article.publish'),
   asyncRoute(async (req, res) => {
     const id = String(req.params.id ?? '');
     if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
@@ -471,7 +459,6 @@ shortRoutes.post(
  */
 shortRoutes.post(
   '/cms/shorts/:id/retract',
-  requireRole('article.retract'),
   asyncRoute(async (req, res) => {
     const id = String(req.params.id ?? '');
     if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');

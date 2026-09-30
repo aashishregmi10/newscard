@@ -18,7 +18,7 @@ import { countGraphemes, countWords } from '@saar/shared';
  *
  *   draft       one still being written, and one with no image, so the
  *               composer's image attachment has somewhere to be demonstrated
- *   in_review   waiting on a reviewer, which is where the role rules show
+ *   in_review   submitted, waiting for an admin to approve it
  *   approved    ready to publish — the button that actually does something
  *
  * It also seeds one CLUSTER: the same event filed by three publishers, which is

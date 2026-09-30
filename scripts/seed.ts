@@ -105,8 +105,6 @@ async function main(): Promise<void> {
     _id: editorId,
     email: DEV_EMAIL,
     name: 'Seed Editor',
-    role: 'admin',
-    languages: ['ne', 'en'],
     isActive: true,
     passwordHash: await argonHash(DEV_PASSWORD, {
       algorithm: 2, // Argon2id

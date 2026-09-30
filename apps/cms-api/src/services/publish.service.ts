@@ -2,7 +2,6 @@ import { ObjectId } from 'mongodb';
 import { collections, getClient, getDb, supportsTransactions } from '@saar/db';
 import {
   AppError,
-  checkReviewGuards,
   measureSummary,
   countGraphemes,
   type LimitType,
@@ -24,8 +23,6 @@ export interface PublishInput {
   articleId: string;
   actorId: string;
   actorEmail: string;
-  actorRole: string;
-  actorLanguages: readonly string[];
   ip: string | null;
   /** Omit to publish now; provide a future date to schedule. */
   scheduledFor?: Date | undefined;
@@ -142,27 +139,9 @@ export async function publishArticle(input: PublishInput): Promise<PublishResult
         );
       }
 
-      // ── 5. reviewer guards ──────────────────────────────────────────────
-      // Reviewer must differ from the author, unless this is still a one-person
-      // operation; and must be able to read the language they are approving.
-      const activeStaffCount = await c.staff.countDocuments(
-        { isActive: true },
-        session ? { session } : {},
-      );
-      const guard = checkReviewGuards({
-        authoredBy: article.authoredBy.toString(),
-        reviewerId: input.actorId,
-        activeStaffCount,
-        articleLanguage: article.language,
-        reviewerLanguages: input.actorLanguages,
-      });
-      if (!guard.ok) {
-        const message =
-          guard.reason === 'same_author'
-            ? 'You cannot approve your own summary now that another editor is active.'
-            : `You are not registered as able to review ${article.language} copy.`;
-        throw new AppError('VALIDATION_FAILED', message, { reason: guard.reason });
-      }
+      // No reviewer rules. Every account is an admin, so who publishes is
+      // recorded rather than restricted — see transition.service.ts.
+      const selfApproved = article.authoredBy.toString() === input.actorId;
 
       const now = new Date();
       const publishedAt = targetStatus === 'published' ? now : null;
@@ -181,7 +160,7 @@ export async function publishArticle(input: PublishInput): Promise<PublishResult
             sourceName: source.displayName,
             sourceLogoUrl: source.logoUrl ?? null,
             reviewedBy: new ObjectId(input.actorId),
-            selfApproved: guard.selfApproved,
+            selfApproved,
             updatedAt: now,
           },
         },
@@ -196,7 +175,7 @@ export async function publishArticle(input: PublishInput): Promise<PublishResult
         );
       }
 
-      result = { status: targetStatus, publishedAt, selfApproved: guard.selfApproved };
+      result = { status: targetStatus, publishedAt, selfApproved };
     }
   };
 

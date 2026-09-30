@@ -243,12 +243,6 @@
   white-space: nowrap;
 }
 
-.rail-role {
-  display: block;
-  font-size: var(--text-xs);
-  color: var(--ink-faint);
-  text-transform: capitalize;
-}
 
 /* Material hides the identity text on a narrow bar and keeps the avatar, which
    is the part that still means something at 32px. */

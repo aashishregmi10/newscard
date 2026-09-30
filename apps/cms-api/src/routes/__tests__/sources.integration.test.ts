@@ -29,18 +29,13 @@ const URI = process.env.MONGO_TEST_URI ?? 'mongodb://localhost:27017/newscard_te
 const app = createCmsApp();
 
 let adminCookie: string;
-let reviewerCookie: string;
-let authorCookie: string;
+let otherAdminCookie: string;
 let sampleSourceId: ObjectId;
 let catId: ObjectId;
 
-async function sessionFor(role: 'author' | 'reviewer' | 'admin'): Promise<string> {
-  const token = await createSession({
-    _id: new ObjectId(),
-    email: `${role}@example.invalid`,
-    role,
-    languages: ['ne', 'en'],
-  });
+/** A signed-in editor. Every account is an admin, so there is only one kind. */
+async function signedIn(email = 'admin@example.invalid'): Promise<string> {
+  const token = await createSession({ _id: new ObjectId(), email });
   return `${SESSION_COOKIE}=${token}`;
 }
 
@@ -70,10 +65,9 @@ beforeAll(async () => {
   await applyValidators(getDb());
   await syncIndexes(getDb());
 
-  [adminCookie, reviewerCookie, authorCookie] = await Promise.all([
-    sessionFor('admin'),
-    sessionFor('reviewer'),
-    sessionFor('author'),
+  [adminCookie, otherAdminCookie] = await Promise.all([
+    signedIn(),
+    signedIn('second.admin@example.invalid'),
   ]);
 
   catId = new ObjectId();
@@ -115,30 +109,18 @@ beforeEach(async () => {
   } as never);
 });
 
-describe('the permission matrix, actually routed', () => {
-  it('lets every role read the list', async () => {
-    for (const cookie of [authorCookie, reviewerCookie, adminCookie]) {
+describe('who may do what', () => {
+  it('lets any signed-in admin read, add and license publishers', async () => {
+    /* One kind of account, so the only line that matters is signed in or
+       not. A second admin can do everything the first can. */
+    for (const cookie of [adminCookie, otherAdminCookie]) {
       const res = await get('/api/cms/sources', cookie);
       expect(res.status).toBe(200);
       expect(res.body.items).toHaveLength(1);
     }
-  });
-
-  it('refuses creation to anyone but an admin', async () => {
-    // `source.write` is admin-only, and until this route existed nothing
-    // enforced that anywhere.
-    expect((await post('/api/cms/sources', authorCookie).send(NEW_PUBLISHER)).status).toBe(403);
-    expect((await post('/api/cms/sources', reviewerCookie).send(NEW_PUBLISHER)).status).toBe(403);
-    expect((await post('/api/cms/sources', adminCookie).send(NEW_PUBLISHER)).status).toBe(201);
-  });
-
-  it('refuses the licence endpoint to a reviewer', async () => {
-    // The single most important row in the matrix: a reviewer may publish, but
-    // may not decide what we are licensed to publish.
+    expect((await post('/api/cms/sources', otherAdminCookie).send(NEW_PUBLISHER)).status).toBe(201);
     const body = { status: 'refused', note: 'They asked us to stop.' };
-    expect((await post('/api/cms/sources/namuna-khabar/licence', reviewerCookie).send(body)).status).toBe(403);
-    expect((await post('/api/cms/sources/namuna-khabar/licence', authorCookie).send(body)).status).toBe(403);
-    expect((await post('/api/cms/sources/namuna-khabar/licence', adminCookie).send(body)).status).toBe(200);
+    expect((await post('/api/cms/sources/namuna-khabar/licence', otherAdminCookie).send(body)).status).toBe(200);
   });
 
   it('refuses everything to a request with no session', async () => {

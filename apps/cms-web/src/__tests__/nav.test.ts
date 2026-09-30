@@ -3,13 +3,10 @@ import {
   DEFAULT_PER_PAGE,
   DEFAULT_ROUTE,
   Routes,
-  canAccess,
   parseRoute,
-  resolveRoute,
   routeToHash,
   screenKeyOf,
   sectionOf,
-  type Role,
   type Route,
 } from '../nav';
 
@@ -386,68 +383,5 @@ describe('screenKeyOf', () => {
     expect(screenKeyOf(Routes.published({ page: 1 }))).toBe(
       screenKeyOf(Routes.published({ page: 7 })),
     );
-  });
-});
-
-describe('canAccess and resolveRoute', () => {
-  const ROLES: readonly Role[] = ['author', 'reviewer', 'admin'];
-
-  it('keeps an author out of the notification screen', () => {
-    // The same rule the server enforces on the route; this is only so the
-    // screen is not offered and a typed link lands somewhere usable.
-    expect(canAccess(Routes.notifications(), 'author')).toBe(false);
-    expect(canAccess(Routes.notifications(), 'reviewer')).toBe(true);
-    expect(canAccess(Routes.notifications(), 'admin')).toBe(true);
-  });
-
-  it('lets every role reach every other screen', () => {
-    /* The two exceptions are the two the permission matrix names: notifications
-       need `notification.send` (reviewer and admin) and adding a publisher needs
-       `source.write` (admin). Everything else is open to all three roles. */
-    for (const role of ROLES) {
-      for (const route of ALL_ROUTES) {
-        if (
-          route.name === 'notifications' ||
-          route.name === 'sourceNew' ||
-          route.name === 'publishedEdit'
-        ) {
-          continue;
-        }
-        expect(canAccess(route, role)).toBe(true);
-      }
-    }
-  });
-
-  it('sends a refused route to the queue rather than nowhere', () => {
-    expect(resolveRoute(Routes.notifications(), 'author')).toEqual(DEFAULT_ROUTE);
-    expect(resolveRoute(Routes.shorts(), 'author')).toEqual(Routes.shorts());
-  });
-
-  it('lets every role read publishers but only an admin add one', () => {
-    /*
-     * Mirrors the server's matrix exactly: `source.read` is held by all three
-     * roles, `source.write` by admin alone. An author who cannot file against a
-     * publisher needs to see that it is a licensing question, not a bug — so
-     * the list is readable; only the create form is not.
-     */
-    for (const role of ROLES) {
-      expect(canAccess(Routes.sources(), role)).toBe(true);
-      expect(canAccess(Routes.source('namuna-khabar'), role)).toBe(true);
-    }
-    expect(canAccess(Routes.sourceNew(), 'author')).toBe(false);
-    expect(canAccess(Routes.sourceNew(), 'reviewer')).toBe(false);
-    expect(canAccess(Routes.sourceNew(), 'admin')).toBe(true);
-    expect(resolveRoute(Routes.sourceNew(), 'reviewer')).toEqual(DEFAULT_ROUTE);
-  });
-
-  it('lets only those who may publish correct a live story', () => {
-    /* The server gates POST /cms/articles/:id/edit on `article.publish`,
-       which is reviewer and admin. Everyone may read the list. */
-    for (const role of ROLES) {
-      expect(canAccess(Routes.published(), role)).toBe(true);
-    }
-    expect(canAccess(Routes.publishedEdit('x'), 'author')).toBe(false);
-    expect(canAccess(Routes.publishedEdit('x'), 'reviewer')).toBe(true);
-    expect(canAccess(Routes.publishedEdit('x'), 'admin')).toBe(true);
   });
 });

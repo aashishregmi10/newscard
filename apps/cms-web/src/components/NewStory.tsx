@@ -312,7 +312,7 @@ export function NewStory({ onCreated, onCancel }: Props) {
                 </p>
                 <p className="prose" style={{ marginTop: 'var(--s3)' }}>
                   We have an agreed licence with {source.displayName}, so a summary of their
-                  reporting can be published once a reviewer has approved it.
+                  reporting can be published once it has been approved.
                 </p>
               </>
             ) : (

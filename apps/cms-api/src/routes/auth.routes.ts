@@ -73,12 +73,7 @@ authRoutes.post(
     // those attempts for the rest of the window.
     await clearLoginAttempts(req);
 
-    const token = await createSession({
-      _id: staff._id,
-      email: staff.email,
-      role: staff.role,
-      languages: staff.languages,
-    });
+    const token = await createSession({ _id: staff._id, email: staff.email });
 
     res.cookie(SESSION_COOKIE, token, {
       httpOnly: true,
@@ -93,8 +88,6 @@ authRoutes.post(
         id: staff._id.toString(),
         email: staff.email,
         name: staff.name,
-        role: staff.role,
-        languages: staff.languages,
       },
     });
   }),

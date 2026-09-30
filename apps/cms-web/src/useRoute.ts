@@ -30,7 +30,7 @@ function getSnapshot(): string {
  * has no reason to do.
  *
  * `replace` is for corrections the editor did not ask for: canonicalising a
- * sloppy URL, or sending someone away from a screen their role cannot open.
+ * sloppy URL, or moving off a page number past the end of a list.
  * Pushing those would put the bad URL in the history, where Back returns to it
  * and is bounced away again — a trap that looks like a frozen Back button.
  */

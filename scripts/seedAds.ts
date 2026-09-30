@@ -127,7 +127,6 @@ export async function seedAds(
         displayName: c.advertiserDisplay,
         contactEmail: `ads@${c.advertiser}.example.invalid`,
         isActive: true,
-        portalPasswordHash: null,
         createdAt: now,
         updatedAt: now,
       });

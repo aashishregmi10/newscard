@@ -5,7 +5,7 @@ import { crumbs } from '../lib/crumbs';
 import { relativeTime } from '../lib/format';
 import { clampPage, pageCountOf, pageSlice } from '../lib/pagination';
 import { ingestHealth, ingestSummary, licenceLook, sourceHaystack } from '../lib/sources';
-import { type LicenceTab, type Role, Routes, SOURCES_PER_PAGE } from '../nav';
+import { type LicenceTab, Routes, SOURCES_PER_PAGE } from '../nav';
 import { navigate } from '../useRoute';
 import {
   Badge,
@@ -36,13 +36,12 @@ import {
  * the counts on those tabs are the Gate 1 dashboard — which is why there is no
  * separate widget for it.
  *
- * -- Why every role can see this ---------------------------------------------
+ * -- Why unlicensed publishers are listed, not hidden -------------------------
  *
- * `source.read` is granted to author, reviewer and admin. `GET /cms/options`
- * already returns unlicensed publishers marked rather than hidden, for the
- * reason its own comment gives: "An editor who cannot find a publisher they
- * expect needs to know it is a licensing question, not a bug." Until now there
- * was nowhere for them to go and find that out. This is that place.
+ * `GET /cms/options` already returns unlicensed publishers marked rather than
+ * hidden, for the reason its own comment gives: "An editor who cannot find a
+ * publisher they expect needs to know it is a licensing question, not a bug."
+ * This is where they go to find that out.
  */
 
 const ID_BASE = 'publishers';
@@ -72,10 +71,9 @@ interface SourcesProps {
   tab: LicenceTab;
   page: number;
   search: string;
-  role: Role;
 }
 
-export function Sources({ tab, page, search, role }: SourcesProps) {
+export function Sources({ tab, page, search }: SourcesProps) {
   const { data, error, loading, reload } = useResource<SourceRow[]>(
     async (signal) => (await api.sources(signal)).items,
     'sources',
@@ -145,11 +143,9 @@ export function Sources({ tab, page, search, role }: SourcesProps) {
           <p className="page-sub">
             {all === null ? 'Loading…' : `${counts.all} recorded · ${counts.agreed} licensed`}
           </p>
-          {role === 'admin' && (
-            <Button variant="primary" icon="plus" onClick={() => navigate(Routes.sourceNew())}>
-              New publisher
-            </Button>
-          )}
+          <Button variant="primary" icon="plus" onClick={() => navigate(Routes.sourceNew())}>
+            New publisher
+          </Button>
         </div>
       </div>
 
@@ -221,11 +217,9 @@ export function Sources({ tab, page, search, role }: SourcesProps) {
               icon="newspaper"
               title="No publishers yet"
               action={
-                role === 'admin' ? (
-                  <Button variant="primary" icon="plus" onClick={() => navigate(Routes.sourceNew())}>
-                    Add the first publisher
-                  </Button>
-                ) : undefined
+                <Button variant="primary" icon="plus" onClick={() => navigate(Routes.sourceNew())}>
+                  Add the first publisher
+                </Button>
               }
             >
               A publisher must be recorded here before a story can be filed against them, and

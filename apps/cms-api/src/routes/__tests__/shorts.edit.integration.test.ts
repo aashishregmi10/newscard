@@ -19,17 +19,12 @@ const URI = process.env.MONGO_TEST_URI ?? 'mongodb://localhost:27017/newscard_te
 const app = createCmsApp();
 
 let adminCookie: string;
-let reviewerCookie: string;
-let authorCookie: string;
+let otherAdminCookie: string;
 let sourceId: ObjectId;
 
-async function sessionFor(role: 'author' | 'reviewer' | 'admin'): Promise<string> {
-  const token = await createSession({
-    _id: new ObjectId(),
-    email: `${role}@example.invalid`,
-    role,
-    languages: ['ne', 'en'],
-  });
+/** A signed-in editor. Every account is an admin, so there is only one kind. */
+async function signedIn(email = 'admin@example.invalid'): Promise<string> {
+  const token = await createSession({ _id: new ObjectId(), email });
   return `${SESSION_COOKIE}=${token}`;
 }
 
@@ -93,10 +88,9 @@ beforeAll(async () => {
   await connect({ uri: URI });
   await applyValidators(getDb());
   await syncIndexes(getDb());
-  [adminCookie, reviewerCookie, authorCookie] = await Promise.all([
-    sessionFor('admin'),
-    sessionFor('reviewer'),
-    sessionFor('author'),
+  [adminCookie, otherAdminCookie] = await Promise.all([
+    signedIn(),
+    signedIn('second.admin@example.invalid'),
   ]);
 });
 
@@ -139,9 +133,9 @@ beforeEach(async () => {
 const videoOf = (id: ObjectId) => getDb().collection('videos').findOne({ _id: id });
 
 describe('editing a draft short', () => {
-  it('saves every field, and lets an author do it', async () => {
+  it('saves every field', async () => {
     const id = await insertShort('draft');
-    const res = await post(`/api/cms/shorts/${id.toString()}/edit`, authorCookie).send(EDIT);
+    const res = await post(`/api/cms/shorts/${id.toString()}/edit`, adminCookie).send(EDIT);
     expect(res.status).toBe(200);
     expect(res.body.lastEditedAt).toBeNull();
 
@@ -205,7 +199,7 @@ describe('editing a live short', () => {
   it('stamps the time and reason, and keeps its place in the tab', async () => {
     const id = await insertShort('published');
     const reason = 'The caption undercounted the districts.';
-    const res = await post(`/api/cms/shorts/${id.toString()}/edit`, reviewerCookie).send({ ...EDIT, reason });
+    const res = await post(`/api/cms/shorts/${id.toString()}/edit`, otherAdminCookie).send({ ...EDIT, reason });
     expect(res.status).toBe(200);
     expect(typeof res.body.lastEditedAt).toBe('string');
 
@@ -221,14 +215,6 @@ describe('editing a live short', () => {
     expect((audit?.after as { reason: string }).reason).toBe(reason);
   });
 
-  it('is refused to an author, as publishing is', async () => {
-    const id = await insertShort('published');
-    const res = await post(`/api/cms/shorts/${id.toString()}/edit`, authorCookie).send({
-      ...EDIT,
-      reason: 'The caption undercounted the districts.',
-    });
-    expect(res.status).toBe(403);
-  });
 
   it('shows the edit on the library list', async () => {
     const id = await insertShort('published');
@@ -271,12 +257,14 @@ describe('withdrawing a short', () => {
     expect(v?.retractedAt).toBeInstanceOf(Date);
   });
 
-  it('is refused to an author', async () => {
+  it('is refused without a session', async () => {
     const id = await insertShort('published');
-    const res = await post(`/api/cms/shorts/${id.toString()}/retract`, authorCookie).send({
-      reason: 'The footage was from a different flood.',
-    });
-    expect(res.status).toBe(403);
+    const res = await request(app)
+      .post(`/api/cms/shorts/${id.toString()}/retract`)
+      .set('X-Requested-With', 'newscard-cms')
+      .send({ reason: 'The footage was from a different flood.' });
+    expect(res.status).toBe(401);
+    expect((await videoOf(id))?.status).toBe('published');
   });
 });
 
@@ -316,7 +304,7 @@ describe('the library list', () => {
 describe('the detail route', () => {
   it('returns what the edit screen needs', async () => {
     const id = await insertShort('published');
-    const res = await get(`/api/cms/shorts/${id.toString()}`, authorCookie);
+    const res = await get(`/api/cms/shorts/${id.toString()}`, otherAdminCookie);
     expect(res.status).toBe(200);
     expect(res.body.short.renditions).toHaveLength(2);
     expect(res.body.short.licence).toBe('publisher_licensed');

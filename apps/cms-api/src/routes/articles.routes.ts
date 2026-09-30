@@ -4,16 +4,13 @@ import { z } from 'zod';
 import { collections, getDb } from '@saar/db';
 import {
   AppError,
-  can,
   countGraphemes,
   countWords,
   measureSummary,
   type LimitType,
-  type Permission,
-  type StaffRole,
 } from '@saar/shared';
 import { ArticleStatusEnum, DEFAULT_CONFIG, ImageLicenceEnum } from '@saar/schemas';
-import { requireRole, requireAuth } from '../auth/requireRole.js';
+import { requireAuth } from '../auth/requireAuth.js';
 import { asyncRoute } from '../middleware/index.js';
 import { transitionArticle } from '../services/transition.service.js';
 import { publishArticle, retractArticle } from '../services/publish.service.js';
@@ -32,7 +29,6 @@ articleRoutes.use(requireAuth);
  */
 articleRoutes.get(
   '/cms/queue',
-  requireRole('queue.read'),
   asyncRoute(async (req, res) => {
     const status = z
       .array(ArticleStatusEnum)
@@ -97,7 +93,6 @@ const PublishedQuery = z.object({
 
 articleRoutes.get(
   '/cms/published',
-  requireRole('queue.read'),
   asyncRoute(async (req, res) => {
     const parsed = PublishedQuery.safeParse(req.query);
     if (!parsed.success) throw new AppError('BAD_REQUEST', 'Unknown query.');
@@ -145,7 +140,6 @@ articleRoutes.get(
 /** GET /cms/articles/:id — everything the composer needs, in one request. */
 articleRoutes.get(
   '/cms/articles/:id',
-  requireRole('queue.read'),
   asyncRoute(async (req, res) => {
     const c = collections(getDb());
     const id = String(req.params.id ?? '');
@@ -279,7 +273,6 @@ const PatchSchema = z.object({
 /** PATCH /cms/articles/:id — autosave from the composer. */
 articleRoutes.patch(
   '/cms/articles/:id',
-  requireRole('article.write'),
   asyncRoute(async (req, res) => {
     const id = String(req.params.id ?? '');
     if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
@@ -326,20 +319,9 @@ articleRoutes.patch(
   }),
 );
 
-/** POST /cms/articles/:id/transition — submit, reject, spike. */
+/** POST /cms/articles/:id/transition — submit, approve, reject, spike. */
 articleRoutes.post(
   '/cms/articles/:id/transition',
-  /*
-   * The floor. Every role may move a story SOMEWHERE — submitting and
-   * rejecting are an author’s own work — so the per-target permissions are
-   * checked inside, against the status actually asked for.
-   *
-   * `article.approve` and `article.spike` were in the matrix from the start
-   * and enforced by nothing: this route accepted any status the state machine
-   * allowed, so an author could approve their own story and spike anyone
-   * else's. Reserving them here is what makes the matrix true.
-   */
-  requireRole('article.submit'),
   asyncRoute(async (req, res) => {
     const Body = z.object({
       to: ArticleStatusEnum,
@@ -349,23 +331,9 @@ articleRoutes.post(
     const parsed = Body.safeParse(req.body);
     if (!parsed.success) throw new AppError('BAD_REQUEST', 'A target status is required.');
 
-    const NEEDED: Partial<Record<string, Permission>> = {
-      approved: 'article.approve',
-      spiked: 'article.spike',
-    };
-    const needed = NEEDED[parsed.data.to];
-    if (needed !== undefined && !can(req.staff!.role as StaffRole, needed)) {
-      throw new AppError(
-        'FORBIDDEN',
-        `Your role (${req.staff!.role}) cannot ${needed}.`,
-        { permission: needed },
-      );
-    }
-
     const status = await transitionArticle({
       articleId: String(req.params.id ?? ''),
       to: parsed.data.to,
-      actorLanguages: req.staff!.languages,
       note: parsed.data.note,
       spikeReason: parsed.data.spikeReason,
       actorId: req.staff!.staffId,
@@ -380,7 +348,6 @@ articleRoutes.post(
 /** POST /cms/articles/:id/publish */
 articleRoutes.post(
   '/cms/articles/:id/publish',
-  requireRole('article.publish'),
   asyncRoute(async (req, res) => {
     const Body = z.object({ scheduledFor: z.coerce.date().optional() });
     const parsed = Body.safeParse(req.body ?? {});
@@ -390,8 +357,6 @@ articleRoutes.post(
       articleId: String(req.params.id ?? ''),
       actorId: req.staff!.staffId,
       actorEmail: req.staff!.email,
-      actorRole: req.staff!.role,
-      actorLanguages: req.staff!.languages,
       ip: req.ip ?? null,
       scheduledFor: parsed.data.scheduledFor,
     });
@@ -403,7 +368,6 @@ articleRoutes.post(
 /** POST /cms/articles/:id/retract */
 articleRoutes.post(
   '/cms/articles/:id/retract',
-  requireRole('article.retract'),
   asyncRoute(async (req, res) => {
     const Body = z.object({ reason: z.string().min(10) });
     const parsed = Body.safeParse(req.body);
@@ -473,12 +437,6 @@ const EditSchema = z.object({
 
 articleRoutes.post(
   '/cms/articles/:id/edit',
-  /*
-   * Changing what readers are being shown is the same act as publishing it,
-   * so it takes the same permission. An author may write and submit; putting
-   * different words in front of the public is a reviewer decision.
-   */
-  requireRole('article.publish'),
   asyncRoute(async (req, res) => {
     const id = String(req.params.id ?? '');
     if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
@@ -660,7 +618,6 @@ export function draftSlug(language: string, categorySlug: string): string {
 
 articleRoutes.post(
   '/cms/articles',
-  requireRole('article.write'),
   asyncRoute(async (req, res) => {
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -755,7 +712,6 @@ articleRoutes.post(
  */
 articleRoutes.get(
   '/cms/options',
-  requireRole('queue.read'),
   asyncRoute(async (_req, res) => {
     const c = collections(getDb());
     const [categories, sources] = await Promise.all([

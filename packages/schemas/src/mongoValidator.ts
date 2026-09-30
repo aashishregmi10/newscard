@@ -169,11 +169,7 @@ export const deviceValidator: MongoValidator = {
 export const staffValidator: MongoValidator = {
   $jsonSchema: {
     bsonType: 'object',
-    required: ['email', 'name', 'role', 'languages', 'isActive', 'passwordHash'],
-    properties: {
-      role: { enum: ['author', 'reviewer', 'admin'] },
-      languages: { bsonType: 'array', minItems: 1, items: { enum: ['ne', 'en'] } },
-    },
+    required: ['email', 'name', 'isActive', 'passwordHash'],
   },
 };
 

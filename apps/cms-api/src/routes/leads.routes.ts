@@ -3,7 +3,7 @@ import { ObjectId } from 'mongodb';
 import { z } from 'zod';
 import { collections, getDb } from '@saar/db';
 import { AppError } from '@saar/shared';
-import { requireAuth, requireRole } from '../auth/requireRole.js';
+import { requireAuth } from '../auth/requireAuth.js';
 import { asyncRoute } from '../middleware/index.js';
 import { writeAudit } from '../audit/writeAudit.js';
 import { draftSlug } from './articles.routes.js';
@@ -130,7 +130,6 @@ function toRow(d: Record<string, unknown>): LeadRow {
  */
 leadRoutes.get(
   '/cms/leads',
-  requireRole('queue.read'),
   asyncRoute(async (req, res) => {
     const parsed = ListQuery.safeParse(req.query);
     if (!parsed.success) throw new AppError('BAD_REQUEST', 'Unknown lead status.');
@@ -178,7 +177,6 @@ leadRoutes.get(
  */
 leadRoutes.post(
   '/cms/leads/:id/promote',
-  requireRole('article.write'),
   asyncRoute(async (req, res) => {
     const parsed = PromoteSchema.safeParse(req.body);
     if (!parsed.success) throw new AppError('BAD_REQUEST', 'A section is required.');
@@ -294,7 +292,6 @@ leadRoutes.post(
 /** POST /cms/leads/:id/dismiss — not for us, and say why. */
 leadRoutes.post(
   '/cms/leads/:id/dismiss',
-  requireRole('article.write'),
   asyncRoute(async (req, res) => {
     const parsed = DismissSchema.safeParse(req.body);
     if (!parsed.success) {

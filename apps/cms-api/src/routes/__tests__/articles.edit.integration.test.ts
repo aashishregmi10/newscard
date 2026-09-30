@@ -27,17 +27,12 @@ const URI = process.env.MONGO_TEST_URI ?? 'mongodb://localhost:27017/newscard_te
 const app = createCmsApp();
 
 let adminCookie: string;
-let reviewerCookie: string;
-let authorCookie: string;
+let otherAdminCookie: string;
 let sourceId: ObjectId;
 
-async function sessionFor(role: 'author' | 'reviewer' | 'admin'): Promise<string> {
-  const token = await createSession({
-    _id: new ObjectId(),
-    email: `${role}@example.invalid`,
-    role,
-    languages: ['ne', 'en'],
-  });
+/** A signed-in editor. Every account is an admin, so there is only one kind. */
+async function signedIn(email = 'admin@example.invalid'): Promise<string> {
+  const token = await createSession({ _id: new ObjectId(), email });
   return `${SESSION_COOKIE}=${token}`;
 }
 
@@ -110,10 +105,9 @@ beforeAll(async () => {
   await connect({ uri: URI });
   await applyValidators(getDb());
   await syncIndexes(getDb());
-  [adminCookie, reviewerCookie, authorCookie] = await Promise.all([
-    sessionFor('admin'),
-    sessionFor('reviewer'),
-    sessionFor('author'),
+  [adminCookie, otherAdminCookie] = await Promise.all([
+    signedIn(),
+    signedIn('second.admin@example.invalid'),
   ]);
 });
 
@@ -151,7 +145,7 @@ describe('editing a live story', () => {
     const id = await insertArticle('published');
     const before = Date.now();
 
-    const res = await post(`/api/cms/articles/${id.toString()}/edit`, reviewerCookie).send(GOOD_EDIT);
+    const res = await post(`/api/cms/articles/${id.toString()}/edit`, otherAdminCookie).send(GOOD_EDIT);
     expect(res.status).toBe(200);
     expect(typeof res.body.lastEditedAt).toBe('string');
 
@@ -219,10 +213,13 @@ describe('editing a live story', () => {
     expect(tinyHeadline.status).toBe(422);
   });
 
-  it('is refused to an author, as publishing is', async () => {
+  it('is refused without a session', async () => {
     const id = await insertArticle('published');
-    const res = await post(`/api/cms/articles/${id.toString()}/edit`, authorCookie).send(GOOD_EDIT);
-    expect(res.status).toBe(403);
+    const res = await request(app)
+      .post(`/api/cms/articles/${id.toString()}/edit`)
+      .set('X-Requested-With', 'newscard-cms')
+      .send(GOOD_EDIT);
+    expect(res.status).toBe(401);
   });
 
   it('refuses a withdrawn story and a draft', async () => {

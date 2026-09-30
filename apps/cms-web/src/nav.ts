@@ -169,8 +169,6 @@ export type Route =
 /** The top-level sections the rail offers. Every route belongs to one. */
 export type Section = 'queue' | 'published' | 'leads' | 'shorts' | 'sources' | 'notifications';
 
-export type Role = 'author' | 'reviewer' | 'admin';
-
 /**
  * Constructors, so a caller never has to remember the defaults.
  *
@@ -241,9 +239,9 @@ export function parseRoute(hash: string): Route {
    * The bare address is the public homepage, not the queue.
    *
    * DEFAULT_ROUTE stays the queue on purpose: it is the fallback for a
-   * route that exists but is not allowed or not understood, and sending a
-   * signed-in author to a marketing page because they followed a stale link
-   * would be worse than sending them to their work.
+   * route that is not understood, and sending a signed-in editor to a
+   * marketing page because they followed a stale link would be worse than
+   * sending them to their work.
    */
   if (section === '') return Routes.home();
   if (section === 'home') return Routes.home();
@@ -494,50 +492,6 @@ export function screenKeyOf(route: Route): string {
     case 'notifications':
       return 'notifications';
   }
-}
-
-/**
- * The same permission the server enforces on the route.
- *
- * Duplicated here on purpose, and only to decide what to SHOW. The server is
- * the authority; this exists so an author is not offered a screen that would
- * refuse them, and so a link to one typed by hand lands somewhere sensible
- * rather than on an error the reader cannot act on.
- */
-export function canAccess(route: Route, role: Role): boolean {
-  switch (route.name) {
-    case 'notifications':
-      return role !== 'author';
-    /*
-     * `source.read` is granted to every role, so the publisher list and one
-     * publisher's record are readable by all — an author who cannot file
-     * against a publisher deserves to see that it is a licensing question
-     * rather than a bug. Only the create form is admin-only, because there is
-     * nothing on it to read.
-     */
-    case 'sourceNew':
-      return role === 'admin';
-    /*
-     * Correcting a live story is the same act as publishing it, and the
-     * server gates it on `article.publish` for that reason. An author reaching
-     * the form would fill it in and be refused at Save, which is the worst
-     * place to find out.
-     */
-    case 'publishedEdit':
-      return role !== 'author';
-    default:
-      return true;
-  }
-}
-
-/**
- * The route to actually show, given who is asking.
- *
- * Kept separate from `canAccess` so the caller does not have to remember to ask
- * both questions in the right order.
- */
-export function resolveRoute(route: Route, role: Role): Route {
-  return canAccess(route, role) ? route : DEFAULT_ROUTE;
 }
 
 /* ------------------------------------------------------------------ parsing */

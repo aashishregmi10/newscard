@@ -5,7 +5,7 @@ import { collections, getDb } from '@saar/db';
 import { AppError, channelFor, isQuietHours, nextQuietWindowEnd } from '@saar/shared';
 import { LanguageEnum, NotificationTypeEnum } from '@saar/schemas';
 import { dispatchNotification, isValidPushToken, sendPush } from '@saar/worker';
-import { requireRole, requireAuth } from '../auth/requireRole.js';
+import { requireAuth } from '../auth/requireAuth.js';
 import { asyncRoute } from '../middleware/index.js';
 import { writeAudit } from '../audit/writeAudit.js';
 
@@ -62,7 +62,6 @@ const ComposeSchema = z.object({
  */
 notificationRoutes.get(
   '/cms/notifications/targets',
-  requireRole('notification.send'),
   asyncRoute(async (_req, res) => {
     const c = collections(getDb());
 
@@ -105,7 +104,6 @@ notificationRoutes.get(
 /** GET /cms/notifications — what has been sent, most recent first. */
 notificationRoutes.get(
   '/cms/notifications',
-  requireRole('notification.send'),
   asyncRoute(async (_req, res) => {
     const docs = await collections(getDb())
       .notifications.find({})
@@ -143,7 +141,6 @@ notificationRoutes.get(
  */
 notificationRoutes.post(
   '/cms/notifications',
-  requireRole('notification.send'),
   asyncRoute(async (req, res) => {
     const parsed = ComposeSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -247,7 +244,6 @@ const TestSchema = z.object({
 
 notificationRoutes.post(
   '/cms/notifications/test',
-  requireRole('notification.send'),
   asyncRoute(async (req, res) => {
     const parsed = TestSchema.safeParse(req.body);
     if (!parsed.success) {

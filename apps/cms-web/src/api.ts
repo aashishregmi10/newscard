@@ -184,11 +184,10 @@ export interface UploadedVideo {
   }>;
 }
 
+/** Who is signed in. Every account is an admin, so this is identity only. */
 export interface Staff {
   staffId: string;
   email: string;
-  role: 'author' | 'reviewer' | 'admin';
-  languages: string[];
 }
 
 export interface Limits {

@@ -3,10 +3,8 @@ import { ApiError, api, isAbort, type Staff } from './api';
 import {
   Routes,
   isPublicRoute,
-  resolveRoute,
   screenKeyOf,
   sectionOf,
-  type Role,
   type Route,
 } from './nav';
 import { navigate, useRoute } from './useRoute';
@@ -130,14 +128,7 @@ export default function App() {
     return <Login problem={sessionError} onSignedIn={() => void checkSession()} />;
   }
 
-  /*
-   * A route this role cannot open resolves to the queue.
-   *
-   * The server enforces the same rule and would refuse the request; this is so
-   * that an author who follows a link to the notification screen lands
-   * somewhere usable instead of on an error they can do nothing about.
-   */
-  const route = resolveRoute(requested, session.role);
+  const route = requested;
 
   return (
     <AppShell
@@ -151,7 +142,7 @@ export default function App() {
       onSignOut={() => void signOut()}
       signingOut={signingOut}
     >
-      <Screen route={route} role={session.role} onQueueCount={setQueueCount} />
+      <Screen route={route} onQueueCount={setQueueCount} />
     </AppShell>
   );
 }
@@ -165,13 +156,9 @@ export default function App() {
  */
 function Screen({
   route,
-  role,
   onQueueCount,
 }: {
   route: Route;
-  /* Threaded down so a screen can render read-only rather than empty. The
-     server holds the same line; this decides what is worth offering. */
-  role: Role;
   onQueueCount: (count: number) => void;
 }) {
   switch (route.name) {
@@ -193,22 +180,17 @@ function Screen({
       return <NewShort />;
     case 'shortEdit':
       /* Keyed by id so moving between two shorts rebuilds the form. */
-      return <EditShort key={route.id} id={route.id} role={role} />;
+      return <EditShort key={route.id} id={route.id} />;
     case 'sources':
       return (
-        <Sources
-          tab={route.tab}
-          page={route.page}
-          search={route.q}
-          role={role}
-        />
+        <Sources tab={route.tab} page={route.page} search={route.q} />
       );
     case 'sourceNew':
       return <NewSource />;
     case 'source':
       /* Keyed by slug so moving between two publishers rebuilds the form
          rather than leaving the previous one's values in the fields. */
-      return <SourceDetail key={route.slug} slug={route.slug} role={role} />;
+      return <SourceDetail key={route.slug} slug={route.slug} />;
     /* Rendered above, outside the shell. Unreachable here, and named so the
        switch stays exhaustive — adding a route is a compile error until it
        is handled somewhere. */
@@ -218,7 +200,7 @@ function Screen({
       return null;
 
     case 'published':
-      return <Published tab={route.tab} page={route.page} role={role} />;
+      return <Published tab={route.tab} page={route.page} />;
     case 'publishedEdit':
       /* Keyed by id, as the publisher screen is by slug: moving between two
          stories must rebuild the form rather than keep the first one's text. */
