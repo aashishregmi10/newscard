@@ -157,8 +157,8 @@ function VideoCardInner({
   const posterColor = blurHashAverageColor(video.posterBlurHash) ?? theme.surfaceRaised;
   const lh = LINE_HEIGHT[video.language];
   const fontFamily = fontFor(video.language);
-  const titleSize = 21 * textScale;
-  const capSize = 14.5 * textScale;
+  const titleSize = textSize(21) * textScale;
+  const capSize = textSize(14.5) * textScale;
 
   return (
     <View style={[styles.card, { height, backgroundColor: '#000' }]}>

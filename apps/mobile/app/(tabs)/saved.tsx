@@ -1,8 +1,10 @@
-import { View, Text, FlatList, StyleSheet, Pressable } from 'react-native';
+import { useRef, useState } from 'react';
+import { View, Text, FlatList, StyleSheet, Pressable, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSettings } from '../../src/state/SettingsContext';
 import { useBookmarks } from '../../src/state/BookmarksContext';
-import { blurHashAverageColor } from '../../src/api/client';
+import { blurHashAverageColor, resolveMediaUrl } from '../../src/api/client';
+import { UndoBar, type UndoMessage } from '../../src/components/UndoBar';
 import { relativeTime } from '../../src/lib/relativeTime';
 import { openArticleInApp } from '../../src/lib/openArticle';
 import { textSize } from '../../src/theme/tokens';
@@ -17,8 +19,10 @@ import { textSize } from '../../src/theme/tokens';
  * network at all — which is the entire point of a bookmark.
  */
 export default function SavedScreen() {
-  const { theme, languages } = useSettings();
-  const { items, remove, ready } = useBookmarks();
+  const { theme, languages, dataSaver } = useSettings();
+  const { items, remove, restore, ready } = useBookmarks();
+  const [undo, setUndo] = useState<UndoMessage | null>(null);
+  const undoId = useRef(0);
   const insets = useSafeAreaInsets();
   const lang = languages.includes('ne') ? 'ne' : 'en';
 
@@ -50,7 +54,8 @@ export default function SavedScreen() {
         <FlatList
           data={items}
           keyExtractor={(c) => c.id}
-          contentContainerStyle={{ padding: 14, gap: 10 }}
+          // Room at the end for the Undo bar, so it never covers the last row.
+          contentContainerStyle={{ padding: 14, paddingBottom: 76, gap: 10 }}
           renderItem={({ item }) => {
             const when = item.sourcePublishedAt ?? item.publishedAt;
             return (
@@ -60,12 +65,23 @@ export default function SavedScreen() {
                 // is the same reader action reached from somewhere else.
                 onPress={() => void openArticleInApp(item.publisherUrl, theme)}
               >
+                {/* The photograph when there is one, over its own average
+                    colour — which is also all that shows offline or on Data
+                    Saver, where a list of thumbnails is not worth the data. */}
                 <View
                   style={[
                     styles.thumb,
                     { backgroundColor: blurHashAverageColor(item.image?.blurHash) ?? theme.divider },
                   ]}
-                />
+                >
+                  {item.image && !dataSaver ? (
+                    <Image
+                      source={{ uri: resolveMediaUrl(item.image.urls.sm ?? item.image.urls.md) ?? '' }}
+                      style={StyleSheet.absoluteFill}
+                      resizeMode="cover"
+                    />
+                  ) : null}
+                </View>
                 <View style={styles.rowBody}>
                   {/* Devanagari needs more line height than Latin, or vowel
                       marks from one line collide with the next (Ch. 11.6). On
@@ -86,7 +102,19 @@ export default function SavedScreen() {
                 </View>
                 <Pressable
                   hitSlop={10}
-                  onPress={() => remove(item.id)}
+                  onPress={() => {
+                    // Instant, like saving — and so one mis-tap from losing a
+                    // story the reader chose to keep. Hence the Undo.
+                    const at = items.findIndex((c) => c.id === item.id);
+                    remove(item.id);
+                    setUndo({
+                      id: ++undoId.current,
+                      text: lang === 'ne' ? 'सुरक्षितबाट हटाइयो' : 'Removed from saved',
+                      undoLabel: lang === 'ne' ? 'फिर्ता' : 'Undo',
+                      onUndo: () => restore(item, at),
+                    });
+                  }}
+                  accessibilityRole="button"
                   accessibilityLabel="Remove from saved"
                 >
                   <Text style={{ color: theme.textSecondary, fontSize: textSize(17) }}>✕</Text>
@@ -96,6 +124,8 @@ export default function SavedScreen() {
           }}
         />
       )}
+
+      <UndoBar message={undo} theme={theme} />
     </View>
   );
 }
@@ -124,7 +154,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
   },
-  thumb: { width: 58, height: 58, borderRadius: 8 },
+  thumb: { width: 58, height: 58, borderRadius: 8, overflow: 'hidden' },
   rowBody: { flex: 1 },
   rowHead: { fontSize: textSize(14.5), fontWeight: '600', lineHeight: textSize(20), marginBottom: 4 },
   rowMeta: { fontSize: textSize(12) },

@@ -19,6 +19,7 @@ import { SponsoredCard } from './SponsoredCard';
 import { useFeed } from '../hooks/useFeed';
 import { useFilters } from '../state/FiltersContext';
 import { useDevice } from '../state/DeviceContext';
+import { useNetwork } from '../state/NetworkContext';
 import { isAd, type AdCard, type Card, type FeedEntry, type InlineAd } from '../api/client';
 import {
   noteAdVisible,
@@ -116,8 +117,10 @@ function CategoryFeedInner({
   // Memoised because a new array identity on every render makes FlatList
   // rebuild its cells, and this component re-renders on every horizontal swipe.
   const cards: FeedEntry[] | null = useMemo(
-    () => raw?.filter((c) => isAd(c) || !filters.isMuted(c.category.slug, c.source.name)) ?? null,
-    [raw, filters],
+    () =>
+      raw?.filter((c) => isAd(c) || !filters.isMuted(c.category.slug, c.source.name, category)) ??
+      null,
+    [raw, filters, category],
   );
 
   useEffect(() => {
@@ -165,6 +168,24 @@ function CategoryFeedInner({
   refreshRef.current = refresh;
 
   /**
+   * The connection came back: try again, without being asked.
+   *
+   * Only where it cannot pull a story out from under the reader. A refresh
+   * replaces the list, so it runs when there is nothing on screen or the
+   * reader is resting on the first card; mid-feed, the stories they have stay
+   * put and pulling down (or tapping Feed) fetches when they are ready.
+   */
+  const { online } = useNetwork();
+  const wasOnline = useRef(online);
+  useEffect(() => {
+    const cameBack = online && !wasOnline.current;
+    wasOnline.current = online;
+    if (!cameBack || !(error?.kind === 'offline' || fromCache)) return;
+    if (!cards || cards.length === 0) void reload();
+    else if (atTop.current) void refresh();
+  }, [online, error, fromCache, cards, reload, refresh]);
+
+  /**
    * Feed tab pressed while already on the Feed.
    *
    * Scrolled down  -> return to the top.
@@ -197,6 +218,7 @@ function CategoryFeedInner({
   }, []);
 
   const keyExtractor = useCallback((e: FeedEntry) => e.id, []);
+  const onEndReached = useCallback(() => void loadMore(), [loadMore]);
 
   const handleAdClick = useCallback(
     (ad: AdCard) => {
@@ -368,12 +390,6 @@ function CategoryFeedInner({
 
   return (
     <View style={styles.fill}>
-      {banner && (
-        <View style={[styles.banner, { backgroundColor: theme.surfaceRaised }]}>
-          <Text style={{ color: theme.textSecondary, fontSize: textSize(12.5) }}>{banner}</Text>
-        </View>
-      )}
-
       {/* One swipe = one card. `disableIntervalMomentum` is what enforces it:
        * pagingEnabled and snapToInterval only decide where a scroll RESTS, so
        * without it a fling keeps its momentum and travels several cards. */}
@@ -392,7 +408,7 @@ function CategoryFeedInner({
         onViewableItemsChanged={onViewableItemsChanged}
         onMomentumScrollEnd={onScrollSettled}
         onScrollEndDrag={onScrollSettled}
-        onEndReached={() => void loadMore()}
+        onEndReached={onEndReached}
         onEndReachedThreshold={0.5}
         refreshControl={refreshControl}
         /* Cards are full-screen, so the defaults (10 initial, window of 21) mount
@@ -407,6 +423,23 @@ function CategoryFeedInner({
          * single biggest win on the entry-level devices this app targets. */
         removeClippedSubviews={Platform.OS === 'android'}
       />
+
+      {/*
+        * Floats over the top of the card rather than sitting above the list.
+        * In the flow it made the list shorter than its pages, so while it
+        * showed, the bottom of every card was cut off and each snap landed a
+        * banner's height out. Clear of the corners, where the card keeps its
+        * menu button, and it takes no touches.
+        */}
+      {banner && (
+        <View style={styles.bannerWrap} pointerEvents="none">
+          <View style={[styles.banner, { backgroundColor: theme.surfaceRaised, borderColor: theme.divider }]}>
+            <Text style={[styles.bannerText, { color: theme.textSecondary }]} numberOfLines={2}>
+              {banner}
+            </Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -423,7 +456,15 @@ export const CategoryFeed = memo(CategoryFeedInner);
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  banner: { paddingHorizontal: 16, paddingVertical: 7 },
+  bannerWrap: { position: 'absolute', top: 10, left: 56, right: 56, alignItems: 'center' },
+  banner: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: StyleSheet.hairlineWidth,
+    opacity: 0.96,
+  },
+  bannerText: { fontSize: textSize(12.5), textAlign: 'center' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 32 },
   emptyTitle: { fontSize: textSize(17), fontWeight: '600', marginBottom: 6 },
   emptyBody: { fontSize: textSize(14), textAlign: 'center', marginBottom: 18 },

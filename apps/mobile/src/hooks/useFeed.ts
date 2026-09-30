@@ -104,10 +104,11 @@ export function useFeed(languages: Array<'ne' | 'en'>, category: string) {
     }
   }, [languages, category]);
 
-  return {
-    ...state,
-    reload: () => load('initial'),
-    refresh: () => load('refresh'),
-    loadMore,
-  };
+  // Stable identities. A fresh function here on every render rebuilt the
+  // feed's pull-to-refresh control on every render too — including the one
+  // each horizontal swipe causes.
+  const reload = useCallback(() => load('initial'), [load]);
+  const refresh = useCallback(() => load('refresh'), [load]);
+
+  return { ...state, reload, refresh, loadMore };
 }

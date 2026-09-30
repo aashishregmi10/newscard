@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import * as Network from 'expo-network';
 import { AppState } from 'react-native';
 
@@ -35,16 +35,22 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
+    const apply = (s: Network.NetworkState) => {
+      if (cancelled) return;
+      const next: Ctx = {
+        unmetered:
+          s.type === Network.NetworkStateType.WIFI || s.type === Network.NetworkStateType.ETHERNET,
+        online: s.isInternetReachable ?? s.isConnected ?? true,
+      };
+      // Only a real change re-renders: every feed on screen reads this.
+      setState((prev) =>
+        prev.unmetered === next.unmetered && prev.online === next.online ? prev : next,
+      );
+    };
+
     const read = async () => {
       try {
-        const s = await Network.getNetworkStateAsync();
-        if (cancelled) return;
-        setState({
-          unmetered:
-            s.type === Network.NetworkStateType.WIFI ||
-            s.type === Network.NetworkStateType.ETHERNET,
-          online: s.isInternetReachable ?? s.isConnected ?? true,
-        });
+        apply(await Network.getNetworkStateAsync());
       } catch {
         // A failed read means we do not know, and not knowing means metered.
         if (!cancelled) setState({ unmetered: false, online: true });
@@ -53,21 +59,36 @@ export function NetworkProvider({ children }: { children: ReactNode }) {
 
     void read();
 
-    // Re-read on foreground rather than subscribing to every change: a reader
-    // who walks out of Wi-Fi range usually backgrounds the app on the way, and
-    // a polling subscription costs battery for a value that changes rarely.
+    /*
+     * Told when the connection changes, while the app is open.
+     *
+     * This used to be read on foreground only. But a connection that drops
+     * and comes back WHILE someone is reading — a lift, a tunnel, a bus — is
+     * the common case here, and the feed stayed on its "could not reach the
+     * server" copy until they thought to pull down. The OS pushes this event;
+     * nothing polls, so it costs nothing while the network is steady.
+     */
+    let listener: { remove: () => void } | null = null;
+    try {
+      listener = Network.addNetworkStateListener(apply);
+    } catch {
+      // A build without the event still has the foreground re-read below.
+    }
+
+    // Kept as well: some Android builds do not deliver the event after a long
+    // background, and a foreground read is one cheap call.
     const sub = AppState.addEventListener('change', (s) => {
       if (s === 'active') void read();
     });
 
     return () => {
       cancelled = true;
+      listener?.remove();
       sub.remove();
     };
   }, []);
 
-  const value = useMemo(() => state, [state]);
-  return <NetworkCtx.Provider value={value}>{children}</NetworkCtx.Provider>;
+  return <NetworkCtx.Provider value={state}>{children}</NetworkCtx.Provider>;
 }
 
 export function useNetwork(): Ctx {

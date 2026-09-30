@@ -1,5 +1,14 @@
-import { useState, memo } from 'react';
-import { View, Image, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { useEffect, useState, memo } from 'react';
+import {
+  View,
+  Image,
+  Text,
+  Pressable,
+  StyleSheet,
+  ActivityIndicator,
+  type StyleProp,
+  type ViewStyle,
+} from 'react-native';
 import {
   blurHashAverageColor,
   resolveMediaUrl,
@@ -26,7 +35,11 @@ import { textSize } from '../theme/tokens';
 interface Props {
   image: CardImageData | null;
   theme: Theme;
-  height: number;
+  /**
+   * The region's size and flex. A style rather than a height, so the card can
+   * let the photograph give way to a long summary — see NewsCard.
+   */
+  style: StyleProp<ViewStyle>;
   dataSaver: boolean;
   /** Rendition to use when loading normally. */
   rendition?: 'sm' | 'md' | 'lg';
@@ -36,8 +49,24 @@ interface Props {
  *  than no number at all — the point is that the reader can decide. */
 const APPROX_KB: Record<string, number> = { sm: 25, md: 70, lg: 140 };
 
-function CardImageInner({ image, theme, height, dataSaver, rendition = 'md' }: Props) {
+/** How long an image may take before a spinner is worth showing. */
+const SPINNER_AFTER_MS = 600;
+
+function CardImageInner({ image, theme, style, dataSaver, rendition = 'md' }: Props) {
   const [loaded, setLoaded] = useState(false);
+  /**
+   * A spinner only for an image that is actually slow.
+   *
+   * Most arrive within a few hundred milliseconds, and a spinner that flashes
+   * up and vanishes on every card reads as the app working hard. The
+   * placeholder colour already says "a picture goes here".
+   */
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    if (loaded) return;
+    const t = setTimeout(() => setSlow(true), SPINNER_AFTER_MS);
+    return () => clearTimeout(t);
+  }, [loaded]);
   const [failed, setFailed] = useState(false);
   const [manuallyRequested, setManuallyRequested] = useState(false);
 
@@ -54,7 +83,7 @@ function CardImageInner({ image, theme, height, dataSaver, rendition = 'md' }: P
   const shouldLoad = (!dataSaver || manuallyRequested) && !!uri && !failed;
 
   return (
-    <View style={[styles.wrap, { height, backgroundColor: placeholder }]}>
+    <View style={[styles.wrap, style, { backgroundColor: placeholder }]}>
       {shouldLoad && (
         <Image
           source={{ uri: uri! }}
@@ -68,7 +97,7 @@ function CardImageInner({ image, theme, height, dataSaver, rendition = 'md' }: P
         />
       )}
 
-      {shouldLoad && !loaded && (
+      {shouldLoad && !loaded && slow && (
         <View style={styles.centre}>
           <ActivityIndicator size="small" color="rgba(255,255,255,0.8)" />
         </View>

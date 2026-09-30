@@ -1,4 +1,5 @@
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { FONT_DEVANAGARI, type Theme, textSize } from '../theme/tokens';
 
@@ -34,8 +35,20 @@ const CHOICES: Array<{ key: string; label: string; sub: string; langs: Array<'ne
 ];
 
 export function FirstRun({ theme, onChoose }: Props) {
+  const insets = useSafeAreaInsets();
+
+  // Scrolls only if it must: on a short phone at a large text size the three
+  // choices and the two hints are taller than the screen, and the hints are
+  // the part that would otherwise be lost under the navigation bar.
   return (
-    <View style={[styles.root, { backgroundColor: theme.surface }]}>
+    <ScrollView
+      style={{ backgroundColor: theme.surface }}
+      contentContainerStyle={[
+        styles.root,
+        { paddingTop: insets.top + 40, paddingBottom: insets.bottom },
+      ]}
+      bounces={false}
+    >
       <View style={styles.top}>
         <Text style={[styles.brand, { color: theme.accent }]}>SAAR</Text>
         <Text style={[styles.tag, { color: theme.textSecondary }]}>
@@ -91,13 +104,13 @@ export function FirstRun({ theme, onChoose }: Props) {
           </Text>
         </View>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, paddingHorizontal: 28, justifyContent: 'space-between' },
-  top: { paddingTop: 72 },
+  root: { flexGrow: 1, paddingHorizontal: 28, justifyContent: 'space-between' },
+  top: { paddingBottom: 24 },
   brand: { fontSize: textSize(15), fontWeight: '800', letterSpacing: 3.5 },
   tag: {
     fontFamily: FONT_DEVANAGARI,

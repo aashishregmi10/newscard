@@ -7,6 +7,7 @@ import { CardSkeleton } from '../../src/components/CardSkeleton';
 import { fetchArticle, ArticleGoneError, type Card } from '../../src/api/client';
 import { useSettings } from '../../src/state/SettingsContext';
 import { textSize } from '../../src/theme/tokens';
+import { useMeasuredHeight } from '../../src/hooks/useMeasuredHeight';
 
 /**
  * Deep-link target.  Spec Ch. 10.7, tested as N-09 in Ch. 16.10.
@@ -28,7 +29,8 @@ export default function ArticleScreen() {
   const [state, setState] = useState<'loading' | 'ready' | 'gone' | 'error'>('loading');
 
   const lang = languages.includes('ne') ? 'ne' : 'en';
-  const cardHeight = height - insets.top - insets.bottom - 46;
+  // The space under the bar, measured — the bar's height depends on text size.
+  const [cardHeight, onBodyLayout] = useMeasuredHeight(height - insets.top - insets.bottom - 46);
 
   useEffect(() => {
     if (!slug) return;
@@ -62,53 +64,58 @@ export default function ArticleScreen() {
         </Pressable>
       </View>
 
-      {state === 'loading' && <CardSkeleton theme={theme} height={cardHeight} />}
+      <View style={[styles.page, { paddingBottom: insets.bottom }]}>
+        <View style={styles.page} onLayout={onBodyLayout}>
+          {state === 'loading' && <CardSkeleton theme={theme} height={cardHeight} />}
 
-      {state === 'ready' && card && (
-        <NewsCard
-          card={card}
-          theme={theme}
-          height={cardHeight}
-          textScale={textScale}
-          dataSaver={dataSaver}
-        />
-      )}
+          {state === 'ready' && card && (
+            <NewsCard
+              card={card}
+              theme={theme}
+              height={cardHeight}
+              textScale={textScale}
+              dataSaver={dataSaver}
+            />
+          )}
 
-      {(state === 'gone' || state === 'error') && (
-        <View style={styles.centre}>
-          <Text style={[styles.title, { color: theme.textPrimary }]}>
-            {state === 'gone'
-              ? lang === 'ne'
-                ? 'यो समाचार हटाइएको छ'
-                : 'This story was withdrawn'
-              : lang === 'ne'
-                ? 'समाचार ल्याउन सकिएन'
-                : 'Could not open that story'}
-          </Text>
-          <Text style={[styles.body, { color: theme.textSecondary }]}>
-            {state === 'gone'
-              ? lang === 'ne'
-                ? 'सम्पादकीय कारणले यो समाचार फिर्ता लिइएको हो।'
-                : 'It was retracted for editorial reasons.'
-              : lang === 'ne'
-                ? 'लिङ्क पुरानो हुन सक्छ।'
-                : 'The link may be out of date.'}
-          </Text>
-          <Pressable style={[styles.btn, { borderColor: theme.divider }]} onPress={back}>
-            <Text style={{ color: theme.accent, fontWeight: '600' }}>
-              {lang === 'ne' ? 'फिडमा जानुहोस्' : 'Go to the feed'}
-            </Text>
-          </Pressable>
+          {(state === 'gone' || state === 'error') && (
+            <View style={styles.centre}>
+              <Text style={[styles.title, { color: theme.textPrimary }]}>
+                {state === 'gone'
+                  ? lang === 'ne'
+                    ? 'यो समाचार हटाइएको छ'
+                    : 'This story was withdrawn'
+                  : lang === 'ne'
+                    ? 'समाचार ल्याउन सकिएन'
+                    : 'Could not open that story'}
+              </Text>
+              <Text style={[styles.body, { color: theme.textSecondary }]}>
+                {state === 'gone'
+                  ? lang === 'ne'
+                    ? 'सम्पादकीय कारणले यो समाचार फिर्ता लिइएको हो।'
+                    : 'It was retracted for editorial reasons.'
+                  : lang === 'ne'
+                    ? 'लिङ्क पुरानो हुन सक्छ।'
+                    : 'The link may be out of date.'}
+              </Text>
+              <Pressable style={[styles.btn, { borderColor: theme.divider }]} onPress={back}>
+                <Text style={{ color: theme.accent, fontWeight: '600' }}>
+                  {lang === 'ne' ? 'फिडमा जानुहोस्' : 'Go to the feed'}
+                </Text>
+              </Pressable>
+            </View>
+          )}
         </View>
-      )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
+  page: { flex: 1 },
   bar: {
-    height: 46,
+    minHeight: 46,
     justifyContent: 'center',
     paddingHorizontal: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,

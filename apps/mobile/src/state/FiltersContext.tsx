@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 /**
@@ -25,7 +25,8 @@ const EMPTY: Filters = { mutedCategories: [], mutedSources: [] };
 
 interface Ctx extends Filters {
   ready: boolean;
-  isMuted: (categorySlug: string, sourceName: string) => boolean;
+  /** `viewing` is the section on screen: a topic is never hidden from its own. */
+  isMuted: (categorySlug: string, sourceName: string, viewing?: string) => boolean;
   muteCategory: (slug: string) => void;
   unmuteCategory: (slug: string) => void;
   muteSource: (name: string) => void;
@@ -48,39 +49,63 @@ export function FiltersProvider({ children }: { children: ReactNode }) {
       .finally(() => setReady(true));
   }, []);
 
-  const write = (next: Filters) => {
-    setFilters(next);
-    void AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => undefined);
-  };
+  /**
+   * Every change is computed from the latest state, not from the render that
+   * created the callback. An Undo runs seconds after the render it was made
+   * in; built on that render's copy, it would quietly roll back anything
+   * changed since.
+   */
+  const write = useCallback((change: (prev: Filters) => Filters) => {
+    setFilters((prev) => {
+      const next = change(prev);
+      if (next === prev) return prev;
+      void AsyncStorage.setItem(KEY, JSON.stringify(next)).catch(() => undefined);
+      return next;
+    });
+  }, []);
+
+  const actions = useMemo(
+    () => ({
+      muteCategory: (slug: string) =>
+        write((f) =>
+          f.mutedCategories.includes(slug)
+            ? f
+            : { ...f, mutedCategories: [...f.mutedCategories, slug] },
+        ),
+      unmuteCategory: (slug: string) =>
+        write((f) =>
+          f.mutedCategories.includes(slug)
+            ? { ...f, mutedCategories: f.mutedCategories.filter((s) => s !== slug) }
+            : f,
+        ),
+      muteSource: (name: string) =>
+        write((f) =>
+          f.mutedSources.includes(name) ? f : { ...f, mutedSources: [...f.mutedSources, name] },
+        ),
+      unmuteSource: (name: string) =>
+        write((f) =>
+          f.mutedSources.includes(name)
+            ? { ...f, mutedSources: f.mutedSources.filter((s) => s !== name) }
+            : f,
+        ),
+      clearAll: () => write(() => EMPTY),
+    }),
+    [write],
+  );
 
   const value = useMemo<Ctx>(
     () => ({
       ...filters,
+      ...actions,
       ready,
-      isMuted: (categorySlug, sourceName) =>
-        filters.mutedCategories.includes(categorySlug) || filters.mutedSources.includes(sourceName),
-      muteCategory: (slug) =>
-        write({
-          ...filters,
-          mutedCategories: filters.mutedCategories.includes(slug)
-            ? filters.mutedCategories
-            : [...filters.mutedCategories, slug],
-        }),
-      unmuteCategory: (slug) =>
-        write({ ...filters, mutedCategories: filters.mutedCategories.filter((s) => s !== slug) }),
-      muteSource: (name) =>
-        write({
-          ...filters,
-          mutedSources: filters.mutedSources.includes(name)
-            ? filters.mutedSources
-            : [...filters.mutedSources, name],
-        }),
-      unmuteSource: (name) =>
-        write({ ...filters, mutedSources: filters.mutedSources.filter((s) => s !== name) }),
-      clearAll: () => write(EMPTY),
+      isMuted: (categorySlug, sourceName, viewing) =>
+        filters.mutedSources.includes(sourceName) ||
+        // A muted topic is hidden from the reader's OTHER sections. Its own tab
+        // is somewhere they went on purpose, and emptying it read as a section
+        // with no news rather than as their own setting.
+        (categorySlug !== viewing && filters.mutedCategories.includes(categorySlug)),
     }),
-     
-    [filters, ready],
+    [filters, actions, ready],
   );
 
   return <FiltersCtx.Provider value={value}>{children}</FiltersCtx.Provider>;

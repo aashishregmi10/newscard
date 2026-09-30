@@ -7,10 +7,12 @@ import { CategoryPager, type CategoryPagerHandle } from '../../src/components/Ca
 import { CategoryFeed } from '../../src/components/CategoryFeed';
 import { CardMenu } from '../../src/components/CardMenu';
 import { NotifPrompt } from '../../src/components/NotifPrompt';
+import { UndoBar, type UndoMessage } from '../../src/components/UndoBar';
 import { fetchCategories, type Card } from '../../src/api/client';
 import { useSettings } from '../../src/state/SettingsContext';
 import { useNetwork } from '../../src/state/NetworkContext';
 import { useFilters } from '../../src/state/FiltersContext';
+import { useMeasuredHeight } from '../../src/hooks/useMeasuredHeight';
 
 /**
  * The feed screen.  Spec Ch. 7.1, 7.9.
@@ -57,9 +59,11 @@ export default function FeedScreen() {
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  const railH = 52;
-  const tabBarH = 58;
-  const pageHeight = Math.round(height - insets.top - railH - tabBarH);
+  // Measured from the pager's own box — see useMeasuredHeight for why the
+  // sum below is only a first-frame guess.
+  const [pageHeight, onPagerLayout] = useMeasuredHeight(
+    height - insets.top - insets.bottom - 56 - 64,
+  );
 
   const [categories, setCategories] = useState<CategoryOption[]>(FALLBACK_CATEGORIES);
   const [index, setIndex] = useState(0);
@@ -86,6 +90,8 @@ export default function FeedScreen() {
   const [visited, setVisited] = useState<ReadonlySet<number>>(() => new Set([0]));
   const [menuCard, setMenuCard] = useState<Card | null>(null);
   const pager = useRef<CategoryPagerHandle>(null);
+  const [undo, setUndo] = useState<UndoMessage | null>(null);
+  const undoId = useRef(0);
 
   /**
    * Load the real sections, and try again when the network comes back.
@@ -145,14 +151,15 @@ export default function FeedScreen() {
    * skeleton — the pager's own `offscreenPageLimit` keeps the native views
    * alive, and this keeps the React side in step with it.
    */
+  const settledIndex = useRef(0);
   const onPageChange = useCallback((i: number) => {
+    // A selection tick on arrival gives the horizontal swipe a physical
+    // answer. Decided here rather than inside a state updater: React may run
+    // an updater twice, and a tick is not something to do twice.
+    if (i !== settledIndex.current) void Haptics.selectionAsync();
+    settledIndex.current = i;
     setRailIndex(i);
-    setIndex((prev) => {
-      // A selection tick on arrival gives the horizontal swipe a physical
-      // answer, the same way the vertical card snap does.
-      if (i !== prev) void Haptics.selectionAsync();
-      return i;
-    });
+    setIndex(i);
     setVisited((prev) => {
       if (prev.has(i) && prev.has(i - 1) && prev.has(i + 1)) return prev;
       const next = new Set(prev);
@@ -179,37 +186,39 @@ export default function FeedScreen() {
         labelLang={labelLang}
       />
 
-      <CategoryPager
-        ref={pager}
-        initialPage={0}
-        onPageChange={onPageChange}
-        onPageApproaching={setRailIndex}
-      >
-        {categories.map((c, i) => (
-          // `key` must be the slug: PagerView keeps children mounted, and a
-          // positional key would recycle one category's list into another.
-          <View key={c.slug} style={styles.page} collapsable={false}>
-            {visited.has(i) ? (
-              <CategoryFeed
-                category={c.slug}
-                languages={languages}
-                theme={theme}
-                textScale={textScale}
-                dataSaver={dataSaver}
-                height={pageHeight}
-                labelLang={labelLang}
-                active={i === index}
-                onMenu={setMenuCard}
-              />
-            ) : (
-              // An unvisited page is a plain surface, not a skeleton: a skeleton
-              // implies something is loading, and nothing is — the reader has
-              // not asked for this category yet.
-              <View style={[styles.page, { backgroundColor: theme.surface }]} />
-            )}
-          </View>
-        ))}
-      </CategoryPager>
+      <View style={styles.page} onLayout={onPagerLayout}>
+        <CategoryPager
+          ref={pager}
+          initialPage={0}
+          onPageChange={onPageChange}
+          onPageApproaching={setRailIndex}
+        >
+          {categories.map((c, i) => (
+            // `key` must be the slug: PagerView keeps children mounted, and a
+            // positional key would recycle one category's list into another.
+            <View key={c.slug} style={styles.page} collapsable={false}>
+              {visited.has(i) ? (
+                <CategoryFeed
+                  category={c.slug}
+                  languages={languages}
+                  theme={theme}
+                  textScale={textScale}
+                  dataSaver={dataSaver}
+                  height={pageHeight}
+                  labelLang={labelLang}
+                  active={i === index}
+                  onMenu={setMenuCard}
+                />
+              ) : (
+                // An unvisited page is a plain surface, not a skeleton: a skeleton
+                // implies something is loading, and nothing is — the reader has
+                // not asked for this category yet.
+                <View style={[styles.page, { backgroundColor: theme.surface }]} />
+              )}
+            </View>
+          ))}
+        </CategoryPager>
+      </View>
 
       <CardMenu
         visible={menuCard !== null}
@@ -217,9 +226,33 @@ export default function FeedScreen() {
         theme={theme}
         lang={labelLang}
         onClose={() => setMenuCard(null)}
-        onNotInterested={(c) => filters.muteCategory(c.category.slug)}
-        onHideSource={(c) => filters.muteSource(c.source.name)}
+        onNotInterested={(c) => {
+          const slug = c.category.slug;
+          const topic = c.category.label[labelLang];
+          filters.muteCategory(slug);
+          setUndo({
+            id: ++undoId.current,
+            text:
+              labelLang === 'ne'
+                ? `${topic} अन्य खण्डहरूमा देखाइने छैन`
+                : `${topic} hidden from your other sections`,
+            undoLabel: labelLang === 'ne' ? 'फिर्ता' : 'Undo',
+            onUndo: () => filters.unmuteCategory(slug),
+          });
+        }}
+        onHideSource={(c) => {
+          const name = c.source.name;
+          filters.muteSource(name);
+          setUndo({
+            id: ++undoId.current,
+            text: labelLang === 'ne' ? `${name} का समाचार लुकाइयो` : `Stories from ${name} hidden`,
+            undoLabel: labelLang === 'ne' ? 'फिर्ता' : 'Undo',
+            onUndo: () => filters.unmuteSource(name),
+          });
+        }}
       />
+
+      <UndoBar message={undo} theme={theme} />
 
       <NotifPrompt theme={theme} lang={labelLang} />
     </View>

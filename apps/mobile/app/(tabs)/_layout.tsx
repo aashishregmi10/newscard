@@ -1,5 +1,6 @@
 import { Tabs } from 'expo-router';
 import { View, StyleSheet, type ColorValue } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSettings } from '../../src/state/SettingsContext';
 import { emitFeedTabPress } from '../../src/lib/feedTabSignal';
@@ -71,6 +72,7 @@ function TabIcon({
 
 export default function TabsLayout() {
   const { theme } = useSettings();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tabs
@@ -81,9 +83,15 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: theme.surface,
           borderTopColor: theme.divider,
-          /* Room for an icon and a label at BASE_TEXT_SCALE. */
-          height: 64,
-          paddingBottom: 6,
+          /*
+           * Room for an icon and a label at BASE_TEXT_SCALE, PLUS the phone's
+           * own bottom inset. A height set here replaces the one the tab bar
+           * would compute, inset included — and the app draws edge to edge, so
+           * without adding it back the icons sit under Android's navigation
+           * buttons and the iPhone's home indicator.
+           */
+          height: 64 + insets.bottom,
+          paddingBottom: 6 + insets.bottom,
           paddingTop: 6,
         },
         tabBarLabelStyle: { fontSize: textSize(11), fontWeight: '600' },

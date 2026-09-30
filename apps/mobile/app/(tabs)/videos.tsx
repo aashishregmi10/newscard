@@ -19,6 +19,7 @@ import { fetchVideos, FeedError, type VideoCard as VideoCardType } from '../../s
 import { useSettings } from '../../src/state/SettingsContext';
 import { useNetwork } from '../../src/state/NetworkContext';
 import { textSize } from '../../src/theme/tokens';
+import { useMeasuredHeight } from '../../src/hooks/useMeasuredHeight';
 
 /**
  * The shorts tab.
@@ -38,14 +39,17 @@ import { textSize } from '../../src/theme/tokens';
  * `useFocusEffect` is what makes the tab bar's own navigation trigger it.
  */
 
+/** Module-level: FlatList reads this once, and a fresh object each render is waste. */
+const VIEWABILITY = { itemVisiblePercentThreshold: 80 } as const;
+
 export default function VideosScreen() {
   const { theme, textScale, dataSaver, languages } = useSettings();
   const { unmetered } = useNetwork();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
 
-  const tabBarH = 58;
-  const pageHeight = Math.round(height - insets.top - tabBarH);
+  // Measured, not computed — see useMeasuredHeight.
+  const [pageHeight, onListLayout] = useMeasuredHeight(height - insets.top - insets.bottom - 64);
 
   const [items, setItems] = useState<VideoCardType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -107,6 +111,10 @@ export default function VideosScreen() {
     if (first) setActiveId(first.id);
   }).current;
 
+  // Stable, so a scroll that moves the active short does not also hand every
+  // mounted card a new function and defeat its memo.
+  const toggleMute = useCallback(() => setMuted((m) => !m), []);
+
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<VideoCardType>) => (
       <VideoCard
@@ -118,10 +126,10 @@ export default function VideosScreen() {
         unmetered={unmetered}
         active={focused && item.id === activeId}
         muted={muted}
-        onToggleMute={() => setMuted((m) => !m)}
+        onToggleMute={toggleMute}
       />
     ),
-    [theme, pageHeight, textScale, dataSaver, unmetered, focused, activeId, muted],
+    [theme, pageHeight, textScale, dataSaver, unmetered, focused, activeId, muted, toggleMute],
   );
 
   const getItemLayout = useCallback(
@@ -187,6 +195,8 @@ export default function VideosScreen() {
       )}
 
       <FlatList
+        style={styles.fill}
+        onLayout={onListLayout}
         data={items}
         keyExtractor={(v) => v.id}
         renderItem={renderItem}
@@ -196,7 +206,7 @@ export default function VideosScreen() {
         snapToAlignment="start"
         disableIntervalMomentum
         decelerationRate="fast"
-        viewabilityConfig={{ itemVisiblePercentThreshold: 80 }}
+        viewabilityConfig={VIEWABILITY}
         onViewableItemsChanged={onViewableItemsChanged}
         onEndReached={() => void loadMore()}
         onEndReachedThreshold={0.6}

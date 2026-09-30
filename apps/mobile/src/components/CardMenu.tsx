@@ -1,5 +1,6 @@
 import { Modal, View, Text, Pressable, StyleSheet, Share, Linking } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { Card } from '../api/client';
 import type { Theme } from '../theme/tokens';
 import { textSize } from '../theme/tokens';
@@ -28,7 +29,6 @@ interface Props {
 const T = {
   notInterested: { en: 'Not interested in this topic', ne: 'यो विषयमा रुचि छैन' },
   hideSource: { en: 'Hide stories from this source', ne: 'यो स्रोतका समाचार नदेखाउने' },
-  report: { en: 'Report a problem', ne: 'समस्या रिपोर्ट गर्नुहोस्' },
   copy: { en: 'Copy link', ne: 'लिङ्क कपी गर्नुहोस्' },
   share: { en: 'Share', ne: 'सेयर गर्नुहोस्' },
   browser: { en: 'Open in browser', ne: 'ब्राउजरमा खोल्नुहोस्' },
@@ -44,16 +44,17 @@ export function CardMenu({
   onNotInterested,
   onHideSource,
 }: Props) {
+  // The sheet draws behind the navigation bar like the rest of the app, so
+  // its last row needs the inset or Cancel sits under the system buttons.
+  const insets = useSafeAreaInsets();
   if (!card) return null;
 
   const Item = ({
     label,
     onPress,
-    destructive,
   }: {
     label: string;
     onPress: () => void;
-    destructive?: boolean;
   }) => (
     <Pressable
       style={({ pressed }) => [
@@ -66,7 +67,7 @@ export function CardMenu({
       }}
       accessibilityRole="button"
     >
-      <Text style={{ fontSize: textSize(15.5), color: destructive ? '#C0392B' : theme.textPrimary }}>
+      <Text style={{ fontSize: textSize(15.5), color: theme.textPrimary }}>
         {label}
       </Text>
     </Pressable>
@@ -77,7 +78,16 @@ export function CardMenu({
       {/* Tapping outside dismisses — a sheet with no escape but a button is a
           trap on a phone. */}
       <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Close menu" />
-      <View style={[styles.sheet, { backgroundColor: theme.surface, borderTopColor: theme.divider }]}>
+      <View
+        style={[
+          styles.sheet,
+          {
+            backgroundColor: theme.surface,
+            borderTopColor: theme.divider,
+            paddingBottom: Math.max(28, insets.bottom + 12),
+          },
+        ]}
+      >
         <View style={[styles.grabber, { backgroundColor: theme.divider }]} />
 
         <Text style={[styles.title, { color: theme.textSecondary }]} numberOfLines={2}>
@@ -114,7 +124,6 @@ export function CardMenu({
           label={T.browser[lang]}
           onPress={() => void Linking.openURL(card.publisherUrl)}
         />
-        <Item label={T.report[lang]} onPress={() => undefined} destructive />
 
         <Pressable style={styles.cancel} onPress={onClose}>
           <Text style={{ fontSize: textSize(15.5), fontWeight: '600', color: theme.accent }}>
@@ -132,7 +141,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 16,
     borderTopRightRadius: 16,
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingBottom: 28,
   },
   grabber: { width: 36, height: 4, borderRadius: 2, alignSelf: 'center', marginTop: 9, marginBottom: 6 },
   title: { fontSize: textSize(12.5), paddingHorizontal: 20, paddingVertical: 10 },

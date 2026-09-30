@@ -1,16 +1,23 @@
-import { View, Text, StyleSheet, Pressable, Share } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Share, Animated } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useRef, memo } from 'react';
-import { Animated } from 'react-native';
+import { useMemo, useRef, memo } from 'react';
 import type { Card, InlineAd as InlineAdData } from '../api/client';
 import { InlineAd } from './InlineAd';
 import { CardImage } from './CardImage';
 import { relativeTime } from '../lib/relativeTime';
-import { useBookmarks } from '../state/BookmarksContext';
+import { useBookmarkActions, useIsSaved } from '../state/BookmarksContext';
 import { LINE_HEIGHT, TYPE, fontFor, type Theme, textSize } from '../theme/tokens';
 import { notePublisherOpen } from '../lib/telemetry';
 import { openArticleInApp } from '../lib/openArticle';
+import { useCardFit } from '../hooks/useCardFit';
+
+/**
+ * The reader's text size times the phone's own font scale may not pass this.
+ * Beyond it a headline is a few words a line and the card is mostly type (Ch.
+ * 11.6.1).
+ */
+const MAX_COMBINED_SCALE = 1.8;
 
 /**
  * One story card.  Spec Ch. 7.2.
@@ -46,8 +53,9 @@ function NewsCardInner({
   inlineAd,
   onInlineAd,
 }: Props) {
-  const bookmarks = useBookmarks();
-  const saved = bookmarks.has(card.id);
+  // Subscribes to this story only: saving another card does not re-render this one.
+  const saved = useIsSaved(card.id);
+  const { toggle } = useBookmarkActions();
 
   // Saving is otherwise invisible — nothing leaves the device and there is no
   // spinner — so the icon itself has to confirm it. Native driver, so this
@@ -55,17 +63,32 @@ function NewsCardInner({
   const pop = useRef(new Animated.Value(1)).current;
   const toggleSave = () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    bookmarks.toggle(card);
+    toggle(card);
     Animated.sequence([
       Animated.timing(pop, { toValue: 1.25, duration: 90, useNativeDriver: true }),
       Animated.spring(pop, { toValue: 1, friction: 4, useNativeDriver: true }),
     ]).start();
   };
+  // Photograph first, then type: see hooks/cardFit for the order and why.
+  const { fit, collapseImage, textHidden, onTextLayout, onStripLayout } = useCardFit(
+    `${card.id}|${height}|${textScale}`,
+    height,
+  );
+  const imageStyle = useMemo(
+    () => ({
+      flexBasis: height * 0.38,
+      flexShrink: 1,
+      minHeight: collapseImage ? 0 : height * 0.2,
+    }),
+    [height, collapseImage],
+  );
+
   const lh = LINE_HEIGHT[card.language];
   // undefined for English, which means the platform's own sans.
   const fontFamily = fontFor(card.language);
-  const summarySize = TYPE.summary.size * textScale;
-  const headlineSize = TYPE.headline.size * textScale;
+  const summarySize = TYPE.summary.size * textScale * fit;
+  const headlineSize = TYPE.headline.size * textScale * fit;
+  const maxFontScale = Math.max(1, MAX_COMBINED_SCALE / textScale);
 
   const when = card.sourcePublishedAt ?? card.publishedAt;
   const attribution = [
@@ -88,7 +111,7 @@ function NewsCardInner({
 
   return (
     <View style={[styles.card, { height, backgroundColor: theme.surface }]}>
-      {onMenu && (
+      {onMenu && card.image && (
         <Pressable
           style={styles.overflow}
           hitSlop={12}
@@ -100,12 +123,7 @@ function NewsCardInner({
         </Pressable>
       )}
 
-      <CardImage
-        image={card.image}
-        theme={theme}
-        height={height * 0.38}
-        dataSaver={dataSaver}
-      />
+      <CardImage image={card.image} theme={theme} style={imageStyle} dataSaver={dataSaver} />
 
       <View style={[styles.actionRow, { borderBottomColor: theme.divider }]}>
         {/*
@@ -158,40 +176,57 @@ function NewsCardInner({
           >
             <MaterialCommunityIcons name="share-variant-outline" size={20} color={theme.textSecondary} />
           </Pressable>
+          {/* A story with no photograph has nowhere to float the menu button —
+              over this row it covered the share icon — so it joins the row. */}
+          {onMenu && !card.image && (
+            <Pressable
+              onPress={() => onMenu(card)}
+              hitSlop={12}
+              accessibilityRole="button"
+              accessibilityLabel="More options"
+            >
+              <MaterialCommunityIcons name="dots-horizontal" size={21} color={theme.textSecondary} />
+            </Pressable>
+          )}
         </View>
       </View>
 
       <View style={styles.body}>
-        <Text
-          style={[
-            styles.headline,
-            {
-              color: theme.textPrimary,
-              fontSize: headlineSize,
-              lineHeight: headlineSize * TYPE.headline.lineHeight,
-              fontFamily,
-            },
-          ]}
-          numberOfLines={TYPE.headline.maxLines}
-        >
-          {card.headline}
-        </Text>
+        <View onLayout={onTextLayout} style={textHidden ? styles.hidden : undefined}>
+          <Text
+            style={[
+              styles.headline,
+              {
+                color: theme.textPrimary,
+                fontSize: headlineSize,
+                lineHeight: headlineSize * TYPE.headline.lineHeight,
+                fontFamily,
+              },
+            ]}
+            numberOfLines={TYPE.headline.maxLines}
+            maxFontSizeMultiplier={maxFontScale}
+          >
+            {card.headline}
+          </Text>
 
-        {/* Never truncated. The summary IS the product; a cut-off short is a
-            broken product (Ch. 7.7). If it does not fit, it scrolls. */}
-        <Text
-          style={[
-            styles.summary,
-            {
-              color: theme.textPrimary,
-              fontSize: summarySize,
-              lineHeight: summarySize * lh,
-              fontFamily,
-            },
-          ]}
-        >
-          {card.summary}
-        </Text>
+          {/* Never truncated. The summary IS the product; a cut-off short is a
+              broken product (Ch. 7.7). If it does not fit, the card makes room —
+              see hooks/cardFit. */}
+          <Text
+            maxFontSizeMultiplier={maxFontScale}
+            style={[
+              styles.summary,
+              {
+                color: theme.textPrimary,
+                fontSize: summarySize,
+                lineHeight: summarySize * lh,
+                fontFamily,
+              },
+            ]}
+          >
+            {card.summary}
+          </Text>
+        </View>
 
         <Text
           style={[
@@ -206,6 +241,7 @@ function NewsCardInner({
 
       <Pressable
         style={[styles.strip, { backgroundColor: theme.strip }]}
+        onLayout={onStripLayout}
         onPress={openArticle}
         accessibilityRole="link"
       >
@@ -233,7 +269,10 @@ function NewsCardInner({
 export const NewsCard = memo(NewsCardInner);
 
 const styles = StyleSheet.create({
-  card: { justifyContent: 'flex-start' },
+  /* Hidden overflow: while a long story is being fitted, nothing may paint
+     past the card onto the next one. */
+  card: { justifyContent: 'flex-start', overflow: 'hidden' },
+  hidden: { opacity: 0 },
   overflow: {
     position: 'absolute',
     top: 10,
@@ -246,8 +285,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
-  overflowIcon: { fontSize: textSize(19), lineHeight: textSize(21), fontWeight: '700' },
   actionRow: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -267,12 +306,13 @@ const styles = StyleSheet.create({
   },
   spacer: { flex: 1, minWidth: 0 },
   actions: { flexDirection: 'row', gap: 20 },
-  actionIcon: { fontSize: textSize(18), width: 24, textAlign: 'center' },
-  body: { flex: 1, paddingHorizontal: 18, paddingTop: 16 },
+  /* Grows into spare room, never shrinks: the photograph is the only part of
+     the card that gives way. */
+  body: { flexGrow: 1, flexShrink: 0, paddingHorizontal: 18, paddingTop: 16 },
   headline: { fontWeight: TYPE.headline.weight, marginBottom: 10 },
   summary: { marginBottom: 14 },
   attribution: { marginTop: 'auto', marginBottom: 12 },
-  strip: { paddingHorizontal: 18, paddingVertical: 12, minHeight: 64, justifyContent: 'center' },
+  strip: { flexShrink: 0, paddingHorizontal: 18, paddingVertical: 12, minHeight: 64, justifyContent: 'center' },
   pullQuote: { fontSize: textSize(15), fontWeight: '600', marginBottom: 3 },
   stripCta: { fontSize: textSize(13), opacity: 0.8 },
   stripRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
