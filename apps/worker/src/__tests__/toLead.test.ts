@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { FeedItem } from '@saar/shared';
-import { detectLanguage, fingerprintOf, MAX_LEAD_AGE_DAYS, toLead, type SourceContext } from '../ingest/toLead.js';
+import {
+  dateInUrl,
+  sortTimeOf,
+  detectLanguage,
+  fingerprintOf,
+  MAX_LEAD_AGE_DAYS,
+  toLead,
+  type SourceContext,
+} from '../ingest/toLead.js';
 
 /**
  * What becomes a lead, and what does not.
@@ -170,6 +178,58 @@ describe('toLead — rejecting', () => {
     // A publisher's clock running ahead is not a reason to lose their story.
     const soon = new Date(NOW.getTime() + 60 * 60 * 1000);
     expect(toLead(item({ publishedAt: soon }), SOURCE, NOW).ok).toBe(true);
+  });
+
+  /* Feeds with no dates at all — the Kathmandu Post's — still carry the day
+     in the address, and that is enough to keep an archive out. */
+  it('drops an undated item whose address is from a week ago', () => {
+    const link = 'https://namunakhabar.example.invalid/politics/2026/09/15/old-story';
+    expect(toLead(item({ publishedAt: null, link }), SOURCE, NOW)).toEqual({
+      ok: false,
+      reason: 'too_old',
+    });
+  });
+
+  it('keeps an undated item whose address is from today, without inventing a time', () => {
+    const link = 'https://namunakhabar.example.invalid/politics/2026/09/22/new-story';
+    const out = toLead(item({ publishedAt: null, link }), SOURCE, NOW);
+    if (!out.ok) throw new Error(`rejected: ${out.reason}`);
+    expect(out.lead.publishedAt).toBeNull();
+  });
+});
+
+describe('sortTimeOf', () => {
+  const seen = new Date('2026-10-04T09:00:00Z');
+
+  it('uses the publisher’s own time when the feed gives one', () => {
+    const own = new Date('2026-10-04T07:00:00Z');
+    expect(sortTimeOf(own, 'https://x.example.invalid/2026/10/02/a', seen)).toBe(own);
+  });
+
+  it('keeps an undated story from an earlier day below today’s', () => {
+    expect(sortTimeOf(null, 'https://x.example.invalid/2026/10/02/a', seen).toISOString()).toBe(
+      '2026-10-02T23:59:59.000Z',
+    );
+  });
+
+  it('uses when it was first seen for an undated story from today, or with no day in its address', () => {
+    expect(sortTimeOf(null, 'https://x.example.invalid/2026/10/04/a', seen)).toBe(seen);
+    expect(sortTimeOf(null, 'https://x.example.invalid/news/123', seen)).toBe(seen);
+  });
+});
+
+describe('dateInUrl', () => {
+  it('reads the day an address carries', () => {
+    expect(dateInUrl('https://kathmandupost.com/world/2026/10/04/a-story')?.toISOString()).toBe(
+      '2026-10-04T23:59:59.000Z',
+    );
+    expect(dateInUrl('https://www.onlinekhabar.com/2026/10/2031611/x')).toBeNull();
+  });
+
+  it('is not fooled by numbers that are not a date', () => {
+    expect(dateInUrl('https://x.example.invalid/2026/13/40/x')).toBeNull();
+    expect(dateInUrl('https://x.example.invalid/2026/02/30/x')).toBeNull();
+    expect(dateInUrl('not a url')).toBeNull();
   });
 });
 

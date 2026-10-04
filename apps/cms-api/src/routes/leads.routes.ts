@@ -143,11 +143,29 @@ leadRoutes.get(
        knows how many pages there are. */
     const total = await c.leads.countDocuments({ status });
 
+    /*
+     * Newest first by the publisher's own time, or by when we first saw the
+     * story if their feed gives none — never with undated stories last.
+     *
+     * Sorting on publishedAt alone put every undated story below every dated
+     * one, because a missing date sorts as the oldest of all. The Kathmandu
+     * Post's feed carries no dates, so its stories would have been at the
+     * bottom of Incoming, behind hundreds from publishers who date theirs.
+     * The time we first saw a story is within one poll of when it went up.
+     */
     const docs = await c.leads
-      .find({ status })
-      .sort({ publishedAt: -1, fetchedAt: -1 })
-      .skip((page - 1) * perPage)
-      .limit(perPage)
+      .aggregate([
+        { $match: { status } },
+        {
+          $addFields: {
+            _sortAt: { $ifNull: ['$sortAt', { $ifNull: ['$publishedAt', '$fetchedAt'] }] },
+          },
+        },
+        { $sort: { _sortAt: -1, fetchedAt: -1, _id: -1 } },
+        { $skip: (page - 1) * perPage },
+        { $limit: perPage },
+        { $project: { _sortAt: 0 } },
+      ])
       .toArray();
 
     /* Counts for the tab strip, in one round trip rather than three requests

@@ -86,6 +86,12 @@ export const Lead = z.object({
   /** What the feed claimed. Null when it said nothing usable. */
   publishedAt: z.date().nullable(),
   fetchedAt: z.date(),
+  /**
+   * Where the story sits in Incoming: `publishedAt` when the feed gave one,
+   * otherwise when we first saw it, capped at the end of the day in its
+   * address. Absent on leads stored before it existed; the list falls back.
+   */
+  sortAt: z.date().optional(),
 
   /**
    * Stable hash of the normalised headline and URL.

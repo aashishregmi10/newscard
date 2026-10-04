@@ -310,6 +310,32 @@ describe('a story collected before the licence terms were on', () => {
   });
 });
 
+describe('the Incoming list', () => {
+  it('puts a story from an undated feed where it belongs, not at the bottom', async () => {
+    /* One dated an hour ago, one undated and first seen just now. */
+    const older = await seed({}, '/photo.jpg', {
+      publishedAt: new Date(Date.now() - 3600e3),
+      fetchedAt: new Date(Date.now() - 3600e3),
+    });
+    const undated = new ObjectId();
+    await collections(getDb()).leads.insertOne({
+      ...(await collections(getDb()).leads.findOne({ _id: older })),
+      _id: undated,
+      canonicalUrl: 'https://namunakhabar.example.invalid/news/undated',
+      fingerprint: 'fp-undated',
+      publishedAt: null,
+      fetchedAt: new Date(),
+    } as never);
+
+    const res = await get('/api/cms/leads?status=new');
+    expect(res.status).toBe(200);
+    expect(res.body.items.map((i: { id: string }) => i.id)).toEqual([
+      undated.toString(),
+      older.toString(),
+    ]);
+  });
+});
+
 describe('Regenerate', () => {
   it('asks for a fresh draft without touching the summary box', async () => {
     const leadId = await seed({ fullText: true });

@@ -215,6 +215,20 @@ describe('editing a publisher', () => {
     expect(stored?.ingest.feedUrl).toBe('https://namunakhabar.example.invalid/feed');
   });
 
+  it('gives a corrected feed address a fresh start, so a paused publisher resumes', async () => {
+    /* A paused publisher is never read, so only this can clear its count. */
+    await collections(getDb()).sources.updateOne(
+      { slug: 'namuna-khabar' },
+      { $set: { 'ingest.consecutiveFailures': 5 } },
+    );
+    await patch('/api/cms/sources/namuna-khabar', adminCookie).send({
+      ingest: { feedUrl: 'https://namunakhabar.example.invalid/rss' },
+    });
+    const stored = await collections(getDb()).sources.findOne({ slug: 'namuna-khabar' });
+    expect(stored?.ingest.feedUrl).toBe('https://namunakhabar.example.invalid/rss');
+    expect(stored?.ingest.consecutiveFailures).toBe(0);
+  });
+
   it('refuses to change the slug rather than ignoring the attempt', async () => {
     const res = await patch('/api/cms/sources/namuna-khabar', adminCookie).send({
       slug: 'something-else',

@@ -498,6 +498,24 @@ sourceRoutes.patch(
       set['ingest.pollIntervalMin'] = mergedIngest.pollIntervalMin;
     }
 
+    /*
+     * A new address gets a fresh start.
+     *
+     * Five failures in a row pause a publisher, and only a successful read
+     * clears the count — but a paused publisher is never read. So a wrong
+     * feed address, once corrected, stayed paused for good, with nothing on
+     * any screen able to resume it. Changing where or how we read them is
+     * exactly the act that deserves another try.
+     */
+    const changedWhereWeRead =
+      mergedIngest.method !== (before.ingest?.method ?? 'manual') ||
+      mergedIngest.feedUrl !== (before.ingest?.feedUrl ?? null) ||
+      mergedIngest.apiUrl !== (before.ingest?.apiUrl ?? null) ||
+      mergedIngest.youtubeChannelId !== (before.ingest?.youtubeChannelId ?? null);
+    if (changedWhereWeRead && (before.ingest?.consecutiveFailures ?? 0) > 0) {
+      set['ingest.consecutiveFailures'] = 0;
+    }
+
     await c.sources.updateOne({ slug }, { $set: set });
 
     await writeAudit({
