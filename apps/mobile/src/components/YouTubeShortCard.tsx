@@ -66,6 +66,18 @@ function getWebView(): WebViewComponent | null {
 }
 
 /**
+ * Who the player page says it is.
+ *
+ * YouTube plays an embed only when it can tell who is embedding it, and for a
+ * page an app loads itself that is the page's base address. The convention is
+ * `https://<app id>` — ours, from app.json. It must not be youtube.com: a page
+ * claiming to be YouTube is refused with error 152, every video, every channel.
+ * That was this file's first version, and it is why every short fell back to
+ * "Watch on YouTube". With no address at all the refusal is error 153.
+ */
+const PLAYER_ORIGIN = 'https://com.saar.news';
+
+/**
  * The page the web view loads: YouTube's IFrame player API, filling the screen.
  *
  * Messages come back as 'ready', 'state:<n>' and 'error:<n>'. The video id is
@@ -81,7 +93,7 @@ var player;
 function send(m){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(m);}}
 function onYouTubeIframeAPIReady(){
   player=new YT.Player('p',{width:'100%',height:'100%',videoId:'${videoId}',
-    playerVars:{autoplay:1,mute:1,playsinline:1,loop:1,playlist:'${videoId}',controls:0,rel:0,fs:0,iv_load_policy:3,disablekb:1},
+    playerVars:{autoplay:1,mute:1,playsinline:1,loop:1,playlist:'${videoId}',controls:0,rel:0,fs:0,iv_load_policy:3,disablekb:1,origin:'${PLAYER_ORIGIN}'},
     events:{
       onReady:function(e){${muted ? 'e.target.mute();' : 'e.target.unMute();'}e.target.playVideo();send('ready');},
       onStateChange:function(e){send('state:'+e.data);},
@@ -173,7 +185,7 @@ export function YouTubeShortCard({
         <View style={[StyleSheet.absoluteFill, !ready && styles.hidden]}>
           <WebView
             ref={web as never}
-            source={{ html, baseUrl: 'https://www.youtube.com' }}
+            source={{ html, baseUrl: PLAYER_ORIGIN }}
             style={styles.web}
             originWhitelist={['https://*']}
             javaScriptEnabled
@@ -193,7 +205,10 @@ export function YouTubeShortCard({
                 req.url === 'about:blank' ||
                 req.url.startsWith('https://www.youtube.com/embed/') ||
                 req.url.startsWith('https://www.youtube.com/iframe_api') ||
-                req.url === 'https://www.youtube.com/';
+                /* The player page itself, which iOS reports as a load of its
+                   base address. */
+                req.url === PLAYER_ORIGIN ||
+                req.url === `${PLAYER_ORIGIN}/`;
               if (!stays && req.isTopFrame) {
                 void Linking.openURL(req.url);
                 return false;
