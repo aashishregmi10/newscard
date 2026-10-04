@@ -1,5 +1,68 @@
+import type { ObjectId } from 'mongodb';
+import { collections, getDb } from '@saar/db';
 import { ImageRejected, processImage, storeImage } from '@saar/media';
-import { FeedFetchError, politeGet } from '@saar/worker';
+import { FeedFetchError, MAX_ARTICLE_CHARS, politeGet, readArticlePage } from '@saar/worker';
+
+/** Below this, what the feed gave is an excerpt and the page has the story. */
+const SHORT_TEXT_CHARS = 600;
+
+export interface LeadMaterial {
+  imageUrl: string | null;
+  text: string;
+}
+
+/**
+ * The lead's photo and text, topped up from the story's own page if needed.
+ *
+ * The collector reads a story page only when it first sees the story, and only
+ * if the publisher's licence asks for something the feed lacks. A story
+ * collected BEFORE a licence term was switched on therefore has neither, and
+ * would stay without them. This reads the page once, at the moment an editor
+ * needs it — promoting, redrafting, asking for the photo — and keeps what it
+ * finds on the lead so it is never read twice.
+ *
+ * Only what the licence allows is looked for. A page that cannot be read
+ * leaves things as they were.
+ */
+export async function leadMaterial(
+  lead: {
+    _id: ObjectId;
+    canonicalUrl: string;
+    feedImageUrl?: string | null;
+    feedContent?: string | null;
+    feedExtract?: string | null;
+  },
+  licence: { images?: boolean; fullText?: boolean } | null | undefined,
+): Promise<LeadMaterial> {
+  let imageUrl = lead.feedImageUrl ?? null;
+  let text = lead.feedContent ?? lead.feedExtract ?? '';
+
+  const wantImage = licence?.images === true && imageUrl === null;
+  const wantText = licence?.fullText === true && (lead.feedContent ?? '').length < SHORT_TEXT_CHARS;
+  if (!wantImage && !wantText) return { imageUrl, text };
+
+  try {
+    const page = await readArticlePage(lead.canonicalUrl, { timeoutMs: 10_000 });
+    const set: Record<string, unknown> = {};
+    if (wantImage && page.imageUrl !== null) {
+      imageUrl = page.imageUrl;
+      set.feedImageUrl = imageUrl;
+    }
+    if (wantText && page.text !== null && page.text.length > text.length) {
+      text = page.text.slice(0, MAX_ARTICLE_CHARS);
+      set.feedContent = text;
+    }
+    if (Object.keys(set).length > 0) {
+      await collections(getDb()).leads.updateOne(
+        { _id: lead._id },
+        { $set: { ...set, updatedAt: new Date() } },
+      );
+    }
+  } catch {
+    /* Their page is down or unreadable: the editor works from what we have. */
+  }
+  return { imageUrl, text };
+}
 
 /**
  * Bringing a publisher's photograph into a draft, when a lead is promoted.

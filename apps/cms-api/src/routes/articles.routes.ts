@@ -16,6 +16,7 @@ import { transitionArticle } from '../services/transition.service.js';
 import { publishArticle, retractArticle } from '../services/publish.service.js';
 import { writeAudit } from '../audit/writeAudit.js';
 import { requestSummaryDraft } from '../services/summaryDraft.service.js';
+import { importPublisherPhoto, leadMaterial } from '../services/leadImport.service.js';
 
 export const articleRoutes = Router();
 
@@ -508,6 +509,71 @@ articleRoutes.post(
     });
 
     res.status(202).json({ status: 'pending', requestedAt: requestedAt.toISOString() });
+  }),
+);
+
+/**
+ * POST /cms/articles/:id/publisher-photo — put the publisher's own photo on a
+ * draft that does not have one.
+ *
+ * For a story promoted before "Their photos" was switched on, or whose photo
+ * could not be fetched at the time. Reads their page if the photo was never
+ * collected, then runs it through the same pipeline as promote. Only for a
+ * draft without a picture: a live story's picture changes on the edit screen,
+ * with a reason, and an editor's own choice is never replaced.
+ */
+articleRoutes.post(
+  '/cms/articles/:id/publisher-photo',
+  asyncRoute(async (req, res) => {
+    const id = String(req.params.id ?? '');
+    if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
+
+    const c = collections(getDb());
+    const article = await c.articles.findOne({ _id: new ObjectId(id) });
+    if (!article) throw new AppError('NOT_FOUND');
+    if (article.status === 'published' || article.status === 'retracted') {
+      throw new AppError('INVALID_TRANSITION', 'Change a live story’s picture on its edit screen.');
+    }
+    if (article.image) {
+      throw new AppError('INVALID_TRANSITION', 'This story already has a picture. Remove it first to use theirs.');
+    }
+
+    const source = await c.sources.findOne({ _id: article.sourceId });
+    if (source?.licence?.images !== true) {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        `${source?.displayName ?? 'This publisher'}'s licence does not cover their photos. Turn on "Their photos" on their page if their agreement allows it.`,
+      );
+    }
+    const lead = await c.leads.findOne({ promotedArticleId: article._id });
+    if (!lead) {
+      throw new AppError('VALIDATION_FAILED', 'The original has expired, so their photo cannot be found.');
+    }
+
+    const { imageUrl } = await leadMaterial(lead as never, { images: true });
+    if (imageUrl === null) {
+      throw new AppError('VALIDATION_FAILED', 'Their page has no photo for this story.');
+    }
+    const imported = await importPublisherPhoto(imageUrl, source.displayName);
+    if (!imported.ok) throw new AppError('VALIDATION_FAILED', imported.reason);
+
+    await c.articles.updateOne(
+      { _id: article._id, image: null },
+      { $set: { image: imported.image, photoNote: null, updatedAt: new Date() } } as never,
+    );
+
+    await writeAudit({
+      action: 'article.publisherPhoto',
+      entityType: 'article',
+      entityId: id,
+      actorId: req.staff!.staffId,
+      actorEmail: req.staff!.email,
+      before: { image: null },
+      after: { credit: imported.image.credit, licence: imported.image.licence, sourceUrl: imageUrl },
+      ip: req.ip ?? null,
+    });
+
+    res.json({ image: imported.image });
   }),
 );
 

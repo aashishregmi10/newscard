@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { mkdtemp, rm } from 'node:fs/promises';
@@ -58,7 +58,11 @@ function get(path: string) {
   return request(app).get(path).set('Cookie', cookie).set('X-Requested-With', 'newscard-cms');
 }
 
-async function seed(licence: { images?: boolean; fullText?: boolean }, imagePath = '/photo.jpg') {
+async function seed(
+  licence: { images?: boolean; fullText?: boolean },
+  imagePath = '/photo.jpg',
+  leadOver: Record<string, unknown> = {},
+) {
   const c = collections(getDb());
   sourceId = new ObjectId();
   await c.sources.insertOne({
@@ -97,6 +101,7 @@ async function seed(licence: { images?: boolean; fullText?: boolean }, imagePath
     purgeAt: new Date(Date.now() + 30 * 86_400_000),
     createdAt: new Date(),
     updatedAt: new Date(),
+    ...leadOver,
   } as never);
   return leadId;
 }
@@ -131,6 +136,16 @@ beforeAll(async () => {
     .toBuffer();
 
   server = createServer((req, res) => {
+    /* The story's own page, for a lead collected without its photo or text. */
+    if (req.url === '/story') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end(
+        `<!doctype html><html><head><meta property="og:image" content="${origin}/photo.jpg"></head>
+        <body><nav><a href="/">गृहपृष्ठ</a></nav><article><h1>शीर्षक</h1>
+        <p>${ARTICLE}</p><p>${ARTICLE}</p></article></body></html>`,
+      );
+      return;
+    }
     const body = req.url === '/small.jpg' ? smallPhoto : req.url === '/photo.jpg' ? photo : null;
     if (body === null) {
       res.writeHead(404);
@@ -243,6 +258,55 @@ describe('promoting without those terms', () => {
     expect(res.status).toBe(201);
     const article = await collections(getDb()).articles.findOne({ _id: new ObjectId(res.body.articleId) });
     expect((article as { photoNote?: string }).photoNote).toMatch(/404/);
+  });
+});
+
+describe('a story collected before the licence terms were on', () => {
+  /* No photo and only an excerpt on the lead — what the collector stores for
+     a publisher whose switches were off at the time. */
+  const STORY = 'https://namunakhabar.example.invalid/story';
+  const bare = () => ({ feedImageUrl: null, feedContent: null, canonicalUrl: STORY });
+
+  /* Publisher links are https, as the database requires; this one address is
+     answered by the local test server instead of the internet. */
+  beforeEach(() => {
+    const real = globalThis.fetch;
+    vi.stubGlobal('fetch', ((input: string | URL | Request, init?: RequestInit) =>
+      real(String(input) === STORY ? `${origin}/story` : input, init)) as typeof fetch);
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('gets its photo and full text from its own page at promote', async () => {
+    const leadId = await seed({ images: true, fullText: true }, '/photo.jpg', bare());
+    const res = await post(`/api/cms/leads/${leadId.toString()}/promote`).send({ categorySlug: 'nepal' });
+    const article = await collections(getDb()).articles.findOne({ _id: new ObjectId(res.body.articleId) });
+    expect(article?.image).toMatchObject({ credit: 'नमुना खबर', licence: 'publisher_licensed' });
+
+    const lead = await collections(getDb()).leads.findOne({ _id: leadId });
+    expect(lead?.feedImageUrl).toBe(`${origin}/photo.jpg`);
+    expect(lead?.feedContent).toContain('खानेपानी आयोजनाको');
+
+    const drafted = await settledDraft(res.body.articleId);
+    expect((drafted as { summaryDraft: { status: string } }).summaryDraft.status).toBe('ready');
+  });
+
+  it('can be given its photo afterwards, on a draft promoted without one', async () => {
+    const leadId = await seed({}, '/photo.jpg', bare());
+    const res = await post(`/api/cms/leads/${leadId.toString()}/promote`).send({ categorySlug: 'nepal' });
+    const id = res.body.articleId as string;
+
+    // Not while the licence does not cover photos.
+    expect((await post(`/api/cms/articles/${id}/publisher-photo`).send({})).status).toBe(422);
+
+    await collections(getDb()).sources.updateOne({ _id: sourceId }, { $set: { 'licence.images': true } });
+    const ok = await post(`/api/cms/articles/${id}/publisher-photo`).send({});
+    expect(ok.status).toBe(200);
+    expect(ok.body.image).toMatchObject({ credit: 'नमुना खबर', licence: 'publisher_licensed' });
+
+    // And never over a picture that is already there.
+    expect((await post(`/api/cms/articles/${id}/publisher-photo`).send({})).status).toBe(409);
   });
 });
 

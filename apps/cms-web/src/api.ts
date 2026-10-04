@@ -977,6 +977,13 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
+  /** Put the publisher's own photo on a draft that has none. */
+  publisherPhoto: (id: string) =>
+    req<{ image: ArticleImageData }>(`/cms/articles/${id}/publisher-photo`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
   summaryDraft: (id: string, signal?: AbortSignal) =>
     req<{ summaryDraft: SummaryDraftData | null }>(`/cms/articles/${id}/summary-draft`, { signal }),
 

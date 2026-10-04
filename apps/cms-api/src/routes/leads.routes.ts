@@ -7,7 +7,7 @@ import { requireAuth } from '../auth/requireAuth.js';
 import { asyncRoute } from '../middleware/index.js';
 import { writeAudit } from '../audit/writeAudit.js';
 import { draftSlug } from './articles.routes.js';
-import { importPublisherPhoto } from '../services/leadImport.service.js';
+import { importPublisherPhoto, leadMaterial } from '../services/leadImport.service.js';
 import { requestSummaryDraft } from '../services/summaryDraft.service.js';
 
 /**
@@ -221,7 +221,10 @@ leadRoutes.post(
      * already in place. Bounded at ten seconds; a failure costs only the
      * photo, and the reason goes on the draft so nobody has to guess.
      */
-    const feedImageUrl = (lead as { feedImageUrl?: string | null }).feedImageUrl ?? null;
+    /* A story collected before the licence terms were switched on has no
+       photo or full text yet; its own page is read now, once. */
+    const material = await leadMaterial(lead as never, source.licence);
+    const feedImageUrl = material.imageUrl;
     let image: Awaited<ReturnType<typeof importPublisherPhoto>> | null = null;
     let photoNote: string | null = null;
     if (feedImageUrl !== null) {

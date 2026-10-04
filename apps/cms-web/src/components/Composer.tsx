@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   api,
+  ApiError,
   type ArticleDetail,
   type ArticleImageData,
   type ClusterSibling,
@@ -205,6 +206,23 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
   );
   const persistRef = useRef(persist);
   persistRef.current = persist;
+
+  /* The publisher's own photo, for a draft promoted without one. Saved on
+     the server as it arrives, so it only has to be shown here. */
+  const [fetchingPhoto, setFetchingPhoto] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
+  const fetchPublisherPhoto = async () => {
+    setFetchingPhoto(true);
+    setPhotoError(null);
+    try {
+      const { image: theirs } = await api.publisherPhoto(id);
+      setImage(theirs);
+    } catch (e) {
+      setPhotoError(e instanceof ApiError ? e.message : 'Could not fetch their photo.');
+    } finally {
+      setFetchingPhoto(false);
+    }
+  };
 
   /**
    * The summariser's draft goes into the box. Saved straight away, like an
@@ -497,12 +515,28 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
             />
           )}
 
-          {/* Why the publisher's photo is not here, when promoting tried. Gone
-              as soon as a picture is attached. */}
-          {article.photoNote !== null && image === null && !locked && (
-            <Banner tone="info" live={false}>
-              <strong>Their photo was not copied.</strong> {article.photoNote}
-            </Banner>
+          {/* Why the publisher's photo is not here, when promoting tried — and
+              the way to get it now. Gone as soon as a picture is attached. */}
+          {image === null && original !== null && !locked && (
+            <div className="summary-draft">
+              {article.photoNote !== null && (
+                <Banner tone="info" live={false}>
+                  <strong>Their photo was not copied.</strong> {article.photoNote}
+                </Banner>
+              )}
+              {photoError !== null && <Banner tone="error">{photoError}</Banner>}
+              <div className="actions actions-plain">
+                <Button
+                  size="sm"
+                  icon="image"
+                  busy={fetchingPhoto}
+                  disabled={action.busy}
+                  onClick={() => void fetchPublisherPhoto()}
+                >
+                  Use their photo
+                </Button>
+              </div>
+            </div>
           )}
 
           {/*

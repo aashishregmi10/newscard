@@ -3,6 +3,7 @@ import { collections, getDb } from '@saar/db';
 import { DEFAULT_CONFIG } from '@saar/schemas';
 import { createLogger } from '@saar/shared';
 import { summarise, type SummaryResult } from '@saar/summarise';
+import { leadMaterial } from './leadImport.service.js';
 
 /**
  * Drafting a summary for a story promoted from a lead, in the background.
@@ -125,7 +126,7 @@ async function draftFor(articleId: ObjectId): Promise<Outcome> {
 
   const lead = await c.leads.findOne(
     { promotedArticleId: articleId },
-    { projection: { headline: 1, feedExtract: 1, feedContent: 1 } },
+    { projection: { headline: 1, feedExtract: 1, feedContent: 1, feedImageUrl: 1, canonicalUrl: 1 } },
   );
   if (!lead) {
     return {
@@ -136,7 +137,7 @@ async function draftFor(articleId: ObjectId): Promise<Outcome> {
 
   const source = await c.sources.findOne(
     { _id: article.sourceId },
-    { projection: { displayName: 1, 'licence.fullText': 1 } },
+    { projection: { displayName: 1, 'licence.fullText': 1, 'licence.images': 1 } },
   );
   if (source?.licence?.fullText !== true) {
     return {
@@ -145,7 +146,8 @@ async function draftFor(articleId: ObjectId): Promise<Outcome> {
     };
   }
 
-  const text = (lead as { feedContent?: string | null }).feedContent ?? lead.feedExtract ?? '';
+  /* The whole story, read from their page if the feed carried only an excerpt. */
+  const { text } = await leadMaterial(lead as never, { fullText: true });
   if (text.trim() === '') {
     return { status: 'failed', error: 'Their article text was not collected, so there is nothing to summarise.' };
   }
