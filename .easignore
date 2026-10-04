@@ -1,0 +1,63 @@
+# What `eas build` must NOT upload to Expo's build servers.
+#
+# When this file exists, EAS uses it INSTEAD of every .gitignore in the
+# repository. So it repeats all of their rules — the root .gitignore and
+# apps/mobile/.gitignore — and then adds what the build never needs but git
+# does not ignore. Add a rule to a .gitignore? Add it here too, or `eas build`
+# will upload what git keeps out (.env above all).
+
+# ── From .gitignore ────────────────────────────────────────────────────────
+node_modules/
+.pnpm-store/
+dist/
+build/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.expo/
+.expo-shared/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+android/
+ios/
+coverage/
+.vitest/
+*.log
+npm-debug.log*
+/data/
+/tmp/
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+/media/
+media/i/
+media/commons-cache.json
+media/v/
+media/video-cache.json
+media/.tmp/
+
+# ── From apps/mobile/.gitignore ────────────────────────────────────────────
+web-build/
+expo-env.d.ts
+.kotlin/
+*.orig.*
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+*.pem
+.env*.local
+*-firebase-adminsdk-*.json
+# google-services.json is deliberately NOT ignored: the build needs it.
+
+# ── Not needed by the build, and not git-ignored ───────────────────────────
+# Documentation, including private business documents kept untracked in
+# docs/, and local assistant settings. Neither belongs on a build server.
+docs/
+.claude/
