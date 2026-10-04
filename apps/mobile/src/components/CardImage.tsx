@@ -43,6 +43,10 @@ interface Props {
   dataSaver: boolean;
   /** Rendition to use when loading normally. */
   rendition?: 'sm' | 'md' | 'lg';
+  /** Tapping the photograph — the card opens it full screen. */
+  onPress?: () => void;
+  /** What a screen reader says that tap does. */
+  pressLabel?: string;
 }
 
 /** Rough byte cost shown on the Data Saver button. Better an honest estimate
@@ -52,7 +56,15 @@ const APPROX_KB: Record<string, number> = { sm: 25, md: 70, lg: 140 };
 /** How long an image may take before a spinner is worth showing. */
 const SPINNER_AFTER_MS = 600;
 
-function CardImageInner({ image, theme, style, dataSaver, rendition = 'md' }: Props) {
+function CardImageInner({
+  image,
+  theme,
+  style,
+  dataSaver,
+  rendition = 'md',
+  onPress,
+  pressLabel,
+}: Props) {
   const [loaded, setLoaded] = useState(false);
   /**
    * A spinner only for an image that is actually slow.
@@ -82,8 +94,17 @@ function CardImageInner({ image, theme, style, dataSaver, rendition = 'md' }: Pr
 
   const shouldLoad = (!dataSaver || manuallyRequested) && !!uri && !failed;
 
+  /* Tappable only once there is a photograph to open: not behind the Data
+     Saver button, and not when it failed. */
+  const Region = onPress && shouldLoad ? Pressable : View;
+
   return (
-    <View style={[styles.wrap, style, { backgroundColor: placeholder }]}>
+    <Region
+      style={[styles.wrap, style, { backgroundColor: placeholder }]}
+      {...(onPress && shouldLoad
+        ? { onPress, accessibilityRole: 'imagebutton' as const, accessibilityLabel: pressLabel }
+        : {})}
+    >
       {shouldLoad && (
         <Image
           source={{ uri: uri! }}
@@ -123,7 +144,7 @@ function CardImageInner({ image, theme, style, dataSaver, rendition = 'md' }: Pr
           <Text style={styles.failText}>image unavailable</Text>
         </View>
       )}
-    </View>
+    </Region>
   );
 }
 

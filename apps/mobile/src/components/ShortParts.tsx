@@ -7,8 +7,8 @@ import { LINE_HEIGHT, fontFor, textSize } from '../theme/tokens';
  * What every short shows, whoever plays the video.
  *
  * An uploaded short (VideoCard) and a YouTube one (YouTubeShortCard) differ in
- * the player and nothing else a reader reads: the poster underneath, the scrim,
- * and the words over it are the same, from here, so the two cannot drift.
+ * the player and nothing else a reader reads: the poster underneath and the
+ * words over it are the same, from here, so the two cannot drift.
  */
 
 /** Split out so the poster keeps its own load state and never re-mounts when
@@ -67,6 +67,19 @@ export function ShortText({
   );
 }
 
+/**
+ * A soft shadow around each letter, in place of a dark band.
+ *
+ * The words used to sit on a half-black block across the bottom half of the
+ * frame, which hid half the video. A shadow keeps white text readable on a
+ * bright frame while the footage stays as it was shot.
+ */
+const readable = {
+  textShadowColor: 'rgba(0,0,0,0.85)',
+  textShadowOffset: { width: 0, height: 1 },
+  textShadowRadius: 6,
+} as const;
+
 export const shortStyles = StyleSheet.create({
   card: { justifyContent: 'flex-end', overflow: 'hidden' },
   centre: {
@@ -113,23 +126,16 @@ export const shortStyles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
-  scrim: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '52%',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
   text: { paddingHorizontal: 20, paddingBottom: 26 },
   meta: {
-    color: 'rgba(255,255,255,0.78)',
+    ...readable,
+    color: 'rgba(255,255,255,0.85)',
     fontSize: textSize(11.5),
     letterSpacing: 0.5,
     textTransform: 'uppercase',
     marginBottom: 8,
   },
-  title: { color: '#fff', fontWeight: '700', marginBottom: 8 },
-  caption: { color: 'rgba(255,255,255,0.9)' },
-  credit: { color: 'rgba(255,255,255,0.55)', fontSize: textSize(10.5), marginTop: 10 },
+  title: { ...readable, color: '#fff', fontWeight: '700', marginBottom: 8 },
+  caption: { ...readable, color: '#fff' },
+  credit: { ...readable, color: 'rgba(255,255,255,0.75)', fontSize: textSize(10.5), marginTop: 10 },
 });

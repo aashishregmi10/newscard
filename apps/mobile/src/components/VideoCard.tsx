@@ -251,10 +251,6 @@ function VideoCardInner({
         </Pressable>
       ) : null}
 
-      {/* Everything readable sits over a scrim, because footage is
-          unpredictable and white text on a bright frame is unreadable. */}
-      <View style={styles.scrim} pointerEvents="none" />
-
       {/*
         * The scrub bar.
         *

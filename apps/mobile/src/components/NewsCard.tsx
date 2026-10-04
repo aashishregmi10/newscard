@@ -1,10 +1,11 @@
 import { View, Text, StyleSheet, Pressable, Share, Animated } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
-import { useMemo, useRef, memo } from 'react';
+import { useCallback, useMemo, useRef, useState, memo } from 'react';
 import type { Card, InlineAd as InlineAdData } from '../api/client';
 import { InlineAd } from './InlineAd';
 import { CardImage } from './CardImage';
+import { ImageViewer } from './ImageViewer';
 import { relativeTime } from '../lib/relativeTime';
 import { useBookmarkActions, useIsSaved } from '../state/BookmarksContext';
 import { LINE_HEIGHT, TYPE, fontFor, type Theme, textSize } from '../theme/tokens';
@@ -26,6 +27,10 @@ const MAX_COMBINED_SCALE = 1.8;
  * → read-more strip. The attribution line is NOT optional and NOT conditional
  * (Ch. 7.2.2) — it is an ethical commitment, what our publishers get in return
  * for licensing to us, and a legal protection, all at once.
+ *
+ * Taps: the photograph opens full screen (ImageViewer). The headline and
+ * summary open the publisher's story, as the strip at the bottom does — a
+ * reader who taps the words they are reading wants more of them.
  */
 
 interface Props {
@@ -56,6 +61,9 @@ function NewsCardInner({
   // Subscribes to this story only: saving another card does not re-render this one.
   const saved = useIsSaved(card.id);
   const { toggle } = useBookmarkActions();
+  const [viewingPhoto, setViewingPhoto] = useState(false);
+  const openPhoto = useCallback(() => setViewingPhoto(true), []);
+  const closePhoto = useCallback(() => setViewingPhoto(false), []);
 
   // Saving is otherwise invisible — nothing leaves the device and there is no
   // spinner — so the icon itself has to confirm it. Native driver, so this
@@ -123,7 +131,22 @@ function NewsCardInner({
         </Pressable>
       )}
 
-      <CardImage image={card.image} theme={theme} style={imageStyle} dataSaver={dataSaver} />
+      <CardImage
+        image={card.image}
+        theme={theme}
+        style={imageStyle}
+        dataSaver={dataSaver}
+        onPress={openPhoto}
+        pressLabel={card.language === 'ne' ? 'तस्बिर ठूलो गरी हेर्नुहोस्' : 'View photo full screen'}
+      />
+      {viewingPhoto && card.image && (
+        <ImageViewer
+          image={card.image}
+          ne={card.language === 'ne'}
+          dataSaver={dataSaver}
+          onClose={closePhoto}
+        />
+      )}
 
       <View style={[styles.actionRow, { borderBottomColor: theme.divider }]}>
         {/*
@@ -192,7 +215,15 @@ function NewsCardInner({
       </View>
 
       <View style={styles.body}>
-        <View onLayout={onTextLayout} style={textHidden ? styles.hidden : undefined}>
+        {/* The pause before the press shows keeps a swipe to the next card
+            from flickering the words it started on. */}
+        <Pressable
+          onLayout={onTextLayout}
+          onPress={openArticle}
+          unstable_pressDelay={90}
+          style={({ pressed }) => [pressed && styles.pressed, textHidden && styles.hidden]}
+          accessibilityRole="link"
+        >
           <Text
             style={[
               styles.headline,
@@ -226,7 +257,7 @@ function NewsCardInner({
           >
             {card.summary}
           </Text>
-        </View>
+        </Pressable>
 
         <Text
           style={[
@@ -273,6 +304,7 @@ const styles = StyleSheet.create({
      past the card onto the next one. */
   card: { justifyContent: 'flex-start', overflow: 'hidden' },
   hidden: { opacity: 0 },
+  pressed: { opacity: 0.6 },
   overflow: {
     position: 'absolute',
     top: 10,

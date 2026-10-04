@@ -277,6 +277,8 @@ export async function fetchVideos(opts: {
   category?: string;
   cursor?: string | null;
   limit?: number;
+  /** Pulled to refresh: ask the server, not the phone's copy from a minute ago. */
+  fresh?: boolean;
 }): Promise<VideoPage> {
   const params = new URLSearchParams({
     lang: opts.languages.join(','),
@@ -293,7 +295,13 @@ export async function fetchVideos(opts: {
 
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/v1/videos?${params}`, { signal: controller.signal });
+    /* The server lets a page be kept for 60 seconds, and Android keeps it. A
+       reader who pulls to refresh is asking for what is new now, so that
+       request skips the phone's copy. */
+    res = await fetch(`${API_BASE}/v1/videos?${params}`, {
+      signal: controller.signal,
+      ...(opts.fresh ? { headers: { 'Cache-Control': 'no-cache' } } : {}),
+    });
   } catch (e) {
     const aborted = (e as { name?: string })?.name === 'AbortError';
     throw new FeedError(

@@ -182,7 +182,10 @@ export function YouTubeShortCard({
       </View>
 
       {playing && WebView !== null && (
-        <View style={[StyleSheet.absoluteFill, !ready && styles.hidden]}>
+        /* Never touched directly: once ready, the pause layer below takes every
+           tap, and until then a hidden web page must not swallow the swipe to
+           the next short or the pull to refresh. */
+        <View style={[StyleSheet.absoluteFill, !ready && styles.hidden]} pointerEvents="none">
           <WebView
             ref={web as never}
             source={{ html, baseUrl: PLAYER_ORIGIN }}
@@ -293,7 +296,6 @@ export function YouTubeShortCard({
         </Pressable>
       )}
 
-      <View style={shortStyles.scrim} pointerEvents="none" />
       {/* Clear of the bottom-right corner, where YouTube's logo sits. */}
       <ShortText video={video} textScale={textScale} note="YouTube" rightInset={84} />
     </View>

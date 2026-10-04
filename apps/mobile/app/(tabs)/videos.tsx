@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   Pressable,
   ActivityIndicator,
   Platform,
+  RefreshControl,
   useWindowDimensions,
   type ListRenderItemInfo,
   type ViewToken,
@@ -56,7 +57,11 @@ export default function VideosScreen() {
   const [activeId, setActiveId] = useState<string | null>(null);
   const [muted, setMuted] = useState(true);
   const [focused, setFocused] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  /** Shown for a moment when a pull could not reach the server. */
+  const [refreshFailed, setRefreshFailed] = useState(false);
 
+  const list = useRef<FlatList<VideoCardType>>(null);
   const cursor = useRef<string | null>(null);
   const hasMore = useRef(true);
   const loadingMore = useRef(false);
@@ -81,6 +86,50 @@ export default function VideosScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  /**
+   * Pull down on the first short for the newest ones.
+   *
+   * The shorts on screen stay until the new page has arrived, so the pull
+   * never empties the screen. If it fails, they stay and a line says so.
+   */
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    setRefreshFailed(false);
+    try {
+      const page = await fetchVideos({ languages, limit: 10, fresh: true });
+      setItems(page.items);
+      cursor.current = page.nextCursor;
+      hasMore.current = page.hasMore;
+      setActiveId(page.items[0]?.id ?? null);
+      list.current?.scrollToOffset({ offset: 0, animated: false });
+    } catch {
+      setRefreshFailed(true);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [languages]);
+
+  useEffect(() => {
+    if (!refreshFailed) return;
+    const t = setTimeout(() => setRefreshFailed(false), 3000);
+    return () => clearTimeout(t);
+  }, [refreshFailed]);
+
+  const refreshControl = useMemo(
+    () => (
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={refresh}
+        // Light on the black of this tab, and a raised disc on Android so the
+        // spinner reads against footage.
+        tintColor="#fff"
+        colors={[theme.accent]}
+        progressBackgroundColor={theme.surfaceRaised}
+      />
+    ),
+    [refreshing, refresh, theme.accent, theme.surfaceRaised],
+  );
 
   // Nothing plays while the reader is on another tab.
   useFocusEffect(
@@ -183,7 +232,14 @@ export default function VideosScreen() {
     <View style={[styles.fill, { backgroundColor: '#000', paddingTop: insets.top }]}>
       {/* Told once, and only when it matters: on mobile data nothing has been
           downloaded yet and tapping is what spends it. */}
-      {!unmetered && (
+      {refreshFailed ? (
+        <View style={styles.dataNote}>
+          <MaterialCommunityIcons name="wifi-off" size={13} color="rgba(255,255,255,0.8)" />
+          <Text style={styles.dataNoteText}>
+            {ne ? 'नयाँ भिडियो ल्याउन सकिएन' : 'Could not get new videos'}
+          </Text>
+        </View>
+      ) : !unmetered && (
         <View style={styles.dataNote}>
           <MaterialCommunityIcons name="information-outline" size={13} color="rgba(255,255,255,0.8)" />
           <Text style={styles.dataNoteText}>
@@ -195,8 +251,10 @@ export default function VideosScreen() {
       )}
 
       <FlatList
+        ref={list}
         style={styles.fill}
         onLayout={onListLayout}
+        refreshControl={refreshControl}
         data={items}
         keyExtractor={(v) => v.id}
         renderItem={renderItem}
