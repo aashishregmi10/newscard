@@ -6,6 +6,7 @@ import type { Card, InlineAd as InlineAdData } from '../api/client';
 import { InlineAd } from './InlineAd';
 import { CardImage } from './CardImage';
 import { ImageViewer } from './ImageViewer';
+import { SaarMark } from './SaarMark';
 import { relativeTime } from '../lib/relativeTime';
 import { useBookmarkActions, useIsSaved } from '../state/BookmarksContext';
 import { LINE_HEIGHT, TYPE, fontFor, type Theme, textSize } from '../theme/tokens';
@@ -150,17 +151,18 @@ function NewsCardInner({
 
       <View style={[styles.actionRow, { borderBottomColor: theme.divider }]}>
         {/*
-          * With a small ad, the publisher’s name keeps up to 45% of the row and
-          * the ad takes what is left, centred between the name and the icons,
-          * shortening before the name ever does. Without one, the name has the
-          * row as before.
+          * SAAR's mark, then the publisher's name. With a small ad, the two
+          * keep up to half the row — enough for the mark and a name like
+          * "Kathmandu Post" — and the ad takes what is left, centred between
+          * the name and the icons, shortening before the name ever does.
+          * Without one, they have the row as before.
           */}
-        <Text
-          style={[inlineAd ? styles.sourceChipWithAd : styles.sourceChip, { color: theme.accent }]}
-          numberOfLines={1}
-        >
-          {card.source.name}
-        </Text>
+        <View style={inlineAd ? styles.creditWithAd : styles.credit}>
+          <SaarMark theme={theme} />
+          <Text style={[styles.sourceChip, { color: theme.accent }]} numberOfLines={1}>
+            {card.source.name}
+          </Text>
+        </View>
         {inlineAd && onInlineAd && (
           <>
             <View style={styles.spacer} />
@@ -329,13 +331,15 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  sourceChip: { fontSize: TYPE.chip.size, fontWeight: TYPE.chip.weight, flex: 1 },
-  sourceChipWithAd: {
-    fontSize: TYPE.chip.size,
-    fontWeight: TYPE.chip.weight,
+  credit: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  creditWithAd: {
     flexShrink: 0,
-    maxWidth: '45%',
+    maxWidth: '50%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
   },
+  sourceChip: { fontSize: TYPE.chip.size, fontWeight: TYPE.chip.weight, flexShrink: 1 },
   spacer: { flex: 1, minWidth: 0 },
   actions: { flexDirection: 'row', gap: 20 },
   /* Grows into spare room, never shrinks: the photograph is the only part of

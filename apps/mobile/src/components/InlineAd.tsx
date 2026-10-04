@@ -5,14 +5,14 @@ import { resolveMediaUrl, type InlineAd as InlineAdData } from '../api/client';
 import { fontFor, type Theme, textSize } from '../theme/tokens';
 
 /**
- * The small ad on a story: one line, in the row with save and share.
+ * The small ad on a story: the advertiser's logo and name, in the row with
+ * save and share.
  *
  * ── How it is kept from reading as part of the story ─────────────────────────
  *
- * It sits in the row that carries the publisher's credit, which is exactly why
- * it has to be unmistakable. It is:
+ * It sits in the row that carries the publisher's credit. It is:
  *
- *   • labelled — "विज्ञापन" or "Ad", in the READER's language, before the text
+ *   • the advertiser's name only — no headline-like line of copy
  *   • outlined in the ad colour (theme.adMark), never the accent blue the
  *     publisher's name is set in
  *   • shorter than the credit is allowed to become: the publisher's name keeps
@@ -20,17 +20,21 @@ import { fontFor, type Theme, textSize } from '../theme/tokens';
  *     Crediting the publisher is what the licence requires; the ad is what is
  *     negotiable.
  *
+ * It carried a printed "विज्ञापन" / "Ad" label until 4 Oct 2026, when the
+ * owner chose the name alone. A screen reader still announces it as an ad.
+ *
  * A tap opens the advertiser's page outside the app, in the phone's browser,
  * and is reported first — once the browser takes over, the app may never get
  * the chance.
  */
 
-const LABEL = { ne: 'विज्ञापन', en: 'Ad' } as const;
+/** Spoken only, for a screen reader. */
+const SPOKEN = { ne: 'विज्ञापन', en: 'Advertisement' } as const;
 
 interface Props {
   ad: InlineAdData;
   theme: Theme;
-  /** The reader's language, for the label. The ad's own text is in its own. */
+  /** The reader's language, for what a screen reader says. */
   lang: 'ne' | 'en';
   onPress: (ad: InlineAdData) => void;
 }
@@ -52,15 +56,14 @@ function InlineAdInner({ ad, theme, lang, onPress }: Props) {
         { borderColor: theme.adMark, opacity: pressed ? 0.7 : 1 },
       ]}
       accessibilityRole="link"
-      accessibilityLabel={`${LABEL[lang]}: ${ad.advertiser}. ${ad.text}`}
+      accessibilityLabel={`${SPOKEN[lang]}: ${ad.advertiser}. ${ad.text}`}
     >
       {logo !== null && <Image source={{ uri: logo }} style={styles.logo} resizeMode="contain" />}
-      <Text style={[styles.label, { color: theme.adMark }]}>{LABEL[lang]}</Text>
       <Text
         style={[styles.text, { color: theme.textSecondary, fontFamily: fontFor(ad.language) }]}
         numberOfLines={1}
       >
-        {ad.text}
+        {ad.advertiser}
       </Text>
       <MaterialCommunityIcons name="chevron-right" size={14} color={theme.adMark} />
     </Pressable>
@@ -84,6 +87,5 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   logo: { width: 14, height: 14, borderRadius: 3 },
-  label: { fontSize: textSize(10.5), fontWeight: '800', letterSpacing: 0.3 },
   text: { flexShrink: 1, fontSize: textSize(12), fontWeight: '500' },
 });
