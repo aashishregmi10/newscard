@@ -4,8 +4,10 @@ import { connect, close, collections, getDb, applyValidators, syncIndexes } from
 import { pollDueSources, lastYouTubeReports } from '../ingest/pollSources.js';
 import {
   channelQuery,
+  learnBoilerplate,
   parseIsoDuration,
   screenVideo,
+  stripBoilerplate,
   uploadsPlaylistId,
   type YouTubeVideo,
 } from '../ingest/youtube.js';
@@ -22,6 +24,14 @@ import {
 const URI = process.env.MONGO_TEST_URI ?? 'mongodb://localhost:27017/newscard_test';
 const CHANNEL = 'UCabcdefghijklmnopqrstuv';
 const KEY = 'test-key-not-real';
+/** What a channel pastes under every upload — invented, shaped like the real thing. */
+const BOILERPLATE = [
+  'नमुना टिभीमा प्रसारित सामग्रीबारे गुनासो भए हामीलाई लेख्नुहोस्।',
+  'च्यानल सब्स्क्राइब गर्न नभुल्नुहोला।',
+  'Contact: news@namunatv.example.invalid',
+  'https://namunatv.example.invalid',
+  '#NamunaTV #NepaliNews #शीर्षक',
+].join('\n');
 const NOW = new Date('2026-10-04T06:00:00Z');
 
 interface FakeVideo {
@@ -56,7 +66,7 @@ const fakeFetch = (async (input: string | URL) => {
           id: v.id,
           snippet: {
             title: v.title,
-            description: 'नमुना विवरण। #shorts',
+            description: `${v.title} बारे छोटो विवरण।\n${BOILERPLATE}`,
             channelId: CHANNEL,
             channelTitle: 'नमुना टिभी',
             publishedAt: new Date(NOW.getTime() - (v.daysOld ?? 0) * 86_400_000).toISOString(),
@@ -174,6 +184,45 @@ describe('reading a channel', () => {
     await seedChannel({ licence: { status: 'pending' } });
     await pollDueSources(NOW, { youtubeKey: KEY, fetchImpl: fakeFetch });
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe('channel boilerplate', () => {
+  it('is learned from the batch and stripped, leaving what describes the clip', async () => {
+    /* Ids no earlier test has seen: the collector remembers the ones it
+       turned down, and would not look them up again. */
+    catalogue = [
+      { id: 'bpShortAAA1', title: 'पहिलो छोटो समाचार', seconds: 40 },
+      { id: 'bpShortBBB2', title: 'दोस्रो छोटो समाचार', seconds: 50 },
+      { id: 'bpLongCCCC3', title: 'लामो कार्यक्रम', seconds: 900 },
+    ];
+    await pollDueSources(NOW, { youtubeKey: KEY, fetchImpl: fakeFetch });
+    const lead = await getDb().collection('shortLeads').findOne({ videoId: 'bpShortAAA1' });
+    expect(lead?.description).toBe('पहिलो छोटो समाचार बारे छोटो विवरण।');
+
+    const source = await collections(getDb()).sources.findOne({});
+    expect((source?.ingest as { youtubeBoilerplate?: string[] }).youtubeBoilerplate).toContain(
+      'च्यानल सब्स्क्राइब गर्न नभुल्नुहोला।',
+    );
+  });
+
+  it('needs three examples before it decides a line is boilerplate', () => {
+    expect(learnBoilerplate(['a\nshared', 'b\nshared'])).toEqual([]);
+    expect(learnBoilerplate(['a\nshared', 'b\nshared', 'c\nshared'])).toEqual(['shared']);
+  });
+
+  it('keeps what it learned before when a poll brings one new video', () => {
+    expect(learnBoilerplate(['only one'], ['shared'])).toEqual(['shared']);
+  });
+
+  it('drops links and hashtag-only lines even before anything is learned', () => {
+    expect(stripBoilerplate('खबर।\nhttps://x.example.invalid\n#a #b', [])).toBe('खबर।');
+  });
+
+  it('leaves a description with nothing of the channel’s alone', () => {
+    expect(stripBoilerplate('पहिलो पङ्क्ति।\nदोस्रो पङ्क्ति।', ['अर्को'])).toBe(
+      'पहिलो पङ्क्ति।\nदोस्रो पङ्क्ति।',
+    );
   });
 });
 

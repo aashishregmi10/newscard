@@ -265,6 +265,53 @@ function rememberTurnedDown(videoId: string): void {
   turnedDown.add(videoId);
 }
 
+/**
+ * A channel's boilerplate: the lines it puts under every upload.
+ *
+ * Channels paste the same block into every description — a request to
+ * subscribe, contact addresses, links, a wall of hashtags. Nepal Times' is
+ * twenty lines and is, on its Shorts, the entire description. Left in, it is
+ * what an editor reads in Incoming instead of what the clip is about, and it
+ * is what a caption would be drafted from.
+ *
+ * Learned rather than listed: a line found in at least half of a batch of a
+ * channel's videos (three or more) is theirs, not the clip's. Kept on the
+ * publisher's record so a later poll that sees one new video can still strip
+ * it. The title is never touched — only the description.
+ */
+export const BOILERPLATE_MIN_BATCH = 3;
+const BOILERPLATE_MAX_LINES = 120;
+
+const normaliseLine = (line: string): string => line.replace(/\s+/g, ' ').trim();
+
+export function learnBoilerplate(descriptions: string[], previous: readonly string[] = []): string[] {
+  const known = new Set(previous);
+  if (descriptions.length >= BOILERPLATE_MIN_BATCH) {
+    const counts = new Map<string, number>();
+    for (const d of descriptions) {
+      for (const line of new Set(d.split('\n').map(normaliseLine).filter(Boolean))) {
+        counts.set(line, (counts.get(line) ?? 0) + 1);
+      }
+    }
+    const threshold = Math.max(2, Math.ceil(descriptions.length / 2));
+    for (const [line, n] of counts) if (n >= threshold) known.add(line);
+  }
+  return [...known].slice(-BOILERPLATE_MAX_LINES);
+}
+
+/** The description without the channel's boilerplate, links or hashtag-only lines. */
+export function stripBoilerplate(description: string, boilerplate: readonly string[]): string {
+  const drop = new Set(boilerplate);
+  return description
+    .split('\n')
+    .map(normaliseLine)
+    .filter((line) => line !== '' && !drop.has(line))
+    .filter((line) => !/^(https?:\/\/\S+\s*)+$/.test(line))
+    .filter((line) => !/^([#＃][\p{L}\p{M}\p{N}_]+\s*)+$/u.test(line))
+    .join('\n')
+    .slice(0, 5000);
+}
+
 /** Why a video was not offered as a Short. Counted in the poll report. */
 export type ShortRejection = 'too_long' | 'not_embeddable' | 'not_vertical' | 'too_old' | 'no_title';
 
@@ -293,7 +340,11 @@ interface YouTubeSource {
   slug: string;
   displayName: string;
   language: 'ne' | 'en';
-  ingest: { youtubeChannelId?: string | null; consecutiveFailures?: number };
+  ingest: {
+    youtubeChannelId?: string | null;
+    consecutiveFailures?: number;
+    youtubeBoilerplate?: string[] | null;
+  };
 }
 
 /**
@@ -341,7 +392,34 @@ export async function pollYouTubeSource(
     report.known = seen.size;
     const fresh = ids.filter((id) => !seen.has(id) && !turnedDown.has(id));
 
-    for (const v of await videoDetails(fresh, key, o)) {
+    const details = await videoDetails(fresh, key, o);
+
+    /* Learned from everything fetched, long videos included: that is where
+       most of a channel's examples are. */
+    const previous = source.ingest?.youtubeBoilerplate ?? [];
+    const boilerplate = learnBoilerplate(
+      details.map((d) => d.description),
+      previous,
+    );
+    if (boilerplate.length !== previous.length) {
+      await c.sources.updateOne(
+        { _id: source._id as never },
+        { $set: { 'ingest.youtubeBoilerplate': boilerplate } },
+      );
+      /* Shorts already waiting were stored before this was known. */
+      const waiting = await shortLeads
+        .find({ sourceId: source._id, status: 'new' }, { projection: { description: 1 } })
+        .limit(200)
+        .toArray();
+      for (const w of waiting) {
+        const cleaned = stripBoilerplate(String(w.description ?? ''), boilerplate);
+        if (cleaned !== w.description) {
+          await shortLeads.updateOne({ _id: w._id }, { $set: { description: cleaned, updatedAt: now } });
+        }
+      }
+    }
+
+    for (const v of details) {
       const rejection = screenVideo(v, now) ?? ((await isVertical(v.videoId, o)) === true ? null : 'not_vertical');
       if (rejection !== null) {
         report.rejected[rejection] = (report.rejected[rejection] ?? 0) + 1;
@@ -357,10 +435,10 @@ export async function pollYouTubeSource(
           channelId: v.channelId || channelId,
           channelTitle: v.channelTitle,
           title: v.title.slice(0, 300),
-          description: v.description,
+          description: stripBoilerplate(v.description, boilerplate),
           thumbnailUrl: v.thumbnailUrl ?? `https://i.ytimg.com/vi/${v.videoId}/hqdefault.jpg`,
           durationSeconds: v.durationSeconds,
-          language: detectLanguage(`${v.title} ${v.description.slice(0, 200)}`, source.language),
+          language: detectLanguage(v.title, source.language),
           publishedAt: v.publishedAt,
           fetchedAt: now,
           status: 'new',

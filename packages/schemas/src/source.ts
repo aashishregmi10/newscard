@@ -73,6 +73,9 @@ export const SourceIngest = z.object({
     .regex(/^UC[A-Za-z0-9_-]{22}$/, 'A YouTube channel id starts with UC and is 24 characters.')
     .nullable()
     .optional(),
+  /** Lines this channel puts under every upload, learned by the collector and
+   *  stripped from descriptions. Written by the collector, never by a form. */
+  youtubeBoilerplate: z.array(z.string()).nullable().optional(),
   /** Never below 5, clamped in code and not only in the admin UI (Ch. 4.4). */
   pollIntervalMin: z.number().int().min(5).default(15),
   lastPolledAt: z.date().nullable().optional(),
