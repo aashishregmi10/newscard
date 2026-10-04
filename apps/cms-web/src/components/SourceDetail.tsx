@@ -5,6 +5,8 @@ import {
   type LicenceStatus,
   type SourceDetail as SourceDetailData,
   type WordPressDetection,
+  type YouTubeChannel,
+  ApiError,
 } from '../api';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useResource } from '../hooks/useResource';
@@ -64,6 +66,27 @@ export function SourceDetail({ slug }: { slug: string }) {
   const [method, setMethod] = useState<IngestMethod>('manual');
   const [feedUrl, setFeedUrl] = useState('');
   const [apiUrl, setApiUrl] = useState('');
+  const [youtubeChannelId, setYoutubeChannelId] = useState('');
+  const [channelInput, setChannelInput] = useState('');
+  const [channel, setChannel] = useState<YouTubeChannel | null>(null);
+  const [channelError, setChannelError] = useState<string | null>(null);
+  const [findingChannel, setFindingChannel] = useState(false);
+
+  /* The id is what is stored; the handle an editor pastes can change. */
+  const findChannel = async () => {
+    setFindingChannel(true);
+    setChannelError(null);
+    try {
+      const found = await api.resolveYouTube(channelInput.trim());
+      setChannel(found);
+      setYoutubeChannelId(found.channelId);
+    } catch (e) {
+      setChannelError(e instanceof ApiError ? e.message : 'Could not look the channel up.');
+    } finally {
+      setFindingChannel(false);
+    }
+  };
+
   const [pollIntervalMin, setPollIntervalMin] = useState(15);
   const detect = useAsyncAction('Could not check this publisher.');
   const [detection, setDetection] = useState<WordPressDetection | null>(null);
@@ -94,6 +117,10 @@ export function SourceDetail({ slug }: { slug: string }) {
     setFeedUrl(data.ingest.feedUrl ?? '');
     setApiUrl(data.ingest.apiUrl ?? '');
     setDetection(null);
+    setYoutubeChannelId(data.ingest.youtubeChannelId ?? '');
+    setChannelInput(data.ingest.youtubeChannelId ?? '');
+    setChannel(null);
+    setChannelError(null);
     setPollIntervalMin(data.ingest.pollIntervalMin);
     setStatus(data.licence.status);
     setAgreementRef(data.licence.agreementRef ?? '');
@@ -159,7 +186,9 @@ export function SourceDetail({ slug }: { slug: string }) {
   const needsContact = contactMissing || contactMalformed;
   const needsNote = wouldWithdraw && note.trim().length < 10;
   const feedMissing =
-    (method === 'rss' && feedUrl.trim() === '') || (method === 'api' && apiUrl.trim() === '');
+    (method === 'rss' && feedUrl.trim() === '') ||
+    (method === 'api' && apiUrl.trim() === '') ||
+    (method === 'youtube' && youtubeChannelId === '');
 
   const runDetect = () =>
     void detect
@@ -191,6 +220,7 @@ export function SourceDetail({ slug }: { slug: string }) {
             feedUrl: feedUrl.trim() === '' ? null : feedUrl.trim(),
             api: method === 'api' ? 'wordpress' : null,
             apiUrl: apiUrl.trim() === '' ? null : apiUrl.trim(),
+            youtubeChannelId: youtubeChannelId === '' ? null : youtubeChannelId,
             pollIntervalMin,
           },
         }),
@@ -611,7 +641,7 @@ export function SourceDetail({ slug }: { slug: string }) {
 
       <Panel title="Ingestion">
         <div className="grid">
-          <div className="col-6">
+          <div className="col-12">
             <Fieldset legend="Method">
               {(g) => (
                 <Segmented
@@ -623,6 +653,7 @@ export function SourceDetail({ slug }: { slug: string }) {
                     { value: 'manual', label: 'Manual' },
                     { value: 'rss', label: 'RSS' },
                     { value: 'api', label: 'WordPress API' },
+                    { value: 'youtube', label: 'YouTube channel' },
                   ]}
                 />
               )}
@@ -650,6 +681,48 @@ export function SourceDetail({ slug }: { slug: string }) {
                   />
                 )}
               </Field>
+            </div>
+          )}
+
+          {method === 'youtube' && (
+            <div className="col-12">
+              <Field
+                label="YouTube channel"
+                invalid={feedMissing}
+                note={
+                  channel !== null
+                    ? `Found: ${channel.title} (${channel.channelId}). Saved as the id, which never changes.`
+                    : youtubeChannelId !== ''
+                      ? `Saved as ${youtubeChannelId}.`
+                      : 'Paste @handle, the channel’s youtube.com address, or its UC… id, then Find.'
+                }
+                noteTone={feedMissing && channel === null ? 'bad' : 'default'}
+              >
+                {(f) => (
+                  <input
+                    {...f}
+                    className="input"
+                    placeholder="@nepaltimesnews"
+                    value={channelInput}
+                    onChange={(e) => {
+                      setChannelInput(e.target.value);
+                      setChannel(null);
+                    }}
+                  />
+                )}
+              </Field>
+              {channelError !== null && <Banner tone="error">{channelError}</Banner>}
+              <div className="actions actions-plain">
+                <Button
+                  size="sm"
+                  icon="search"
+                  busy={findingChannel}
+                  disabled={channelInput.trim().length < 2}
+                  onClick={() => void findChannel()}
+                >
+                  Find channel
+                </Button>
+              </div>
             </div>
           )}
 

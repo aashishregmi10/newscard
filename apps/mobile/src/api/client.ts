@@ -282,6 +282,9 @@ export async function fetchVideos(opts: {
     lang: opts.languages.join(','),
     category: opts.category ?? 'all',
     limit: String(opts.limit ?? 10),
+    /* This app can play a YouTube short (YouTubeShortCard); older ones
+       cannot, and the server sends them none unless asked. */
+    youtube: '1',
   });
   if (opts.cursor) params.set('cursor', opts.cursor);
 

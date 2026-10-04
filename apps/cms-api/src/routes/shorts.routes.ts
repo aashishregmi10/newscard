@@ -54,7 +54,7 @@ const CreateSchema = z.object({
   renditions: z.array(Rendition).min(1),
 });
 
-function slugFor(title: string, language: string): string {
+export function shortSlugFor(title: string, language: string): string {
   const base = title
     .toLowerCase()
     .replace(/[^a-z0-9\s-]/g, '')
@@ -114,6 +114,7 @@ shortRoutes.get(
         caption: v.caption,
         durationSeconds: v.durationSeconds,
         posterUrl: v.posterUrl,
+        origin: (v.origin as string | undefined) ?? 'upload',
         credit: v.credit,
         sourceName: v.sourceName,
         categorySlug: v.categorySlug,
@@ -165,7 +166,7 @@ shortRoutes.post(
       .collection('videos')
       .insertOne({
         _id,
-        slug: slugFor(d.title, d.language),
+        slug: shortSlugFor(d.title, d.language),
         status: 'draft',
         language: d.language,
         categoryId: category._id,
@@ -228,6 +229,11 @@ shortRoutes.get(
         posterUrl: v.posterUrl,
         posterBlurHash: v.posterBlurHash ?? null,
         renditions: v.renditions,
+        origin: (v.origin as string | undefined) ?? 'upload',
+        youtubeId: (v.youtubeId as string | undefined) ?? null,
+        sourceUrl: (v.sourceUrl as string | undefined) ?? null,
+        /* Why the caption is empty, for a short promoted from YouTube. */
+        captionNote: (v.captionNote as string | undefined) ?? null,
         sourceName: v.sourceName,
         categorySlug: v.categorySlug,
         publishedAt: iso(v.publishedAt),
@@ -308,6 +314,12 @@ shortRoutes.post(
         'This short was withdrawn. A withdrawal is final, so it is no longer edited.',
       );
     }
+    if (d.clip !== undefined && v.origin === 'youtube') {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        'This short plays from YouTube, so its video cannot be replaced. Dismiss it and upload your own instead.',
+      );
+    }
 
     const live = v.status === 'published';
     const reason = (d.reason ?? '').trim();
@@ -333,6 +345,8 @@ shortRoutes.post(
       categoryId: category._id,
       categorySlug: category.slug,
       categoryLabel: category.label,
+      /* A caption now exists, so the note about why it was empty is done. */
+      captionNote: null,
       updatedAt: now,
     };
     if (d.clip !== undefined) {
@@ -412,6 +426,11 @@ shortRoutes.post(
     if (!v) throw new AppError('NOT_FOUND');
     if (v.status !== 'draft') {
       throw new AppError('INVALID_TRANSITION', `A ${v.status} short cannot be published.`);
+    }
+    /* An uploaded short cannot be saved without these; one promoted from
+       YouTube can, when no caption could be drafted. */
+    if (String(v.title ?? '').trim() === '' || String(v.caption ?? '').trim() === '') {
+      throw new AppError('VALIDATION_FAILED', 'Write a title and a caption before publishing this short.');
     }
 
     const source = await c.sources.findOne({ _id: v.sourceId as ObjectId });

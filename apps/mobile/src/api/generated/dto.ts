@@ -109,6 +109,7 @@ export interface VideoCardDto {
   posterUrl: string;
   posterBlurHash: string | null;
   renditions: VideoRendition[];
+  youtubeId: string | null;
   credit: string;
   source: {
     name: string;

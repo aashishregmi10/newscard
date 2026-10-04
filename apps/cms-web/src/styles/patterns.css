@@ -797,6 +797,43 @@
   margin-bottom: var(--s4);
 }
 
+/* A YouTube Short at its own 9:16 shape, beside the triage form. */
+.yt-preview {
+  display: block;
+  width: 180px;
+  flex: none;
+  aspect-ratio: 9 / 16;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: #000;
+}
+
+.yt-preview iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
+}
+
+.short-lead-actions {
+  display: flex;
+  gap: var(--s4);
+  align-items: flex-start;
+}
+
+.short-lead-form {
+  display: grid;
+  gap: var(--s3);
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .short-lead-actions {
+    flex-direction: column;
+  }
+}
+
 /* The summariser's draft, under the summary box. A suggestion reads as a
    quieter card than the box itself, so it is never mistaken for what will be
    published. */

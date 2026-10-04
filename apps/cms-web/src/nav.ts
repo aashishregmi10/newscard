@@ -73,6 +73,14 @@ export const LEAD_TABS = ['new', 'promoted', 'dismissed'] as const;
 export type LeadTab = (typeof LEAD_TABS)[number];
 
 /**
+ * The Shorts screen's tabs: the library of shorts we have made, and the
+ * Shorts collected from YouTube channels — waiting, promoted, dismissed —
+ * which are article Incoming's three tabs for video.
+ */
+export const SHORTS_TABS = ['library', 'incoming', 'promoted', 'dismissed'] as const;
+export type ShortsTab = (typeof SHORTS_TABS)[number];
+
+/**
  * Ten, and not a setting.
  *
  * Every other list lets the reader pick a page size. A lead row is a
@@ -166,7 +174,7 @@ export type Route =
   | { name: 'queue'; page: number; perPage: PerPage; q: string }
   | { name: 'new' }
   | { name: 'article'; id: string; tab: ArticleTab }
-  | { name: 'shorts'; page: number }
+  | { name: 'shorts'; tab: ShortsTab; page: number }
   | { name: 'shortEdit'; id: string }
   | { name: 'ads'; tab: AdTab; page: number }
   | { name: 'adNew' }
@@ -211,8 +219,9 @@ export const Routes = {
   }),
   new: (): Route => ({ name: 'new' }),
   article: (id: string, tab: ArticleTab = 'source'): Route => ({ name: 'article', id, tab }),
-  shorts: (params: { page?: number } = {}): Route => ({
+  shorts: (params: { tab?: ShortsTab; page?: number } = {}): Route => ({
     name: 'shorts',
+    tab: params.tab ?? 'library',
     page: params.page ?? 1,
   }),
   shortNew: (): Route => ({ name: 'shortNew' }),
@@ -287,7 +296,7 @@ export function parseRoute(hash: string): Route {
   }
 
   if (section === 'shorts') {
-    return Routes.shorts({ page: readPage(query) });
+    return Routes.shorts({ tab: readShortsTab(query), page: readPage(query) });
   }
 
   if (section === 'shorts/new') return Routes.shortNew();
@@ -423,6 +432,7 @@ export function routeToHash(route: Route): string {
       });
     case 'shorts':
       return withQuery('#/shorts', {
+        tab: route.tab === 'library' ? null : route.tab,
         page: route.page === 1 ? null : String(route.page),
       });
     case 'shortNew':
@@ -531,7 +541,7 @@ export function screenKeyOf(route: Route): string {
     case 'article':
       return `article:${route.id}`;
     case 'shorts':
-      return 'shorts';
+      return `shorts:${route.tab}`;
     case 'shortNew':
       return 'shortNew';
     case 'shortEdit':
@@ -651,6 +661,11 @@ function readAdTab(query: URLSearchParams): AdTab {
 function readPublishedTab(query: URLSearchParams): PublishedTab {
   const raw = (query.get('tab') ?? '').toLowerCase();
   return PUBLISHED_TABS.find((tab) => tab === raw) ?? 'published';
+}
+
+function readShortsTab(query: URLSearchParams): ShortsTab {
+  const raw = (query.get('tab') ?? '').toLowerCase();
+  return SHORTS_TABS.find((tab) => tab === raw) ?? 'library';
 }
 
 function readLeadTab(query: URLSearchParams): LeadTab {

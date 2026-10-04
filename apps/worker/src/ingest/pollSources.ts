@@ -5,6 +5,7 @@ import type { FeedItem } from '@saar/shared';
 import { fetchFeed, FeedFetchError } from './fetchFeed.js';
 import { fetchWordPressPosts } from './wordpress.js';
 import { readArticlePage, MAX_ARTICLE_CHARS } from './enrich.js';
+import { pollYouTubeSource, type YouTubePollReport } from './youtube.js';
 import { toLead, type RejectReason, type SourceContext } from './toLead.js';
 
 /**
@@ -56,7 +57,17 @@ export interface PollReport {
  * "Due" means pollable, not paused, and `pollIntervalMin` has elapsed since the
  * last attempt — so a run every minute does not mean a request every minute.
  */
-export async function pollDueSources(now: Date = new Date()): Promise<PollReport[]> {
+/** Logged once per process, not once a minute. */
+let warnedNoYouTubeKey = false;
+
+/** YouTube channels read on the last run, for callers that want them. */
+export let lastYouTubeReports: YouTubePollReport[] = [];
+
+export async function pollDueSources(
+  now: Date = new Date(),
+  options: { youtubeKey?: string; fetchImpl?: typeof fetch } = {},
+): Promise<PollReport[]> {
+  const youtubeKey = (options.youtubeKey ?? process.env.YOUTUBE_API_KEY ?? '').trim();
   const c = collections(getDb());
 
   /* Served by `ingestable_sources`. The predicate is applied again in memory
@@ -79,9 +90,35 @@ export async function pollDueSources(now: Date = new Date()): Promise<PollReport
    * and firing fourteen simultaneous requests from one address is how a
    * collector gets itself rate-limited by a CDN it shares with other readers.
    */
+  lastYouTubeReports = [];
   for (const source of due) {
-    /* YouTube channels feed Shorts, through their own collector. */
-    if ((source.ingest?.method as string) === 'youtube') continue;
+    /*
+     * YouTube channels feed Shorts, through their own collector. Without a
+     * key they are skipped rather than failed: a missing setting is not the
+     * channel's fault, and counting it would pause every channel in five
+     * minutes.
+     */
+    if ((source.ingest?.method as string) === 'youtube') {
+      if (youtubeKey === '') {
+        if (!warnedNoYouTubeKey) {
+          warnedNoYouTubeKey = true;
+          log.warn('YouTube channels are not being read', {
+            fix: 'set YOUTUBE_API_KEY in .env (free: Google Cloud, YouTube Data API v3)',
+          });
+        }
+        continue;
+      }
+      lastYouTubeReports.push(
+        await pollYouTubeSource(
+          source as never,
+          youtubeKey,
+          now,
+          options.fetchImpl ? { fetchImpl: options.fetchImpl } : {},
+          AUTO_PAUSE_AFTER_FAILURES,
+        ),
+      );
+      continue;
+    }
     reports.push(await pollOne(source as never, now));
   }
   return reports;

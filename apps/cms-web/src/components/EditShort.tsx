@@ -16,6 +16,7 @@ import { mediaUrl } from '../lib/media';
 import { shortStatus } from '../lib/status';
 import { Routes } from '../nav';
 import { navigate } from '../useRoute';
+import { YouTubePreview } from './YouTubePreview';
 import {
   Badge,
   Banner,
@@ -288,7 +289,38 @@ export function EditShort({ id }: { id: string }) {
   const shownRenditions = clip?.renditions ?? short.renditions;
   const shownDuration = clip?.durationSeconds ?? short.durationSeconds;
 
-  const clipPanel = (
+  /*
+   * A Short promoted from YouTube plays from YouTube, here as in the app. It
+   * has no renditions to list and no file to replace: a different clip is a
+   * different short.
+   */
+  const youtubePanel = short.origin === 'youtube' && short.youtubeId !== null && (
+    <Panel title="The Short, on YouTube">
+      <div className="clip-summary">
+        <YouTubePreview videoId={short.youtubeId} title={short.title} />
+        <div>
+          <p className="meta-line">
+            <span>{short.durationSeconds}s</span>
+            <span>Played with YouTube’s player</span>
+          </p>
+          {short.sourceUrl !== null && (
+            <p className="field-note">
+              <a href={short.sourceUrl} target="_blank" rel="noreferrer noopener">
+                Open on YouTube
+              </a>
+            </p>
+          )}
+        </div>
+      </div>
+
+      <dl className="edit-record">
+        <dt>Publisher</dt>
+        <dd>{short.sourceName}</dd>
+      </dl>
+    </Panel>
+  );
+
+  const clipPanel = youtubePanel || (
     <Panel title={clip === null ? 'The clip' : 'The new clip'}>
       <div className="clip-summary">
         {/*
@@ -510,6 +542,16 @@ export function EditShort({ id }: { id: string }) {
                   )}
                 </Field>
               </div>
+
+              {/* Why the caption is empty, for a short promoted from YouTube —
+                  gone once one is written and saved. */}
+              {short.captionNote !== null && caption.trim() === '' && !readOnly && (
+                <div className="col-12">
+                  <Banner tone="info" live={false}>
+                    <strong>Write the caption.</strong> {short.captionNote}
+                  </Banner>
+                </div>
+              )}
 
               <div className="col-12">
                 <Field

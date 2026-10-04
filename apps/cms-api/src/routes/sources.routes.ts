@@ -14,7 +14,7 @@ import {
 import { requireAuth } from '../auth/requireAuth.js';
 import { asyncRoute } from '../middleware/index.js';
 import { setSourceLicence } from '../services/sources.service.js';
-import { detectWordPressApi } from '@saar/worker';
+import { detectWordPressApi, resolveChannel, YouTubeApiError } from '@saar/worker';
 import { writeAudit } from '../audit/writeAudit.js';
 
 /**
@@ -586,5 +586,34 @@ sourceRoutes.post(
     const doc = (await c.sources.findOne({ slug })) as unknown as SourceDoc | null;
     if (!doc) throw new AppError('NOT_FOUND', 'No such publisher.');
     res.json(await detectWordPressApi(doc.homepageUrl));
+  }),
+);
+
+/**
+ * POST /cms/sources/resolve-youtube — which channel does this name?
+ *
+ * Takes what an editor pastes (@handle, a channel link, or the UC… id) and
+ * answers with the channel's id and title, so the publisher is saved against
+ * the id — which never changes — and the editor can see it is the right one
+ * before saving. One quota unit of the free daily ten thousand.
+ */
+sourceRoutes.post(
+  '/cms/sources/resolve-youtube',
+  asyncRoute(async (req, res) => {
+    const parsed = z.object({ input: z.string().trim().min(2).max(300) }).safeParse(req.body);
+    if (!parsed.success) throw new AppError('BAD_REQUEST', 'Paste the channel to look up.');
+    const key = (process.env.YOUTUBE_API_KEY ?? '').trim();
+    if (key === '') {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        'YouTube is not set up: add YOUTUBE_API_KEY to .env (free from Google Cloud, with the YouTube Data API v3 enabled) and restart.',
+      );
+    }
+    try {
+      res.json(await resolveChannel(parsed.data.input, key));
+    } catch (e) {
+      if (e instanceof YouTubeApiError) throw new AppError('VALIDATION_FAILED', e.message);
+      throw e;
+    }
   }),
 );

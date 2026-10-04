@@ -43,6 +43,23 @@ export const VideoRendition = z.object({
 export type VideoRendition = z.infer<typeof VideoRendition>;
 
 export const VideoStatusEnum = z.enum(['draft', 'published', 'retracted']);
+
+/**
+ * Where a short's video lives.
+ *
+ *   upload   a file an editor uploaded, transcoded into our three renditions
+ *            and served by us — with its size known, so the app can say what
+ *            tapping play will cost
+ *   youtube  a Short on a licensed publisher's YouTube channel, played in the
+ *            app with YouTube's own player. Never downloaded: YouTube's terms
+ *            forbid that without YouTube's written permission, whatever the
+ *            channel agrees. It has no renditions; `youtubeId` is the video.
+ */
+export const VideoOriginEnum = z.enum(['upload', 'youtube']);
+export type VideoOrigin = z.infer<typeof VideoOriginEnum>;
+
+/** A YouTube video id: eleven characters of A–Z, a–z, 0–9, - and _. */
+export const YouTubeVideoId = z.string().regex(/^[A-Za-z0-9_-]{11}$/);
 export type VideoStatus = z.infer<typeof VideoStatusEnum>;
 
 export const Video = z.object({
@@ -88,7 +105,13 @@ export const Video = z.object({
   posterUrl: z.string().min(1),
   posterBlurHash: z.string().min(6).nullable().optional(),
 
-  renditions: z.array(VideoRendition).min(1),
+  /** Absent on shorts saved before YouTube existed here, which were uploads. */
+  origin: VideoOriginEnum.default('upload'),
+  /** The YouTube video, when `origin` is `youtube`. */
+  youtubeId: YouTubeVideoId.nullable().optional(),
+
+  /** At least one for an upload; none for a YouTube short, which YouTube serves. */
+  renditions: z.array(VideoRendition),
 
   /** Same licensing discipline as a photograph. Publication is blocked without
    *  a recognised licence and a credit. */
@@ -121,7 +144,14 @@ export const VideoCardDto = z.object({
   durationSeconds: z.number(),
   posterUrl: z.string(),
   posterBlurHash: z.string().nullable(),
+  /** Empty for a YouTube short. */
   renditions: z.array(VideoRendition),
+  /**
+   * The YouTube video to play with YouTube's player, or null for an uploaded
+   * short. Only sent to an app that says it can play one (`youtube=1`): an
+   * older app would find no renditions and nothing to play.
+   */
+  youtubeId: z.string().nullable(),
   credit: z.string(),
   source: z.object({ name: z.string() }),
   category: z.object({ slug: z.string(), label: LocalisedText }),

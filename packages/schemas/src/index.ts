@@ -11,4 +11,5 @@ export * from './readEvent.js';
 export * from './config.js';
 export * from './ad.js';
 export * from './video.js';
+export * from './shortLead.js';
 export * from './mongoValidator.js';

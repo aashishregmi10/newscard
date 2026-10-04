@@ -39,6 +39,17 @@ export { politeGet, bodyText, USER_AGENT } from './ingest/politeGet.js';
 export type { PoliteGetOptions, PoliteGetResult } from './ingest/politeGet.js';
 export { fetchWordPressPosts, postsToItems, detectWordPressApi } from './ingest/wordpress.js';
 export { readArticlePage, readArticleHtml, MAX_ARTICLE_CHARS } from './ingest/enrich.js';
+export {
+  resolveChannel,
+  channelQuery,
+  parseIsoDuration,
+  screenVideo,
+  isVertical,
+  pollYouTubeSource,
+  YouTubeApiError,
+  MAX_SHORT_AGE_DAYS,
+} from './ingest/youtube.js';
+export type { ChannelInfo, YouTubeVideo, YouTubePollReport } from './ingest/youtube.js';
 export type { PageReading } from './ingest/enrich.js';
 export { toLead, detectLanguage, fingerprintOf, MAX_LEAD_AGE_DAYS } from './ingest/toLead.js';
 export type { LeadCandidate, SourceContext, RejectReason, ToLeadResult } from './ingest/toLead.js';

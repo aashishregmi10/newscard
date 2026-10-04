@@ -133,6 +133,8 @@ export interface ShortItem {
   caption: string;
   durationSeconds: number;
   posterUrl: string;
+  /** `youtube`: plays from a licensed publisher's YouTube channel. */
+  origin: 'upload' | 'youtube';
   credit: string;
   sourceName: string;
   categorySlug: string;
@@ -271,6 +273,12 @@ export interface ShortDetail {
   posterUrl: string;
   posterBlurHash: string | null;
   renditions: UploadedVideo['renditions'];
+  origin: 'upload' | 'youtube';
+  /** The YouTube video, for a short promoted from a channel. */
+  youtubeId: string | null;
+  sourceUrl: string | null;
+  /** Why the caption is empty, for a short promoted from YouTube. */
+  captionNote: string | null;
   sourceName: string;
   categorySlug: string;
   publishedAt: string | null;
@@ -416,6 +424,31 @@ export interface PublishedRow {
   lastEditedAt: string | null;
   lastEditReason: string | null;
   hasImage: boolean;
+}
+
+/** A Short found on a licensed publisher's YouTube channel. */
+export interface ShortLeadRow {
+  id: string;
+  sourceSlug: string;
+  sourceName: string;
+  videoId: string;
+  channelTitle: string;
+  title: string;
+  description: string;
+  thumbnailUrl: string;
+  durationSeconds: number;
+  language: 'ne' | 'en';
+  publishedAt: string | null;
+  fetchedAt: string;
+  status: 'new' | 'promoted' | 'dismissed';
+  promotedVideoId: string | null;
+  dismissedReason: string | null;
+}
+
+export interface YouTubeChannel {
+  channelId: string;
+  title: string;
+  thumbnailUrl: string | null;
 }
 
 export interface LeadCounts {
@@ -876,6 +909,33 @@ export const api = {
     req<{ status: string }>(`/cms/leads/${encodeURIComponent(id)}/dismiss`, {
       method: 'POST',
       body: JSON.stringify({ reason }),
+    }),
+
+  /** Shorts found on YouTube channels. Paged on the server, like leads. */
+  shortLeads: (status: string, page: number, perPage: number, signal?: AbortSignal) =>
+    req<{ items: ShortLeadRow[]; total: number; counts: LeadCounts }>(
+      `/cms/short-leads?status=${encodeURIComponent(status)}&page=${page}&perPage=${perPage}`,
+      { signal },
+    ),
+
+  /** Returns the id of the short draft it created. */
+  promoteShortLead: (id: string, categorySlug: string) =>
+    req<{ id: string }>(`/cms/short-leads/${encodeURIComponent(id)}/promote`, {
+      method: 'POST',
+      body: JSON.stringify({ categorySlug }),
+    }),
+
+  dismissShortLead: (id: string, reason: string) =>
+    req<{ ok: true }>(`/cms/short-leads/${encodeURIComponent(id)}/dismiss`, {
+      method: 'POST',
+      body: JSON.stringify({ reason }),
+    }),
+
+  /** Which channel an @handle, link or UC… id names. Needs YOUTUBE_API_KEY. */
+  resolveYouTube: (input: string) =>
+    req<YouTubeChannel>('/cms/sources/resolve-youtube', {
+      method: 'POST',
+      body: JSON.stringify({ input }),
     }),
 
   sources: (signal?: AbortSignal) => req<{ items: SourceRow[] }>('/cms/sources', { signal }),

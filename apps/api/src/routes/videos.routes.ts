@@ -33,6 +33,17 @@ const QuerySchema = z.object({
   category: z.string().default('all'),
   cursor: z.string().optional(),
   limit: z.coerce.number().int().positive().max(20).default(10),
+  /**
+   * Whether the app can play a YouTube short, with YouTube's player.
+   *
+   * Apps built before YouTube shorts existed play only our own renditions, and
+   * a YouTube short has none — so it is sent only to an app that says `1`.
+   * An older install keeps working and simply does not see them.
+   */
+  youtube: z
+    .enum(['0', '1'])
+    .default('0')
+    .transform((v) => v === '1'),
 });
 
 export const videoRoutes = Router();
@@ -48,12 +59,13 @@ videoRoutes.get(
     }
 
     const env = loadEnv();
-    const { lang, category, cursor, limit } = parsed.data;
+    const { lang, category, cursor, limit, youtube } = parsed.data;
 
     const filter: Record<string, unknown> = {
       status: 'published',
       language: { $in: lang },
       publishedAt: { $ne: null },
+      ...(youtube ? {} : { origin: { $ne: 'youtube' } }),
     };
     // `all` and `top` are virtual: no video is filed against them.
     if (category !== 'all' && category !== 'top') filter.categorySlug = category;
@@ -100,7 +112,8 @@ videoRoutes.get(
         durationSeconds: v.durationSeconds,
         posterUrl: v.posterUrl,
         posterBlurHash: v.posterBlurHash ?? null,
-        renditions: v.renditions,
+        renditions: v.renditions ?? [],
+        youtubeId: v.origin === 'youtube' ? ((v.youtubeId as string | undefined) ?? null) : null,
         credit: v.credit,
         source: { name: v.sourceName },
         category: { slug: v.categorySlug, label: v.categoryLabel },

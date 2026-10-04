@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { api, ApiError, type IngestMethod } from '../api';
+import { api, ApiError, type IngestMethod, type YouTubeChannel } from '../api';
 import { crumbs } from '../lib/crumbs';
 import { suggestSlug } from '../lib/sources';
 import { Routes } from '../nav';
@@ -48,6 +48,27 @@ export function NewSource() {
   const [method, setMethod] = useState<IngestMethod>('manual');
   const [feedUrl, setFeedUrl] = useState('');
   const [apiUrl, setApiUrl] = useState('');
+  const [youtubeChannelId, setYoutubeChannelId] = useState('');
+  const [channelInput, setChannelInput] = useState('');
+  const [channel, setChannel] = useState<YouTubeChannel | null>(null);
+  const [channelError, setChannelError] = useState<string | null>(null);
+  const [findingChannel, setFindingChannel] = useState(false);
+
+  /* The id is what is stored; the handle an editor pastes can change. */
+  const findChannel = async () => {
+    setFindingChannel(true);
+    setChannelError(null);
+    try {
+      const found = await api.resolveYouTube(channelInput.trim());
+      setChannel(found);
+      setYoutubeChannelId(found.channelId);
+    } catch (e) {
+      setChannelError(e instanceof ApiError ? e.message : 'Could not look the channel up.');
+    } finally {
+      setFindingChannel(false);
+    }
+  };
+
   const [pollIntervalMin, setPollIntervalMin] = useState(15);
   const [priority, setPriority] = useState(50);
   const [busy, setBusy] = useState(false);
@@ -69,7 +90,9 @@ export function NewSource() {
   };
 
   const feedMissing =
-    (method === 'rss' && feedUrl.trim() === '') || (method === 'api' && apiUrl.trim() === '');
+    (method === 'rss' && feedUrl.trim() === '') ||
+    (method === 'api' && apiUrl.trim() === '') ||
+    (method === 'youtube' && youtubeChannelId === '');
   const complete =
     displayName.trim() !== '' && slug.trim() !== '' && homepageUrl.trim() !== '' && !feedMissing;
 
@@ -91,6 +114,7 @@ export function NewSource() {
           feedUrl: feedUrl.trim() === '' ? null : feedUrl.trim(),
           api: method === 'api' ? 'wordpress' : null,
           apiUrl: method === 'api' && apiUrl.trim() !== '' ? apiUrl.trim() : null,
+          youtubeChannelId: method === 'youtube' && youtubeChannelId !== '' ? youtubeChannelId : null,
           pollIntervalMin,
         },
         priority,
@@ -225,7 +249,7 @@ export function NewSource() {
 
             <Panel title="How their stories reach us">
               <div className="grid">
-                <div className="col-6">
+                <div className="col-12">
                   <Fieldset
                     legend="Method"
                     note="The collector reads their feed or API on the interval you set. Not sure which they have? Choose RSS, then use Detect WordPress API on their page."
@@ -240,6 +264,7 @@ export function NewSource() {
                           { value: 'manual', label: 'Manual' },
                           { value: 'rss', label: 'RSS' },
                           { value: 'api', label: 'WordPress API' },
+                          { value: 'youtube', label: 'YouTube channel' },
                         ]}
                       />
                     )}
@@ -264,6 +289,48 @@ export function NewSource() {
                         />
                       )}
                     </Field>
+                  </div>
+                )}
+
+                {method === 'youtube' && (
+                  <div className="col-12">
+                    <Field
+                      label="YouTube channel"
+                      invalid={feedMissing}
+                      note={
+                        channel !== null
+                          ? `Found: ${channel.title} (${channel.channelId}). Saved as the id, which never changes.`
+                          : youtubeChannelId !== ''
+                            ? `Saved as ${youtubeChannelId}.`
+                            : 'Paste @handle, the channel’s youtube.com address, or its UC… id, then Find.'
+                      }
+                      noteTone={feedMissing && channel === null ? 'bad' : 'default'}
+                    >
+                      {(f) => (
+                        <input
+                          {...f}
+                          className="input"
+                          placeholder="@nepaltimesnews"
+                          value={channelInput}
+                          onChange={(e) => {
+                            setChannelInput(e.target.value);
+                            setChannel(null);
+                          }}
+                        />
+                      )}
+                    </Field>
+                    {channelError !== null && <Banner tone="error">{channelError}</Banner>}
+                    <div className="actions actions-plain">
+                      <Button
+                        size="sm"
+                        icon="search"
+                        busy={findingChannel}
+                        disabled={channelInput.trim().length < 2}
+                        onClick={() => void findChannel()}
+                      >
+                        Find channel
+                      </Button>
+                    </div>
                   </div>
                 )}
 

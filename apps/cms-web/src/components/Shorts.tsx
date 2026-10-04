@@ -8,7 +8,7 @@ import { mediaUrl } from '../lib/media';
 import { pageCountOf } from '../lib/pagination';
 
 import { shortStatus } from '../lib/status';
-import { Routes, SHORTS_PER_PAGE } from '../nav';
+import { Routes, SHORTS_PER_PAGE, type ShortsTab } from '../nav';
 import { navigate } from '../useRoute';
 import {
   Badge,
@@ -19,7 +19,11 @@ import {
   LangTag,
   Pagination,
   Skeleton,
+  TabPanel,
+  Tabs,
+  type TabDef,
 } from '../ui';
+import { ShortLeads } from './ShortLeads';
 
 /**
  * The shorts library.
@@ -46,6 +50,13 @@ import {
  *
  * The pencil is always the last thing on the row, so it lines up down the
  * list whatever else a row happens to carry.
+ *
+ * -- The tabs ---------------------------------------------------------------
+ *
+ * Library is every short we have made, uploaded or promoted. Incoming,
+ * Promoted and Dismissed are the Shorts collected from licensed publishers'
+ * YouTube channels — article Incoming's three states, for video, under the
+ * section a short belongs to rather than in a second rail item.
  */
 
 function ShortsSkeleton() {
@@ -74,7 +85,49 @@ interface Data {
   total: number;
 }
 
-export function Shorts({ page }: { page: number }) {
+export function Shorts({ tab, page }: { tab: ShortsTab; page: number }) {
+  /* Only the waiting count, for the tab's badge. One small request. */
+  const { data: waiting } = useResource<number>(
+    async (signal) => (await api.shortLeads('new', 1, 1, signal)).counts.new,
+    'shortLeads:count',
+    'Could not count the waiting Shorts.',
+  );
+
+  const tabs: ReadonlyArray<TabDef<ShortsTab>> = [
+    { value: 'library', label: 'Library', icon: 'video' },
+    { value: 'incoming', label: 'Incoming', icon: 'inbox', badge: waiting || undefined },
+    { value: 'promoted', label: 'Promoted', icon: 'checkCircle' },
+    { value: 'dismissed', label: 'Dismissed', icon: 'ban' },
+  ];
+
+  return (
+    <div className="page">
+      <h1 className="sr-only">Shorts</h1>
+      <div className="detail-bar">
+        <Breadcrumbs items={crumbs({ label: 'Shorts' })} showBack={false} />
+        <div className="detail-bar-actions">
+          <Button variant="primary" icon="plus" onClick={() => navigate(Routes.shortNew())}>
+            New short
+          </Button>
+        </div>
+      </div>
+
+      <Tabs
+        tabs={tabs}
+        value={tab}
+        onChange={(next) => navigate(Routes.shorts({ tab: next }))}
+        idBase="shorts"
+        aria-label="Shorts library and incoming"
+      />
+
+      <TabPanel value={tab} current={tab} idBase="shorts">
+        {tab === 'library' ? <ShortsLibrary page={page} /> : <ShortLeads tab={tab} page={page} />}
+      </TabPanel>
+    </div>
+  );
+}
+
+function ShortsLibrary({ page }: { page: number }) {
   /* Keyed by page, so moving between pages is a fresh request rather than
      the previous page shown under a new number. */
   const { data, error: loadError, loading, reload } = useResource<Data>(
@@ -107,19 +160,8 @@ export function Shorts({ page }: { page: number }) {
   };
 
   return (
-    <div className="page">
-      <h1 className="sr-only">Shorts</h1>
-      <div className="detail-bar">
-        <Breadcrumbs items={crumbs({ label: 'Shorts' })} showBack={false} />
-        <div className="detail-bar-actions">
-          <p className="page-sub">
-            {data === null ? 'Loading…' : `${total} in the library`}
-          </p>
-          <Button variant="primary" icon="plus" onClick={() => navigate(Routes.shortNew())}>
-            New short
-          </Button>
-        </div>
-      </div>
+    <>
+      <p className="page-sub">{data === null ? 'Loading…' : `${total} in the library`}</p>
 
       {loadError !== null && (
         <>
@@ -189,6 +231,7 @@ export function Shorts({ page }: { page: number }) {
                       {meta.map((part, index) => (
                         <span key={index}>{part}</span>
                       ))}
+                      {short.origin === 'youtube' && <span>From YouTube</span>}
                       {short.lastEditedAt !== null && (
                         <span
                           className="item-edited"
@@ -260,6 +303,6 @@ export function Shorts({ page }: { page: number }) {
           />
         </>
       )}
-    </div>
+    </>
   );
 }

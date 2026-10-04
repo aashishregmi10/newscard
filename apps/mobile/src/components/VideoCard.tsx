@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, memo } from 'react';
-import { View, Text, Image, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Pressable, StyleSheet, ActivityIndicator } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import {
@@ -9,7 +9,9 @@ import {
   blurHashAverageColor,
   type VideoCard as VideoCardType,
 } from '../api/client';
-import { LINE_HEIGHT, fontFor, type Theme, textSize } from '../theme/tokens';
+import { type Theme } from '../theme/tokens';
+import { PosterImage, ShortText, shortStyles } from './ShortParts';
+import { YouTubeShortCard } from './YouTubeShortCard';
 
 /**
  * One short, full screen.
@@ -32,7 +34,7 @@ import { LINE_HEIGHT, fontFor, type Theme, textSize } from '../theme/tokens';
  * reopened.
  */
 
-interface Props {
+export interface ShortCardProps {
   video: VideoCardType;
   theme: Theme;
   height: number;
@@ -55,7 +57,7 @@ function VideoCardInner({
   active,
   muted,
   onToggleMute,
-}: Props) {
+}: ShortCardProps) {
   const rendition = pickRendition(video.renditions, { unmetered, dataSaver });
   const uri = resolveMediaUrl(rendition?.url) ?? '';
 
@@ -155,10 +157,6 @@ function VideoCardInner({
   }, [allowed]);
 
   const posterColor = blurHashAverageColor(video.posterBlurHash) ?? theme.surfaceRaised;
-  const lh = LINE_HEIGHT[video.language];
-  const fontFamily = fontFor(video.language);
-  const titleSize = textSize(21) * textScale;
-  const capSize = textSize(14.5) * textScale;
 
   return (
     <View style={[styles.card, { height, backgroundColor: '#000' }]}>
@@ -325,98 +323,24 @@ function VideoCardInner({
         </View>
       ) : null}
 
-      <View style={styles.text}>
-        <Text style={styles.meta}>
-          {video.source.name} · {video.durationSeconds}s
-        </Text>
-        <Text
-          style={[styles.title, { fontSize: titleSize, lineHeight: titleSize * 1.28, fontFamily }]}
-          numberOfLines={3}
-        >
-          {video.title}
-        </Text>
-        <Text
-          style={[styles.caption, { fontSize: capSize, lineHeight: capSize * lh, fontFamily }]}
-          numberOfLines={4}
-        >
-          {video.caption}
-        </Text>
-        {/* The credit is required by the licence and is not decoration. */}
-        <Text style={styles.credit} numberOfLines={1}>
-          {video.credit}
-        </Text>
-      </View>
+      <ShortText video={video} textScale={textScale} />
     </View>
   );
 }
 
-/** Split out so the poster keeps its own load state and never re-mounts when
- *  the player above it appears. */
-const PosterImage = memo(function PosterImage({ uri }: { uri: string }) {
-  if (!uri) return null;
-  return <Image source={{ uri }} style={StyleSheet.absoluteFill} resizeMode="cover" />;
-});
+/**
+ * One short, whichever player it needs: a YouTube short plays with YouTube's
+ * player, an uploaded one with ours. Chosen here so the list does not have to
+ * know there are two.
+ */
+function ShortCard(props: ShortCardProps) {
+  return props.video.youtubeId ? <YouTubeShortCard {...props} /> : <VideoCardInner {...props} />;
+}
 
-export const VideoCard = memo(VideoCardInner);
+export const VideoCard = memo(ShortCard);
 
 const styles = StyleSheet.create({
-  card: { justifyContent: 'flex-end', overflow: 'hidden' },
-  centre: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-
-  playBig: {
-    width: 74,
-    height: 74,
-    borderRadius: 37,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.35)',
-  },
-  playCost: {
-    color: '#fff',
-    fontSize: textSize(12.5),
-    marginTop: 12,
-    opacity: 0.9,
-    letterSpacing: 0.3,
-  },
-
-  mute: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-
-  pausedBadge: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.45)',
-  },
-
-  scrim: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: '52%',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
+  ...shortStyles,
 
   // 28pt of touch around a 3pt line. The target is the point; the line is only
   // what the reader sees.
@@ -442,16 +366,4 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     backgroundColor: '#fff',
   },
-
-  text: { paddingHorizontal: 20, paddingBottom: 26 },
-  meta: {
-    color: 'rgba(255,255,255,0.78)',
-    fontSize: textSize(11.5),
-    letterSpacing: 0.5,
-    textTransform: 'uppercase',
-    marginBottom: 8,
-  },
-  title: { color: '#fff', fontWeight: '700', marginBottom: 8 },
-  caption: { color: 'rgba(255,255,255,0.9)' },
-  credit: { color: 'rgba(255,255,255,0.55)', fontSize: textSize(10.5), marginTop: 10 },
 });

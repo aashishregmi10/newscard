@@ -271,6 +271,35 @@ const VIDEOS: IndexSpec[] = [
     serves: 'GET /v1/videos?category=<slug>',
   },
   { key: { slug: 1 }, name: 'video_slug_unique', unique: true, serves: 'Deep-link resolution' },
+  {
+    /* One short per YouTube video. Partial, because an uploaded short has no
+       youtubeId and a unique index over missing values would allow only one. */
+    key: { youtubeId: 1 },
+    name: 'video_youtube_unique',
+    unique: true,
+    partialFilterExpression: { youtubeId: { $type: 'string' } },
+    serves: 'Promoting the same YouTube Short twice',
+  },
+];
+
+const SHORT_LEADS: IndexSpec[] = [
+  {
+    key: { videoId: 1 },
+    name: 'short_lead_video_unique',
+    unique: true,
+    serves: 'Collector dedup — a Short is offered once, however often the channel is read',
+  },
+  {
+    key: { status: 1, fetchedAt: -1 },
+    name: 'short_lead_triage',
+    serves: 'GET /cms/short-leads — the Incoming tab on Shorts',
+  },
+  {
+    key: { purgeAt: 1 },
+    name: 'short_lead_expiry',
+    expireAfterSeconds: 0,
+    serves: 'A Short nobody acted on expires, like a lead',
+  },
 ];
 
 export const ALL_INDEXES = {
@@ -288,6 +317,7 @@ export const ALL_INDEXES = {
   adEvents: AD_EVENTS,
   clientErrors: CLIENT_ERRORS,
   videos: VIDEOS,
+  shortLeads: SHORT_LEADS,
 } as const;
 
 export interface SyncResult {
