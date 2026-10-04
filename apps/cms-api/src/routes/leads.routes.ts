@@ -7,6 +7,8 @@ import { requireAuth } from '../auth/requireAuth.js';
 import { asyncRoute } from '../middleware/index.js';
 import { writeAudit } from '../audit/writeAudit.js';
 import { draftSlug } from './articles.routes.js';
+import { importPublisherPhoto } from '../services/leadImport.service.js';
+import { requestSummaryDraft } from '../services/summaryDraft.service.js';
 
 /**
  * The triage queue.  Plan §2a.
@@ -212,6 +214,25 @@ leadRoutes.post(
       );
     }
 
+    /*
+     * Their photo, when their licence covers photos and the lead has one.
+     *
+     * Fetched before the draft exists so the composer opens with the picture
+     * already in place. Bounded at ten seconds; a failure costs only the
+     * photo, and the reason goes on the draft so nobody has to guess.
+     */
+    const feedImageUrl = (lead as { feedImageUrl?: string | null }).feedImageUrl ?? null;
+    let image: Awaited<ReturnType<typeof importPublisherPhoto>> | null = null;
+    let photoNote: string | null = null;
+    if (feedImageUrl !== null) {
+      if (source.licence?.images === true) {
+        image = await importPublisherPhoto(feedImageUrl, source.displayName);
+        if (!image.ok) photoNote = image.reason;
+      } else {
+        photoNote = `${source.displayName}'s licence does not cover their photos, so theirs was not copied. Add one of your own, or turn on "Their photos" on the publisher's page if their agreement allows it.`;
+      }
+    }
+
     const now = new Date();
     const _id = new ObjectId();
 
@@ -244,7 +265,8 @@ leadRoutes.post(
       tags: [],
       clusterId: null,
       originatingAgency: null,
-      image: null,
+      image: image?.ok ? image.image : null,
+      photoNote,
       sourceName: source.displayName,
       sourceLogoUrl: source.logoUrl ?? null,
       categorySlug: category.slug,
@@ -274,6 +296,11 @@ leadRoutes.post(
       { $set: { status: 'promoted', promotedArticleId: _id, updatedAt: now } },
     );
 
+    /* After the link above, because the draft is written from the lead it
+       finds through it. Recorded now, written in the background: promote
+       returns at once and the composer shows the draft arriving. */
+    await requestSummaryDraft(_id);
+
     await writeAudit({
       action: 'lead.promote',
       entityType: 'lead',
@@ -281,7 +308,12 @@ leadRoutes.post(
       actorId: req.staff!.staffId,
       actorEmail: req.staff!.email,
       before: { status: 'new' },
-      after: { status: 'promoted', articleId: _id.toString(), categorySlug: category.slug },
+      after: {
+        status: 'promoted',
+        articleId: _id.toString(),
+        categorySlug: category.slug,
+        photo: image?.ok ? 'copied' : photoNote === null ? 'none' : 'not copied',
+      },
       ip: req.ip ?? null,
     });
 

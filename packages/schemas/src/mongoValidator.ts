@@ -83,13 +83,20 @@ export const sourceValidator: MongoValidator = {
       licence: {
         bsonType: 'object',
         required: ['status'],
-        properties: { status: { enum: ['agreed', 'pending', 'refused', 'unknown'] } },
+        properties: {
+          status: { enum: ['agreed', 'pending', 'refused', 'unknown'] },
+          // Licence terms. Absent on documents written before they existed,
+          // which reads as no.
+          images: { bsonType: 'bool' },
+          fullText: { bsonType: 'bool' },
+        },
       },
       ingest: {
         bsonType: 'object',
         required: ['method', 'pollIntervalMin'],
         properties: {
-          method: { enum: ['rss', 'api', 'manual'] },
+          method: { enum: ['rss', 'api', 'manual', 'youtube'] },
+          api: { enum: ['wordpress', null] },
           // The legal basis on which we read this feed. Absent on documents
           // written before the field existed, which `isPollable` reads as the
           // stricter 'agreement'.

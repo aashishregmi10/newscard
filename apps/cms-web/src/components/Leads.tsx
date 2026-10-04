@@ -33,11 +33,10 @@ import {
  * -- Why the extract and the thumbnail are here ------------------------------
  *
  * They are the publisher's own words and the publisher's own image, and neither
- * is ever shown to a reader — the lead schema is emphatic about it. They exist
- * for exactly this screen, so that judging forty stories does not mean opening
- * forty tabs. The image is referenced on their server and never copied to ours,
- * which is why it is an `<img src>` pointing off-site rather than anything in
- * our media store.
+ * is ever shown to a reader from here. They exist so that judging forty stories
+ * does not mean opening forty tabs. The thumbnail is an `<img src>` pointing at
+ * their server: it is copied into our media store only when a lead is promoted
+ * and the publisher's licence allows their photos (see the lead schema).
  *
  * -- Why promoting asks for a section ----------------------------------------
  *

@@ -32,6 +32,9 @@ export interface SetLicenceInput {
   agreementRef?: string | null;
   agreedAt?: Date | null;
   contactEmail?: string | null;
+  /** Licence terms: may we show their photos, may we use the whole article. */
+  images?: boolean;
+  fullText?: boolean;
   /** Required when the licence LEAVES `agreed`. Not stored — it is the audit line. */
   note?: string | undefined;
   actorId: string;
@@ -44,6 +47,8 @@ export interface SourceLicenceValue {
   agreementRef: string | null;
   agreedAt: Date | null;
   contactEmail: string | null;
+  images: boolean;
+  fullText: boolean;
 }
 
 export interface SetLicenceResult {
@@ -100,6 +105,9 @@ export async function setSourceLicence(input: SetLicenceInput): Promise<SetLicen
           : (before.licence?.agreedAt ?? null),
     contactEmail:
       input.contactEmail !== undefined ? input.contactEmail : (before.licence?.contactEmail ?? null),
+    /* Absent on a publisher recorded before these terms existed: read as no. */
+    images: input.images ?? before.licence?.images === true,
+    fullText: input.fullText ?? before.licence?.fullText === true,
   };
 
   /*
@@ -148,6 +156,8 @@ export async function setSourceLicence(input: SetLicenceInput): Promise<SetLicen
         'licence.agreementRef': next.agreementRef,
         'licence.agreedAt': next.agreedAt,
         'licence.contactEmail': next.contactEmail,
+        'licence.images': next.images,
+        'licence.fullText': next.fullText,
         updatedAt: now,
       },
     },

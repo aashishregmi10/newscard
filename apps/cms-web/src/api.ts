@@ -324,6 +324,23 @@ export interface QueueItem {
   clusterId: string | null;
 }
 
+/**
+ * The summariser's draft. Offered to the editor, never forced on them: it fills
+ * an empty summary box, and is only suggested once they have typed.
+ */
+export interface SummaryDraftData {
+  status: 'pending' | 'ready' | 'failed';
+  text: string | null;
+  /** `gemini`: written by the AI. `key_sentences`: the publisher's own
+   *  sentences, picked out when the AI was unavailable — must be rewritten. */
+  source: 'gemini' | 'key_sentences' | null;
+  model: string | null;
+  /** Why there is no AI draft, in words. */
+  error: string | null;
+  requestedAt: string;
+  finishedAt: string | null;
+}
+
 export interface ArticleDetail {
   id: string;
   status: string;
@@ -341,6 +358,9 @@ export interface ArticleDetail {
   revisionCount: number;
   measured: number;
   image: ArticleImageData | null;
+  /** Why promoting could not bring the publisher's photo, when it tried. */
+  photoNote: string | null;
+  summaryDraft: SummaryDraftData | null;
   publishedAt: string | null;
   retractedAt: string | null;
   retractionReason: string | null;
@@ -473,7 +493,7 @@ export interface Localised {
 }
 
 export type LicenceStatus = 'agreed' | 'pending' | 'refused' | 'unknown';
-export type IngestMethod = 'rss' | 'api' | 'manual';
+export type IngestMethod = 'rss' | 'api' | 'manual' | 'youtube';
 
 export interface SourceLicenceData {
   status: LicenceStatus;
@@ -482,13 +502,21 @@ export interface SourceLicenceData {
   agreedAt: string | null;
   /** Where a takedown demand goes. Required once the status is `agreed`. */
   contactEmail: string | null;
+  /** Licence term: we may show their photographs. */
+  images: boolean;
+  /** Licence term: we may use the whole article to draft a summary. */
+  fullText: boolean;
 }
 
 export interface SourceIngestData {
   method: IngestMethod;
   feedUrl: string | null;
+  /** Which content API, when `method` is `api`. */
+  api: 'wordpress' | null;
+  apiUrl: string | null;
+  youtubeChannelId: string | null;
   pollIntervalMin: number;
-  /** Written by the poller, which does not exist yet — null on every row today. */
+  /** Written by the collector on every attempt and every success. */
   lastPolledAt: string | null;
   lastSuccessAt: string | null;
   consecutiveFailures: number;
@@ -521,9 +549,18 @@ export interface SourceInput {
   homepageUrl: string;
   logoUrl?: string | null;
   language: 'ne' | 'en';
-  ingest: { method: IngestMethod; feedUrl?: string | null; pollIntervalMin: number };
+  ingest: IngestInput & { method: IngestMethod; pollIntervalMin: number };
   priority: number;
   isActive: boolean;
+}
+
+export interface IngestInput {
+  method?: IngestMethod;
+  feedUrl?: string | null;
+  api?: 'wordpress' | null;
+  apiUrl?: string | null;
+  youtubeChannelId?: string | null;
+  pollIntervalMin?: number;
 }
 
 export interface SourcePatch {
@@ -531,11 +568,15 @@ export interface SourcePatch {
   homepageUrl?: string;
   logoUrl?: string | null;
   language?: 'ne' | 'en';
-  ingest?: { method?: IngestMethod; feedUrl?: string | null; pollIntervalMin?: number };
+  ingest?: IngestInput;
   priority?: number;
   isActive?: boolean;
   inlineAds?: boolean;
 }
+
+export type WordPressDetection =
+  | { found: true; apiUrl: string; sample: number }
+  | { found: false; reason: string };
 
 export interface LicenceResult {
   licence: SourceLicenceData;
@@ -866,12 +907,31 @@ export const api = {
       agreementRef?: string | null;
       agreedAt?: string | null;
       contactEmail?: string | null;
+      images?: boolean;
+      fullText?: boolean;
       note?: string;
     },
   ) =>
     req<LicenceResult>(`/cms/sources/${encodeURIComponent(slug)}/licence`, {
       method: 'POST',
       body: JSON.stringify(body),
+    }),
+
+  summaryDraft: (id: string, signal?: AbortSignal) =>
+    req<{ summaryDraft: SummaryDraftData | null }>(`/cms/articles/${id}/summary-draft`, { signal }),
+
+  /** Ask for a fresh draft. Arrives in `summaryDraft`; the summary box is untouched. */
+  regenerateSummary: (id: string) =>
+    req<{ status: 'pending'; requestedAt: string }>(`/cms/articles/${id}/summary-draft`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
+  /** Asks whether the publisher serves the WordPress posts API. Changes nothing. */
+  detectWordPress: (slug: string) =>
+    req<WordPressDetection>(`/cms/sources/${encodeURIComponent(slug)}/detect-wordpress`, {
+      method: 'POST',
+      body: JSON.stringify({}),
     }),
 
   notifyTargets: (signal?: AbortSignal) =>

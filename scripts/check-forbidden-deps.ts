@@ -9,10 +9,14 @@
  *      monetisation (Ch. 1.6), and these libraries are among the largest and
  *      most start-up-expensive in mobile.
  *
- *   2. No LLM or ML runtime. The MVP has no model in the pipeline at all
+ *   2. No LLM or ML runtime. The MVP had no model in the pipeline at all
  *      (Ch. 4.7). The point is not that using one is wrong — it is that having
- *      the SDK present invites someone to switch it on before a human baseline
- *      exists to measure it against.
+ *      the SDK present invites someone to switch it on without deciding to.
+ *
+ *      One has now been decided on, and is listed in ALLOWED below with the
+ *      decision beside it: the summariser drafts summaries for editors with
+ *      Gemini's free tier (4 October 2026). Every other provider stays banned,
+ *      and so does a second route to this one.
  *
  * Run: npm run check:forbidden
  */
@@ -42,7 +46,7 @@ const RULES: readonly Rule[] = [
     specRef: 'Ch. 14.7 — replay can capture anything on screen',
   },
   {
-    pattern: /^(openai|@anthropic-ai\/|@google\/generative-ai|cohere-ai|@mistralai\/|replicate)/i,
+    pattern: /^(openai|@anthropic-ai\/|@google\/generative-ai|@google\/genai|cohere-ai|@mistralai\/|replicate)/i,
     reason: 'LLM provider SDK',
     specRef: 'Ch. 4.7 — no model in the MVP pipeline',
   },
@@ -62,6 +66,20 @@ const RULES: readonly Rule[] = [
     specRef: 'plan §3 — no embeddings before ~15 sources',
   },
 ];
+
+/**
+ * Dependencies a rule would refuse, allowed by a recorded decision.
+ *
+ * Listed by exact name, so the exception covers this package and nothing that
+ * merely resembles it. Removing an entry restores the ban.
+ */
+const ALLOWED: ReadonlyMap<string, string> = new Map([
+  [
+    '@google/genai',
+    'packages/summarise drafts 45–60 word summaries on the Gemini free tier (decided 4 Oct 2026). ' +
+      'Every draft is reviewed by an editor, marked llm_assisted, and publish refuses a summary that copies the original.',
+  ],
+]);
 
 interface DepNode {
   version?: string;
@@ -101,14 +119,18 @@ function main(): void {
   collect(tree, all);
 
   const violations: Array<{ name: string; version: string; rule: Rule }> = [];
+  const allowed: string[] = [];
   for (const [name, version] of all) {
     for (const rule of RULES) {
-      if (rule.pattern.test(name)) violations.push({ name, version, rule });
+      if (!rule.pattern.test(name)) continue;
+      if (ALLOWED.has(name)) allowed.push(`${name}@${version} — ${ALLOWED.get(name)}`);
+      else violations.push({ name, version, rule });
     }
   }
 
   if (violations.length === 0) {
     console.log(`forbidden-dependency check passed (${all.size} packages scanned)`);
+    for (const a of allowed) console.log(`  allowed by decision: ${a}`);
     return;
   }
 

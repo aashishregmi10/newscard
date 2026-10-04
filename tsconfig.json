@@ -17,6 +17,9 @@
       "path": "./packages/media"
     },
     {
+      "path": "./packages/summarise"
+    },
+    {
       "path": "./apps/api"
     },
     {

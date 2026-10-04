@@ -1,7 +1,10 @@
 import { collections, getDb } from '@saar/db';
 import { isPollable } from '@saar/schemas';
 import { createLogger } from '@saar/shared';
+import type { FeedItem } from '@saar/shared';
 import { fetchFeed, FeedFetchError } from './fetchFeed.js';
+import { fetchWordPressPosts } from './wordpress.js';
+import { readArticlePage, MAX_ARTICLE_CHARS } from './enrich.js';
 import { toLead, type RejectReason, type SourceContext } from './toLead.js';
 
 /**
@@ -40,6 +43,8 @@ export interface PollReport {
   inserted: number;
   duplicates: number;
   rejected: Partial<Record<RejectReason, number>>;
+  /** New leads given a photo or the full story from their own page. */
+  enriched: number;
   notModified: boolean;
   error: string | null;
   paused: boolean;
@@ -75,6 +80,8 @@ export async function pollDueSources(now: Date = new Date()): Promise<PollReport
    * collector gets itself rate-limited by a CDN it shares with other readers.
    */
   for (const source of due) {
+    /* YouTube channels feed Shorts, through their own collector. */
+    if ((source.ingest?.method as string) === 'youtube') continue;
     reports.push(await pollOne(source as never, now));
   }
   return reports;
@@ -86,7 +93,11 @@ interface SourceRecord {
   displayName: string;
   language: 'ne' | 'en';
   homepageUrl: string;
+  licence?: { images?: boolean; fullText?: boolean } | null;
   ingest: {
+    method?: string;
+    api?: string | null;
+    apiUrl?: string | null;
     feedUrl?: string | null;
     etag?: string | null;
     lastModified?: string | null;
@@ -102,16 +113,20 @@ async function pollOne(source: SourceRecord, now: Date): Promise<PollReport> {
     inserted: 0,
     duplicates: 0,
     rejected: {},
+    enriched: 0,
     notModified: false,
     error: null,
     paused: false,
   };
 
-  const feedUrl = source.ingest?.feedUrl;
+  const viaWordPress = source.ingest?.method === 'api' && source.ingest.api === 'wordpress';
+  const feedUrl = viaWordPress ? source.ingest?.apiUrl : source.ingest?.feedUrl;
   if (!feedUrl) {
-    report.error = 'No feed URL.';
+    report.error = viaWordPress ? 'No API URL.' : 'No feed URL.';
     return report;
   }
+  const mayUseImages = source.licence?.images === true;
+  const mayUseFullText = source.licence?.fullText === true;
 
   /* Stamped before the attempt, not after. A run that crashes mid-fetch must
      not leave the source looking un-polled and get hammered on the next tick. */
@@ -120,12 +135,43 @@ async function pollOne(source: SourceRecord, now: Date): Promise<PollReport> {
     { $set: { 'ingest.lastPolledAt': now, updatedAt: now } },
   );
 
-  let result;
+  let result: {
+    items: FeedItem[];
+    notModified: boolean;
+    etag: string | null;
+    lastModified: string | null;
+  };
   try {
-    result = await fetchFeed(feedUrl, {
-      etag: source.ingest?.etag ?? null,
-      lastModified: source.ingest?.lastModified ?? null,
-    });
+    if (viaWordPress) {
+      /*
+       * The API hands over the full story and the photograph whatever the
+       * licence says. What we KEEP is decided here: the full text only under
+       * `fullText` (otherwise the excerpt, as their feed would have said), the
+       * photograph only under `images`.
+       */
+      const posts = await fetchWordPressPosts(feedUrl);
+      result = {
+        items: posts.map((p) => ({
+          ...p,
+          content: mayUseFullText ? p.content : null,
+          imageUrl: mayUseImages ? p.imageUrl : null,
+        })),
+        notModified: false,
+        etag: null,
+        lastModified: null,
+      };
+    } else {
+      const feed = await fetchFeed(feedUrl, {
+        etag: source.ingest?.etag ?? null,
+        lastModified: source.ingest?.lastModified ?? null,
+      });
+      result = {
+        items: feed.feed?.items ?? [],
+        notModified: feed.notModified,
+        etag: feed.etag,
+        lastModified: feed.lastModified,
+      };
+    }
   } catch (e) {
     const reason = e instanceof FeedFetchError ? `${e.reason}: ${e.message}` : String(e);
     const failures = (source.ingest?.consecutiveFailures ?? 0) + 1;
@@ -163,8 +209,10 @@ async function pollOne(source: SourceRecord, now: Date): Promise<PollReport> {
     homepageUrl: source.homepageUrl,
   };
 
-  const items = result.feed?.items ?? [];
+  const items = result.items;
   report.fetched = items.length;
+  /** New leads whose photo or full text the story page might supply. */
+  const toEnrich: EnrichJob[] = [];
 
   for (const item of items) {
     const outcome = toLead(item, context, now);
@@ -174,13 +222,29 @@ async function pollOne(source: SourceRecord, now: Date): Promise<PollReport> {
     }
 
     try {
-      await c.leads.insertOne({
+      const inserted = await c.leads.insertOne({
         ...outcome.lead,
         sourceId: source._id as never,
         createdAt: now,
         updatedAt: now,
       } as never);
       report.inserted += 1;
+
+      /* Only an RSS story can be missing what the page has; the WordPress
+         API already gave everything the licence lets us keep. */
+      const needImage = !viaWordPress && mayUseImages && outcome.lead.feedImageUrl === null;
+      const needText =
+        !viaWordPress &&
+        mayUseFullText &&
+        (outcome.lead.feedContent?.length ?? 0) < SHORT_TEXT_CHARS;
+      if (needImage || needText) {
+        toEnrich.push({
+          id: inserted.insertedId,
+          url: outcome.lead.canonicalUrl,
+          needImage,
+          needText,
+        });
+      }
     } catch (e) {
       /*
        * A duplicate is the normal case, not an error: a feed carries the same
@@ -209,13 +273,70 @@ async function pollOne(source: SourceRecord, now: Date): Promise<PollReport> {
     },
   );
 
+  report.enriched = await enrichLeads(source.slug, toEnrich);
+
   log.info('feed polled', {
     source: source.slug,
+    via: viaWordPress ? 'wordpress' : 'rss',
     fetched: report.fetched,
     inserted: report.inserted,
     duplicates: report.duplicates,
+    enriched: report.enriched,
   });
   return report;
+}
+
+/** Below this, a feed's "content" is an excerpt and the page has the story. */
+const SHORT_TEXT_CHARS = 600;
+
+/** Story pages read per poll, at most. The rest wait: a lead is never lost
+ *  for lacking a photo, it is only shown without one. */
+const MAX_ENRICH_PER_POLL = 20;
+
+/** One page a second from any one publisher. */
+const ENRICH_GAP_MS = 1_000;
+
+interface EnrichJob {
+  id: unknown;
+  url: string;
+  needImage: boolean;
+  needText: boolean;
+}
+
+/**
+ * Read the story pages a new batch of leads needs, one at a time.
+ *
+ * Runs after the poll's own writes, so a slow or failing page can delay only
+ * itself. Each lead is updated on its own; a failure leaves it exactly as the
+ * feed made it.
+ */
+async function enrichLeads(sourceSlug: string, queue: EnrichJob[]): Promise<number> {
+  const c = collections(getDb());
+  let enriched = 0;
+  for (const [i, job] of queue.slice(0, MAX_ENRICH_PER_POLL).entries()) {
+    if (i > 0) await new Promise((r) => setTimeout(r, ENRICH_GAP_MS));
+    try {
+      const page = await readArticlePage(job.url);
+      const set: Record<string, unknown> = {};
+      if (job.needImage && page.imageUrl !== null) set.feedImageUrl = page.imageUrl;
+      if (job.needText && page.text !== null) {
+        set.feedContent = page.text.slice(0, MAX_ARTICLE_CHARS);
+      }
+      if (Object.keys(set).length === 0) continue;
+      await c.leads.updateOne(
+        { _id: job.id as never },
+        { $set: { ...set, updatedAt: new Date() } },
+      );
+      enriched += 1;
+    } catch (e) {
+      log.warn('story page unreadable', {
+        source: sourceSlug,
+        url: job.url,
+        reason: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+  return enriched;
 }
 
 /** Runs the collector on a timer. Started alongside the notification sweeps. */

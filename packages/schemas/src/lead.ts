@@ -12,17 +12,21 @@ import { ObjectIdString } from './common.js';
  * story exists, and you have not written about it yet."
  *
  * It is NOT the story. Nothing in this collection is ever rendered to a reader,
- * and two fields in particular — `feedExtract` and `feedImageUrl` — carry the
- * publisher's own words and the publisher's own picture. They exist so an
- * editor can triage forty headlines without opening forty tabs, and for no
- * other reason.
+ * and three fields in particular — `feedExtract`, `feedContent` and
+ * `feedImageUrl` — carry the publisher's own words and the publisher's own
+ * picture. They exist so an editor can triage forty headlines without opening
+ * forty tabs, and so a draft can start from the story rather than a blank box.
  *
  *   - `feedExtract` is what the publisher chose to put in their public feed.
- *     It must never appear in a reader-facing DTO. Our summary is written from
- *     scratch, by a person, after reading the original.
- *   - `feedImageUrl` is a link to THEIR file on THEIR server. It is never
- *     downloaded, never copied into our media store, and never served. An image
- *     we host is an image we are licensing, and we license none of these.
+ *     It must never appear in a reader-facing DTO.
+ *   - `feedContent` is the whole story only where their licence says
+ *     `fullText` (see SourceLicence). It is what the summariser drafts from,
+ *     and the publish gate compares the summary against it so that what
+ *     reaches a reader is our words, not theirs.
+ *   - `feedImageUrl` is a link to THEIR file on THEIR server. It is copied
+ *     into our media store, credited to them, only when an editor promotes the
+ *     lead AND their licence says `images`. Otherwise it is never downloaded
+ *     and never served.
  *
  * The rule the whole product rests on: we summarise in our own words, we
  * attribute, and we link back. A lead is the first half of that and must not
@@ -74,7 +78,8 @@ export const Lead = z.object({
    * Nothing renders this to a reader, and it expires with the lead.
    */
   feedContent: z.string().max(20000).nullable().default(null),
-  /** THEIR image, by URL. Never downloaded, never served. See above. */
+  /** THEIR image, by URL. Copied only on promote, and only under an `images`
+   *  licence. See above. */
   feedImageUrl: z.string().url().nullable(),
 
   language: LanguageEnum,

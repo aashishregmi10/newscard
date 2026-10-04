@@ -47,6 +47,7 @@ export function NewSource() {
   const [language, setLanguage] = useState<'ne' | 'en'>('ne');
   const [method, setMethod] = useState<IngestMethod>('manual');
   const [feedUrl, setFeedUrl] = useState('');
+  const [apiUrl, setApiUrl] = useState('');
   const [pollIntervalMin, setPollIntervalMin] = useState(15);
   const [priority, setPriority] = useState(50);
   const [busy, setBusy] = useState(false);
@@ -67,7 +68,8 @@ export function NewSource() {
     if (!slugEdited) setSlug(suggestSlug(value));
   };
 
-  const feedMissing = method === 'rss' && feedUrl.trim() === '';
+  const feedMissing =
+    (method === 'rss' && feedUrl.trim() === '') || (method === 'api' && apiUrl.trim() === '');
   const complete =
     displayName.trim() !== '' && slug.trim() !== '' && homepageUrl.trim() !== '' && !feedMissing;
 
@@ -87,6 +89,8 @@ export function NewSource() {
         ingest: {
           method,
           feedUrl: feedUrl.trim() === '' ? null : feedUrl.trim(),
+          api: method === 'api' ? 'wordpress' : null,
+          apiUrl: method === 'api' && apiUrl.trim() !== '' ? apiUrl.trim() : null,
           pollIntervalMin,
         },
         priority,
@@ -224,7 +228,7 @@ export function NewSource() {
                 <div className="col-6">
                   <Fieldset
                     legend="Method"
-                    note="Recording a feed prepares for automated ingestion. Nothing polls it yet."
+                    note="The collector reads their feed or API on the interval you set. Not sure which they have? Choose RSS, then use Detect WordPress API on their page."
                   >
                     {(g) => (
                       <Segmented
@@ -235,7 +239,7 @@ export function NewSource() {
                         options={[
                           { value: 'manual', label: 'Manual' },
                           { value: 'rss', label: 'RSS' },
-                          { value: 'api', label: 'API' },
+                          { value: 'api', label: 'WordPress API' },
                         ]}
                       />
                     )}
@@ -263,7 +267,33 @@ export function NewSource() {
                   </div>
                 )}
 
-                {method !== 'manual' && (
+                {method === 'api' && (
+                  <div className="col-12">
+                    <Field
+                      label="API URL"
+                      invalid={feedMissing}
+                      note={
+                        feedMissing
+                          ? 'A WordPress publisher needs the address of their posts API.'
+                          : undefined
+                      }
+                      noteTone="bad"
+                    >
+                      {(f) => (
+                        <input
+                          {...f}
+                          className="input"
+                          type="url"
+                          placeholder="https://publisher.example.invalid/wp-json/wp/v2/posts"
+                          value={apiUrl}
+                          onChange={(e) => setApiUrl(e.target.value)}
+                        />
+                      )}
+                    </Field>
+                  </div>
+                )}
+
+                {method === 'rss' && (
                   <div className="col-12">
                     <Field
                       label="Feed URL"

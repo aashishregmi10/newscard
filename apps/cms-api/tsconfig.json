@@ -22,6 +22,9 @@
     },
     {
       "path": "../../packages/media"
+    },
+    {
+      "path": "../../packages/summarise"
     }
   ],
   "include": [

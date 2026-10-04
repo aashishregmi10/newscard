@@ -19,6 +19,7 @@ import {
   Skeleton,
 } from '../ui';
 import { ImagePicker } from './ImagePicker';
+import { SummaryDraftBox } from './SummaryDraftBox';
 import { AdsOnStory } from './AdsOnStory';
 
 /**
@@ -55,6 +56,8 @@ const HEADLINE_MIN = 10;
 interface Data {
   article: ArticleDetail;
   limits: Limits;
+  /** Whether a lead's original is still on file to draft from. */
+  hasOriginal: boolean;
 }
 
 function EditSkeleton() {
@@ -85,7 +88,7 @@ export function EditPublished({ id }: { id: string }) {
   const { data, error: loadError, loading, reload } = useResource<Data>(
     async (signal) => {
       const r = await api.article(id, signal);
-      return { article: r.article, limits: r.limits };
+      return { article: r.article, limits: r.limits, hasOriginal: r.original !== null };
     },
     `article:${id}:edit`,
     'Could not open this story.',
@@ -340,6 +343,19 @@ export function EditPublished({ id }: { id: string }) {
               />
             )}
           </Field>
+
+          {/* Suggests only: a live story's summary changes when Save is pressed
+              with a reason, never because a draft arrived. */}
+          <SummaryDraftBox
+            articleId={data.article.id}
+            initial={data.article.summaryDraft}
+            summary={summary}
+            canRegenerate={data.hasOriginal}
+            fillWhenEmpty={false}
+            sourceName={data.article.sourceName}
+            disabled={action.busy}
+            onUse={setSummary}
+          />
 
           {/* Held on this screen until Save, unlike the composer, which attaches
               an upload the moment it finishes. A picture swapped on a live

@@ -286,3 +286,143 @@ describe('when a publisher misbehaves', () => {
     expect(reports.reduce((n, r) => n + r.inserted, 0)).toBe(3);
   });
 });
+
+/*
+ * What the licence lets us keep.
+ *
+ * A publisher's photo and full story are kept only under the matching licence
+ * term, and their story pages are read only when a term asks for something the
+ * feed did not carry. Served from localhost like the rest; the text is
+ * synthetic.
+ */
+describe('photos and full text, by licence', () => {
+  const ARTICLE =
+    'नमुना नगरपालिकाले आज नयाँ खानेपानी आयोजनाको काम सुरु गरेको छ। आयोजना दुई वर्षमा सम्पन्न हुने र दश हजार घरधुरीले लाभ पाउने जनाइएको छ। ';
+
+  let origin: string;
+  let pageRequests: number;
+
+  function wpPosts(): string {
+    return JSON.stringify(
+      STORIES.map((s, i) => ({
+        id: 100 + i,
+        date_gmt: new Date().toISOString().slice(0, 19),
+        link: `${origin}/news/${i + 1}`,
+        title: { rendered: s.title },
+        excerpt: { rendered: '<p>सानो अंश।</p>' },
+        content: { rendered: `<p>${ARTICLE.repeat(4)}</p>` },
+        _embedded: {
+          'wp:featuredmedia': [{ media_type: 'image', source_url: `${origin}/img/${i + 1}.jpg` }],
+        },
+      })),
+    );
+  }
+
+  function storyPage(n: string): string {
+    return `<!doctype html><html><head>
+      <meta property="og:image" content="${origin}/share/${n}.jpg"></head>
+      <body><nav><a href="/">गृहपृष्ठ</a></nav>
+      <article><h1>शीर्षक</h1><p>${ARTICLE.repeat(5)}</p><p>${ARTICLE}</p></article>
+      </body></html>`;
+  }
+
+  beforeEach(() => {
+    origin = new URL(feedUrl).origin;
+    pageRequests = 0;
+    respond = (req) => {
+      const url = (req as { url?: string }).url ?? '';
+      if (url.startsWith('/wp-json/wp/v2/posts')) {
+        return { status: 200, body: wpPosts(), headers: { 'Content-Type': 'application/json' } };
+      }
+      if (url.startsWith('/news/')) {
+        pageRequests += 1;
+        return { status: 200, body: storyPage(url.slice(6)), headers: { 'Content-Type': 'text/html' } };
+      }
+      return {
+        status: 200,
+        body: rss(STORIES.map((s, i) => ({ ...s, link: `${origin}/news/${i + 1}` }))),
+      };
+    };
+  });
+
+  const wordpress = (licence: Record<string, unknown>) =>
+    seedSource({
+      homepageUrl: origin,
+      licence: { status: 'agreed', contactEmail: 'legal@namuna.example.invalid', ...licence },
+      ingest: {
+        method: 'api',
+        api: 'wordpress',
+        apiUrl: `${origin}/wp-json/wp/v2/posts`,
+        basis: 'agreement',
+        pollIntervalMin: 5,
+        consecutiveFailures: 0,
+      },
+    });
+
+  it('keeps only the excerpt and no photo from a WordPress API when the licence covers neither', async () => {
+    await wordpress({});
+    const [report] = await pollDueSources();
+    expect(report?.inserted).toBe(3);
+
+    const lead = await collections(getDb()).leads.findOne({});
+    expect(lead?.feedExtract).toBe('सानो अंश।');
+    expect(lead?.feedContent).toBeNull();
+    expect(lead?.feedImageUrl).toBeNull();
+    expect(pageRequests).toBe(0);
+  });
+
+  it('keeps the full story and the photo from a WordPress API when the licence covers both', async () => {
+    await wordpress({ images: true, fullText: true });
+    await pollDueSources();
+
+    const lead = await collections(getDb()).leads.findOne({ canonicalUrl: `${origin}/news/1` });
+    expect(lead?.feedContent).toContain('खानेपानी आयोजनाको');
+    expect(lead?.feedImageUrl).toBe(`${origin}/img/1.jpg`);
+    // Everything came in the one API response.
+    expect(pageRequests).toBe(0);
+  });
+
+  it('reads an RSS story page for the photo and the full story when the licence allows', async () => {
+    await seedSource({
+      homepageUrl: origin,
+      licence: {
+        status: 'agreed',
+        contactEmail: 'legal@namuna.example.invalid',
+        images: true,
+        fullText: true,
+      },
+    });
+    const [report] = await pollDueSources();
+    expect(report?.enriched).toBe(3);
+    expect(pageRequests).toBe(3);
+
+    const lead = await collections(getDb()).leads.findOne({ canonicalUrl: `${origin}/news/2` });
+    expect(lead?.feedImageUrl).toBe(`${origin}/share/2.jpg`);
+    expect(lead?.feedContent).toContain('खानेपानी आयोजनाको');
+  });
+
+  it('never reads an RSS story page when the licence covers neither', async () => {
+    await seedSource({ homepageUrl: origin });
+    const [report] = await pollDueSources();
+    expect(report?.inserted).toBe(3);
+    expect(pageRequests).toBe(0);
+    const lead = await collections(getDb()).leads.findOne({});
+    expect(lead?.feedImageUrl).toBeNull();
+  });
+
+  it('does not read the page again for a story it has already collected', async () => {
+    await seedSource({
+      homepageUrl: origin,
+      licence: { status: 'agreed', contactEmail: 'legal@namuna.example.invalid', images: true },
+    });
+    await pollDueSources();
+    expect(pageRequests).toBe(3);
+
+    await collections(getDb()).sources.updateOne(
+      { _id: sourceId },
+      { $set: { 'ingest.lastPolledAt': new Date(0) } },
+    );
+    await pollDueSources();
+    expect(pageRequests).toBe(3);
+  });
+});

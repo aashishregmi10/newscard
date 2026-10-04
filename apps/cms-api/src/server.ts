@@ -37,6 +37,8 @@ import { createLogger, drainHttpServer } from '@saar/shared';
 import { startDeferredSweep, startIngestion, startReceiptReconciliation } from '@saar/worker';
 import { ensureSessionIndexes } from './auth/session.js';
 import { loadCmsEnv } from './config/index.js';
+import { summariserConfigured } from '@saar/summarise';
+import { sweepInterruptedSummaryDrafts } from './services/summaryDraft.service.js';
 
 /**
  * The allowed origin is passed in rather than read from the environment here,
@@ -124,6 +126,16 @@ async function main(): Promise<void> {
    * it can do wrong is offer an editor something not worth summarising.
    */
   const stopIngestion = startIngestion();
+
+  /* A summary being drafted when the process last stopped was lost with it.
+     Marked failed so the composer offers Regenerate instead of waiting. */
+  const interrupted = await sweepInterruptedSummaryDrafts();
+  if (interrupted > 0) log.info('summary drafts interrupted by restart', { count: interrupted });
+  if (!summariserConfigured()) {
+    log.warn('no AI summariser configured — drafts will be key sentences', {
+      fix: 'set GEMINI_API_KEY in .env (free from aistudio.google.com)',
+    });
+  }
 
   const server = createCmsApp(env.CMS_ORIGIN).listen(env.CMS_PORT, () => {
     log.info('cms-api listening', {

@@ -35,8 +35,27 @@ export type ImageLicence = z.infer<typeof ImageLicenceEnum>;
 export const DraftSourceEnum = z.enum(['human', 'llm_assisted']);
 export type DraftSource = z.infer<typeof DraftSourceEnum>;
 
-export const IngestMethodEnum = z.enum(['rss', 'api', 'manual']);
+/**
+ * How stories reach us from a publisher.
+ *
+ *   rss      their public feed
+ *   api      their own content API, of the kind named by `ingest.api`
+ *   youtube  a YouTube channel's uploads, read for Shorts through the YouTube
+ *            Data API — collected into `shortLeads`, never into `leads`
+ *   manual   nothing is collected; an editor files stories by hand
+ */
+export const IngestMethodEnum = z.enum(['rss', 'api', 'manual', 'youtube']);
 export type IngestMethod = z.infer<typeof IngestMethodEnum>;
+
+/**
+ * Which content API an `api` source speaks.
+ *
+ * One, today: WordPress's built-in REST API, which most Nepali portals run.
+ * A single request returns their latest posts with the full text and the
+ * featured photograph, where their RSS carries an excerpt and no picture.
+ */
+export const IngestApiEnum = z.enum(['wordpress']);
+export type IngestApi = z.infer<typeof IngestApiEnum>;
 
 /**
  * On what basis we read a publisher's feed.

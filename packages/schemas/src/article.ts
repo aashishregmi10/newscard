@@ -34,6 +34,35 @@ export const ArticleImage = z.object({
 });
 export type ArticleImage = z.infer<typeof ArticleImage>;
 
+/**
+ * The summariser's draft for a story promoted from a lead.
+ *
+ * Kept beside the summary rather than written into it, because the two have
+ * different owners: `summary` is what the editor has, `summaryDraft` is what the
+ * machine offered. The composer puts the draft into an EMPTY summary box and
+ * otherwise offers it — it never overwrites words a person typed.
+ *
+ *   gemini         written by the AI model, from the publisher's full article
+ *   key_sentences  the article's own most important sentences, picked out when
+ *                  the AI was unavailable — the publisher's words, which the
+ *                  publish gate will not let through until they are rewritten
+ */
+export const SummaryDraftStatusEnum = z.enum(['pending', 'ready', 'failed']);
+export const SummaryDraftSourceEnum = z.enum(['gemini', 'key_sentences']);
+
+export const SummaryDraft = z.object({
+  status: SummaryDraftStatusEnum,
+  text: z.string().max(1200).nullable(),
+  source: SummaryDraftSourceEnum.nullable(),
+  /** Which model wrote it, for the record — free tiers change their models. */
+  model: z.string().nullable(),
+  /** Why there is no draft, in words an editor can act on. */
+  error: z.string().max(300).nullable(),
+  requestedAt: z.date(),
+  finishedAt: z.date().nullable(),
+});
+export type SummaryDraft = z.infer<typeof SummaryDraft>;
+
 export const Article = z.object({
   // --- identity and state (Ch. 3.2.1) ---
   slug: Slug,
@@ -103,6 +132,13 @@ export const Article = z.object({
 
   // --- images (Ch. 3.2.4) ---
   image: ArticleImage.nullable(),
+  /** Why the publisher's photo is not on this draft, when promoting tried to
+   *  bring it and could not. Editor-facing; never on a public DTO. */
+  photoNote: z.string().max(300).nullable().optional(),
+
+  // --- drafted from a lead ---
+  /** INTERNAL ONLY, like editorialNotes. See SummaryDraft above. */
+  summaryDraft: SummaryDraft.nullable().optional(),
 
   // --- denormalised for the feed (Ch. 3.2.5) ---
   sourceName: z.string().min(1),

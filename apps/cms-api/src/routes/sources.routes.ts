@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { collections, getDb } from '@saar/db';
 import { AppError } from '@saar/shared';
 import {
+  IngestApiEnum,
   IngestBasisEnum,
   IngestMethodEnum,
   LanguageEnum,
@@ -13,6 +14,7 @@ import {
 import { requireAuth } from '../auth/requireAuth.js';
 import { asyncRoute } from '../middleware/index.js';
 import { setSourceLicence } from '../services/sources.service.js';
+import { detectWordPressApi } from '@saar/worker';
 import { writeAudit } from '../audit/writeAudit.js';
 
 /**
@@ -78,6 +80,9 @@ const IngestCreate = z.object({
    */
   basis: IngestBasisEnum.default('agreement'),
   feedUrl: z.string().url().nullable().optional(),
+  api: IngestApiEnum.nullable().optional(),
+  apiUrl: z.string().url().nullable().optional(),
+  youtubeChannelId: z.string().nullable().optional(),
   /* The floor of 5 is the schema's and the database validator's, to be polite
      to the publisher's servers. The ceiling is this route's: a once-a-day poll
      interval is a typo, not a policy. */
@@ -91,6 +96,9 @@ const IngestPatch = z.object({
   method: IngestMethodEnum.optional(),
   basis: IngestBasisEnum.optional(),
   feedUrl: z.string().url().nullable().optional(),
+  api: IngestApiEnum.nullable().optional(),
+  apiUrl: z.string().url().nullable().optional(),
+  youtubeChannelId: z.string().nullable().optional(),
   pollIntervalMin: z.number().int().min(5).max(1440).optional(),
 });
 
@@ -124,6 +132,9 @@ const LicenceSchema = z.object({
   agreementRef: z.string().min(1).max(200).nullable().optional(),
   agreedAt: z.coerce.date().nullable().optional(),
   contactEmail: z.string().email().nullable().optional(),
+  /** Licence terms. See SourceLicence in @saar/schemas for what each one does. */
+  images: z.boolean().optional(),
+  fullText: z.boolean().optional(),
   note: z.string().max(500).optional(),
 });
 
@@ -160,11 +171,16 @@ interface SourceDoc {
     agreementRef?: string | null;
     agreedAt?: Date | null;
     contactEmail?: string | null;
+    images?: boolean;
+    fullText?: boolean;
   } | null;
   ingest?: {
     method?: string;
     basis?: string;
     feedUrl?: string | null;
+    api?: string | null;
+    apiUrl?: string | null;
+    youtubeChannelId?: string | null;
     pollIntervalMin?: number;
     lastPolledAt?: Date | null;
     lastSuccessAt?: Date | null;
@@ -192,11 +208,16 @@ function toRow(s: SourceDoc) {
       agreementRef: s.licence?.agreementRef ?? null,
       agreedAt: s.licence?.agreedAt?.toISOString() ?? null,
       contactEmail: s.licence?.contactEmail ?? null,
+      images: s.licence?.images === true,
+      fullText: s.licence?.fullText === true,
     },
     ingest: {
       method: s.ingest?.method ?? 'manual',
       basis: s.ingest?.basis ?? 'agreement',
       feedUrl: s.ingest?.feedUrl ?? null,
+      api: s.ingest?.api ?? null,
+      apiUrl: s.ingest?.apiUrl ?? null,
+      youtubeChannelId: s.ingest?.youtubeChannelId ?? null,
       pollIntervalMin: s.ingest?.pollIntervalMin ?? 15,
       lastPolledAt: s.ingest?.lastPolledAt?.toISOString() ?? null,
       lastSuccessAt: s.ingest?.lastSuccessAt?.toISOString() ?? null,
@@ -292,10 +313,15 @@ sourceRoutes.post(
         agreementRef: null,
         agreedAt: null,
         contactEmail: null,
+        images: false,
+        fullText: false,
       },
       ingest: {
         ...parsed.data.ingest,
         feedUrl: parsed.data.ingest.feedUrl ?? null,
+        api: parsed.data.ingest.api ?? null,
+        apiUrl: parsed.data.ingest.apiUrl ?? null,
+        youtubeChannelId: parsed.data.ingest.youtubeChannelId ?? null,
         lastPolledAt: null,
         lastSuccessAt: null,
         consecutiveFailures: 0,
@@ -409,12 +435,17 @@ sourceRoutes.patch(
     const before = (await c.sources.findOne({ slug })) as unknown as SourceDoc | null;
     if (!before) throw new AppError('NOT_FOUND', 'No such publisher.');
 
+    const keep = <K extends 'feedUrl' | 'api' | 'apiUrl' | 'youtubeChannelId'>(key: K) =>
+      parsed.data.ingest?.[key] !== undefined
+        ? parsed.data.ingest[key]
+        : (before.ingest?.[key] ?? null);
+
     const mergedIngest = {
       method: parsed.data.ingest?.method ?? before.ingest?.method ?? 'manual',
-      feedUrl:
-        parsed.data.ingest?.feedUrl !== undefined
-          ? parsed.data.ingest.feedUrl
-          : (before.ingest?.feedUrl ?? null),
+      feedUrl: keep('feedUrl'),
+      api: keep('api'),
+      apiUrl: keep('apiUrl'),
+      youtubeChannelId: keep('youtubeChannelId'),
       pollIntervalMin:
         parsed.data.ingest?.pollIntervalMin ?? before.ingest?.pollIntervalMin ?? 15,
     };
@@ -430,6 +461,8 @@ sourceRoutes.patch(
         agreementRef: before.licence?.agreementRef ?? null,
         agreedAt: before.licence?.agreedAt ?? null,
         contactEmail: before.licence?.contactEmail ?? null,
+        images: before.licence?.images === true,
+        fullText: before.licence?.fullText === true,
       },
       ingest: { ...mergedIngest, consecutiveFailures: before.ingest?.consecutiveFailures ?? 0 },
       priority: parsed.data.priority ?? before.priority ?? 50,
@@ -456,6 +489,11 @@ sourceRoutes.patch(
     if (parsed.data.inlineAds !== undefined) set.inlineAds = parsed.data.inlineAds;
     if (parsed.data.ingest?.method !== undefined) set['ingest.method'] = mergedIngest.method;
     if (parsed.data.ingest?.feedUrl !== undefined) set['ingest.feedUrl'] = mergedIngest.feedUrl;
+    if (parsed.data.ingest?.api !== undefined) set['ingest.api'] = mergedIngest.api;
+    if (parsed.data.ingest?.apiUrl !== undefined) set['ingest.apiUrl'] = mergedIngest.apiUrl;
+    if (parsed.data.ingest?.youtubeChannelId !== undefined) {
+      set['ingest.youtubeChannelId'] = mergedIngest.youtubeChannelId;
+    }
     if (parsed.data.ingest?.pollIntervalMin !== undefined) {
       set['ingest.pollIntervalMin'] = mergedIngest.pollIntervalMin;
     }
@@ -478,6 +516,9 @@ sourceRoutes.patch(
         ingest: {
           method: before.ingest?.method ?? 'manual',
           feedUrl: before.ingest?.feedUrl ?? null,
+          api: before.ingest?.api ?? null,
+          apiUrl: before.ingest?.apiUrl ?? null,
+          youtubeChannelId: before.ingest?.youtubeChannelId ?? null,
           pollIntervalMin: before.ingest?.pollIntervalMin ?? 15,
         },
       },
@@ -505,6 +546,8 @@ sourceRoutes.post(
       ...(parsed.data.agreementRef !== undefined && { agreementRef: parsed.data.agreementRef }),
       ...(parsed.data.agreedAt !== undefined && { agreedAt: parsed.data.agreedAt }),
       ...(parsed.data.contactEmail !== undefined && { contactEmail: parsed.data.contactEmail }),
+      ...(parsed.data.images !== undefined && { images: parsed.data.images }),
+      ...(parsed.data.fullText !== undefined && { fullText: parsed.data.fullText }),
       note: parsed.data.note,
       actorId: req.staff?.staffId ?? '',
       actorEmail: req.staff?.email ?? '',
@@ -517,9 +560,31 @@ sourceRoutes.post(
         agreementRef: result.licence.agreementRef,
         agreedAt: result.licence.agreedAt?.toISOString() ?? null,
         contactEmail: result.licence.contactEmail,
+        images: result.licence.images,
+        fullText: result.licence.fullText,
       },
       publishedArticles: result.publishedArticles,
       wasDowngraded: result.wasDowngraded,
     });
+  }),
+);
+
+/**
+ * POST /cms/sources/:slug/detect-wordpress — does this publisher serve the
+ * WordPress posts API?
+ *
+ * Asks once, changes nothing: the screen shows the answer and the editor
+ * decides whether to switch the publisher to it. A WordPress portal's API
+ * carries the full story and the photograph where its RSS usually has an
+ * excerpt and no picture.
+ */
+sourceRoutes.post(
+  '/cms/sources/:slug/detect-wordpress',
+  asyncRoute(async (req, res) => {
+    const slug = String(req.params.slug ?? '');
+    const c = collections(getDb());
+    const doc = (await c.sources.findOne({ slug })) as unknown as SourceDoc | null;
+    if (!doc) throw new AppError('NOT_FOUND', 'No such publisher.');
+    res.json(await detectWordPressApi(doc.homepageUrl));
   }),
 );

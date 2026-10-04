@@ -1,5 +1,11 @@
 import { useEffect, useState } from 'react';
-import { api, type LicenceStatus, type SourceDetail as SourceDetailData } from '../api';
+import {
+  api,
+  type IngestMethod,
+  type LicenceStatus,
+  type SourceDetail as SourceDetailData,
+  type WordPressDetection,
+} from '../api';
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useResource } from '../hooks/useResource';
 import { crumbs } from '../lib/crumbs';
@@ -55,15 +61,20 @@ export function SourceDetail({ slug }: { slug: string }) {
   const [inlineAds, setInlineAds] = useState<'allowed' | 'blocked'>('allowed');
 
   // Ingestion panel
-  const [method, setMethod] = useState<'manual' | 'rss' | 'api'>('manual');
+  const [method, setMethod] = useState<IngestMethod>('manual');
   const [feedUrl, setFeedUrl] = useState('');
+  const [apiUrl, setApiUrl] = useState('');
   const [pollIntervalMin, setPollIntervalMin] = useState(15);
+  const detect = useAsyncAction('Could not check this publisher.');
+  const [detection, setDetection] = useState<WordPressDetection | null>(null);
 
   // Licence panel
   const [status, setStatus] = useState<LicenceStatus>('unknown');
   const [agreementRef, setAgreementRef] = useState('');
   const [agreedAt, setAgreedAt] = useState('');
   const [contactEmail, setContactEmail] = useState('');
+  const [images, setImages] = useState<'allowed' | 'blocked'>('blocked');
+  const [fullText, setFullText] = useState<'allowed' | 'blocked'>('blocked');
   const [note, setNote] = useState('');
   const [confirming, setConfirming] = useState(false);
 
@@ -81,11 +92,15 @@ export function SourceDetail({ slug }: { slug: string }) {
     setInlineAds(data.inlineAds ? 'allowed' : 'blocked');
     setMethod(data.ingest.method);
     setFeedUrl(data.ingest.feedUrl ?? '');
+    setApiUrl(data.ingest.apiUrl ?? '');
+    setDetection(null);
     setPollIntervalMin(data.ingest.pollIntervalMin);
     setStatus(data.licence.status);
     setAgreementRef(data.licence.agreementRef ?? '');
     setAgreedAt(toDateInput(data.licence.agreedAt));
     setContactEmail(data.licence.contactEmail ?? '');
+    setImages(data.licence.images ? 'allowed' : 'blocked');
+    setFullText(data.licence.fullText ? 'allowed' : 'blocked');
     setNote('');
     setConfirming(false);
   }, [data]);
@@ -143,7 +158,22 @@ export function SourceDetail({ slug }: { slug: string }) {
     status === 'agreed' && contactEmail.trim() !== '' && !looksLikeEmail(contactEmail);
   const needsContact = contactMissing || contactMalformed;
   const needsNote = wouldWithdraw && note.trim().length < 10;
-  const feedMissing = method === 'rss' && feedUrl.trim() === '';
+  const feedMissing =
+    (method === 'rss' && feedUrl.trim() === '') || (method === 'api' && apiUrl.trim() === '');
+
+  const runDetect = () =>
+    void detect
+      .run(async () => {
+        const found = await api.detectWordPress(slug);
+        setDetection(found);
+        /* Filled in, not saved: switching how a publisher is collected is the
+           editor's decision, made with Save below. */
+        if (found.found) {
+          setMethod('api');
+          setApiUrl(found.apiUrl);
+        }
+      })
+      .then(() => undefined);
 
   const saveDetails = () =>
     void details
@@ -159,6 +189,8 @@ export function SourceDetail({ slug }: { slug: string }) {
           ingest: {
             method,
             feedUrl: feedUrl.trim() === '' ? null : feedUrl.trim(),
+            api: method === 'api' ? 'wordpress' : null,
+            apiUrl: apiUrl.trim() === '' ? null : apiUrl.trim(),
             pollIntervalMin,
           },
         }),
@@ -179,6 +211,8 @@ export function SourceDetail({ slug }: { slug: string }) {
           agreementRef: agreementRef.trim() === '' ? null : agreementRef.trim(),
           agreedAt: agreedAt === '' ? null : new Date(`${agreedAt}T00:00:00Z`).toISOString(),
           contactEmail: contactEmail.trim() === '' ? null : contactEmail.trim(),
+          images: images === 'allowed',
+          fullText: fullText === 'allowed',
           ...(note.trim() !== '' && { note: note.trim() }),
         }),
       )
@@ -312,6 +346,52 @@ export function SourceDetail({ slug }: { slug: string }) {
                   />
                 )}
               </Field>
+            </div>
+          </div>
+
+          {/*
+            * What the agreement covers beyond the headline and the link.
+            * Licence terms, so they are saved with the licence and audited as
+            * a change of legal position — not with the details below.
+            */}
+          <div className="grid">
+            <div className="col-6">
+              <Fieldset
+                legend="Their photos"
+                note="Allowed: Incoming shows each story's photo, and promoting copies it into the draft, credited to them. Only if their agreement lets us show their photographs."
+              >
+                {(g) => (
+                  <Segmented
+                    {...g}
+                    aria-label="May we use their photos"
+                    value={images}
+                    onChange={setImages}
+                    options={[
+                      { value: 'allowed', label: 'Allowed' },
+                      { value: 'blocked', label: 'Not allowed' },
+                    ]}
+                  />
+                )}
+              </Fieldset>
+            </div>
+            <div className="col-6">
+              <Fieldset
+                legend="Full article for summaries"
+                note="Allowed: the whole story is kept and, on promote, sent to the summariser — Google's free tier, which may use it to improve their products. Only if their agreement allows that."
+              >
+                {(g) => (
+                  <Segmented
+                    {...g}
+                    aria-label="May we use the full article for summaries"
+                    value={fullText}
+                    onChange={setFullText}
+                    options={[
+                      { value: 'allowed', label: 'Allowed' },
+                      { value: 'blocked', label: 'Not allowed' },
+                    ]}
+                  />
+                )}
+              </Fieldset>
             </div>
           </div>
 
@@ -542,7 +622,7 @@ export function SourceDetail({ slug }: { slug: string }) {
                   options={[
                     { value: 'manual', label: 'Manual' },
                     { value: 'rss', label: 'RSS' },
-                    { value: 'api', label: 'API' },
+                    { value: 'api', label: 'WordPress API' },
                   ]}
                 />
               )}
@@ -573,7 +653,33 @@ export function SourceDetail({ slug }: { slug: string }) {
             </div>
           )}
 
-          {method !== 'manual' && (
+          {method === 'api' && (
+            <div className="col-12">
+              <Field
+                label="API URL"
+                invalid={feedMissing}
+                note={
+                  feedMissing
+                    ? 'A WordPress publisher needs the address of their posts API.'
+                    : 'Their posts API. One request brings the latest stories with the full text and the photo.'
+                }
+                noteTone={feedMissing ? 'bad' : 'default'}
+              >
+                {(f) => (
+                  <input
+                    {...f}
+                    className="input"
+                    type="url"
+                    placeholder="https://publisher.example.invalid/wp-json/wp/v2/posts"
+                    value={apiUrl}
+                    onChange={(e) => setApiUrl(e.target.value)}
+                  />
+                )}
+              </Field>
+            </div>
+          )}
+
+          {method === 'rss' && (
             <div className="col-12">
               <Field
                 label="Feed URL"
@@ -605,9 +711,19 @@ export function SourceDetail({ slug }: { slug: string }) {
           </p>
         </div>
         <p className="field-note">
-          Nothing polls these feeds yet — ingestion is not built and is blocked on publisher
-          licensing. These three figures are written by the poller when it exists.
+          The collector checks every minute and reads a publisher once their interval has passed.
+          Many Nepali portals run WordPress, whose API carries the full story and the photo where
+          their RSS has an excerpt and none — check whether this one does.
         </p>
+
+        {detect.error !== null && <Banner tone="error">{detect.error}</Banner>}
+        {detection !== null && (
+          <Banner tone={detection.found ? 'ok' : 'warn'} onDismiss={() => setDetection(null)}>
+            {detection.found
+              ? 'Found their WordPress API. The method and address are filled in — Save changes to switch to it.'
+              : detection.reason + ' Keep using RSS.'}
+          </Banner>
+        )}
 
         <div className="actions">
           <Button
@@ -618,6 +734,9 @@ export function SourceDetail({ slug }: { slug: string }) {
             onClick={saveDetails}
           >
             Save changes
+          </Button>
+          <Button icon="search" busy={detect.busy} disabled={details.busy} onClick={runDetect}>
+            Detect WordPress API
           </Button>
           <Button disabled={details.busy} onClick={() => navigate(Routes.sources())}>
             Back to publishers

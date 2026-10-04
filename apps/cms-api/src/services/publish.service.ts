@@ -5,6 +5,8 @@ import {
   measureSummary,
   countGraphemes,
   type LimitType,
+  copiedShare,
+  COPIED_SHARE_LIMIT,
 } from '@saar/shared';
 import { canTransition, DEFAULT_CONFIG, type ArticleStatus } from '@saar/schemas';
 import { writeAudit } from '../audit/writeAudit.js';
@@ -137,6 +139,29 @@ export async function publishArticle(input: PublishInput): Promise<PublishResult
           `Summary is ${measured} ${limits.limitType}; allowed ${band.min}–${band.max}.`,
           { measured, min: band.min, max: band.max, unit: limits.limitType },
         );
+      }
+
+      // ── 4b. our own words ───────────────────────────────────────────────
+      // A summary can now arrive pre-written — by the AI, or as the article's
+      // own key sentences when the AI was unavailable. Whatever wrote it, what
+      // reaches a reader must be ours. Compared against the original the
+      // story was promoted from, while that is still on file (leads expire
+      // after 30 days); a hand-written story has none and is not compared.
+      const lead = await c.leads.findOne(
+        { promotedArticleId: article._id },
+        { projection: { feedContent: 1, feedExtract: 1 }, ...(session ? { session } : {}) },
+      );
+      const original =
+        (lead as { feedContent?: string | null } | null)?.feedContent ?? lead?.feedExtract ?? '';
+      if (original !== '') {
+        const share = copiedShare(article.summary, original);
+        if (share >= COPIED_SHARE_LIMIT) {
+          throw new AppError(
+            'VALIDATION_FAILED',
+            "This summary is mostly the publisher's own sentences. Rewrite it in your own words before publishing.",
+            { copiedShare: Math.round(share * 100) / 100 },
+          );
+        }
       }
 
       // No reviewer rules. Every account is an admin, so who publishes is

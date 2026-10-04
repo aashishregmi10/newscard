@@ -797,6 +797,47 @@
   margin-bottom: var(--s4);
 }
 
+/* The summariser's draft, under the summary box. A suggestion reads as a
+   quieter card than the box itself, so it is never mistaken for what will be
+   published. */
+.summary-draft {
+  display: grid;
+  gap: var(--s3);
+  margin-bottom: var(--s4);
+}
+
+.summary-draft-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--ink-soft);
+}
+
+.summary-draft-card {
+  padding: var(--s3) var(--s4);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-md);
+  background: var(--surface-sunk);
+}
+
+.summary-draft-label {
+  margin: 0 0 6px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ink-faint);
+}
+
+.summary-draft-text {
+  margin: 0 0 var(--s3);
+  font-size: var(--text-base);
+  line-height: 1.7;
+  color: var(--ink);
+}
+
 /* A chosen picture that is not on the story yet — the same place and shape
    as "Attached", so the difference between the two is the words and colour. */
 .media-pending {

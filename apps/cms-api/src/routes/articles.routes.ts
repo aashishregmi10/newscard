@@ -15,8 +15,33 @@ import { asyncRoute } from '../middleware/index.js';
 import { transitionArticle } from '../services/transition.service.js';
 import { publishArticle, retractArticle } from '../services/publish.service.js';
 import { writeAudit } from '../audit/writeAudit.js';
+import { requestSummaryDraft } from '../services/summaryDraft.service.js';
 
 export const articleRoutes = Router();
+
+/** The summariser's draft as stored. See SummaryDraft in @saar/schemas. */
+interface StoredSummaryDraft {
+  status: 'pending' | 'ready' | 'failed';
+  text: string | null;
+  source: 'gemini' | 'key_sentences' | null;
+  model: string | null;
+  error: string | null;
+  requestedAt: Date;
+  finishedAt: Date | null;
+}
+
+function summaryDraftOut(d: StoredSummaryDraft | null) {
+  if (d === null) return null;
+  return {
+    status: d.status,
+    text: d.text,
+    source: d.source,
+    model: d.model,
+    error: d.error,
+    requestedAt: d.requestedAt.toISOString(),
+    finishedAt: d.finishedAt?.toISOString() ?? null,
+  };
+}
 
 /** Everything below needs a signed-in editor. */
 articleRoutes.use(requireAuth);
@@ -201,6 +226,11 @@ articleRoutes.get(
         publisherUrl: d.publisherUrl,
         publisherAuthor: d.publisherAuthor ?? null,
         image: d.image,
+        /* Why promoting could not bring the publisher's photo, if it tried. */
+        photoNote: (d as { photoNote?: string | null }).photoNote ?? null,
+        summaryDraft: summaryDraftOut(
+          (d as { summaryDraft?: StoredSummaryDraft | null }).summaryDraft ?? null,
+        ),
         editorialNotes: d.editorialNotes ?? null,
         revisionCount: d.revisionCount,
         adsSuppressed: d.adsSuppressed === true,
@@ -408,6 +438,76 @@ articleRoutes.post(
     });
 
     res.json({ ok: true, adsSuppressed: parsed.data.suppressed });
+  }),
+);
+
+/**
+ * GET /cms/articles/:id/summary-draft — just the draft, for the composer to
+ * check while one is being written. A whole-story reload would redraw the
+ * screen every two seconds; this is a few hundred bytes.
+ */
+articleRoutes.get(
+  '/cms/articles/:id/summary-draft',
+  asyncRoute(async (req, res) => {
+    const id = String(req.params.id ?? '');
+    if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
+    const c = collections(getDb());
+    const d = await c.articles.findOne({ _id: new ObjectId(id) }, { projection: { summaryDraft: 1 } });
+    if (!d) throw new AppError('NOT_FOUND');
+    res.json({
+      summaryDraft: summaryDraftOut(
+        (d as { summaryDraft?: StoredSummaryDraft | null }).summaryDraft ?? null,
+      ),
+    });
+  }),
+);
+
+/**
+ * POST /cms/articles/:id/summary-draft — draft the summary again.
+ *
+ * Changes nothing a reader sees, and not even the summary box: the new draft
+ * arrives in `summaryDraft`, and the composer offers it. Works on a live story
+ * too, because a correction may want a fresh start — the edit screen still
+ * needs a reason before anything is saved. Not on a withdrawn story, which is
+ * a record.
+ */
+articleRoutes.post(
+  '/cms/articles/:id/summary-draft',
+  asyncRoute(async (req, res) => {
+    const id = String(req.params.id ?? '');
+    if (!ObjectId.isValid(id)) throw new AppError('BAD_REQUEST', 'Malformed id.');
+
+    const c = collections(getDb());
+    const existing = await c.articles.findOne(
+      { _id: new ObjectId(id) },
+      { projection: { status: 1 } },
+    );
+    if (!existing) throw new AppError('NOT_FOUND');
+    if (existing.status === 'retracted') {
+      throw new AppError('INVALID_TRANSITION', 'A withdrawn story cannot be redrafted.');
+    }
+    const hasOriginal = await c.leads.countDocuments({ promotedArticleId: existing._id }, { limit: 1 });
+    if (hasOriginal === 0) {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        'This story has no original to summarise — it was written by hand, or its original has expired.',
+      );
+    }
+
+    const requestedAt = await requestSummaryDraft(existing._id);
+
+    await writeAudit({
+      action: 'article.summaryDraft',
+      entityType: 'article',
+      entityId: id,
+      actorId: req.staff!.staffId,
+      actorEmail: req.staff!.email,
+      before: null,
+      after: { requestedAt: requestedAt.toISOString() },
+      ip: req.ip ?? null,
+    });
+
+    res.status(202).json({ status: 'pending', requestedAt: requestedAt.toISOString() });
   }),
 );
 

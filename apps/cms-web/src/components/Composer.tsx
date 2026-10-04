@@ -31,6 +31,8 @@ import {
   type TabDef,
 } from '../ui';
 import { ImagePicker } from './ImagePicker';
+import { SummaryDraftBox } from './SummaryDraftBox';
+import { copiedShare, COPIED_SHARE_LIMIT } from '../lib/overlap';
 import { AdsOnStory } from './AdsOnStory';
 
 /**
@@ -201,6 +203,23 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
     },
     [id],
   );
+  const persistRef = useRef(persist);
+  persistRef.current = persist;
+
+  /**
+   * The summariser's draft goes into the box. Saved straight away, like an
+   * upload: it is a deliberate act with a visible result, and the autosave
+   * timer would leave a closed tab without it.
+   */
+  const adoptDraft = useCallback((text: string) => {
+    setSummary(text);
+    latest.current = { ...latest.current, summary: text };
+    if (timer.current !== null) {
+      clearTimeout(timer.current);
+      timer.current = null;
+    }
+    void persistRef.current({ headline: latest.current.headline, summary: text });
+  }, []);
 
   const scheduleSave = useCallback(() => {
     dirty.current = true;
@@ -314,6 +333,9 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
   const count = measure(summary, limits, language);
   const state = bandState(count, band);
   const look = articleStatus(article.status);
+  /* The publish gate's own-words rule, shown while typing. See lib/overlap. */
+  const copied = original?.text ? copiedShare(summary, original.text) : 0;
+  const mostlyCopied = copied >= COPIED_SHARE_LIMIT;
 
   /*
    * A published or withdrawn story is a record, not a draft.
@@ -333,7 +355,8 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
   const locked = article.status === 'published' || article.status === 'retracted';
 
   const headlineTooShort = headline.trim().length < HEADLINE_MIN;
-  const canSubmit = state === 'ok' && !headlineTooShort && !action.busy && !locked;
+  const canSubmit =
+    state === 'ok' && !headlineTooShort && !mostlyCopied && !action.busy && !locked;
   const canPublish = article.status === 'approved' && !action.busy;
 
   const shownHeadline = headline.trim() === '' ? 'Untitled draft' : headline;
@@ -428,13 +451,15 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
               </Counter>
             }
             note={
-              state === 'under'
-                ? `${band.min - count} more to go. A short summary reads as low effort.`
-                : state === 'over'
-                  ? `${count - band.max} over the limit.`
-                  : undefined
+              mostlyCopied
+                ? `${Math.round(copied * 100)}% of this is word for word from the original. Rewrite it in your own words — it cannot be submitted or published like this.`
+                : state === 'under'
+                  ? `${band.min - count} more to go. A short summary reads as low effort.`
+                  : state === 'over'
+                    ? `${count - band.max} over the limit.`
+                    : undefined
             }
-            noteTone={state === 'over' ? 'bad' : 'warn'}
+            noteTone={mostlyCopied || state === 'over' ? 'bad' : 'warn'}
           >
             {(f) => (
               <textarea
@@ -458,6 +483,27 @@ export function Composer({ id, tab }: { id: string; tab: ArticleTab }) {
               />
             )}
           </Field>
+
+          {!locked && (
+            <SummaryDraftBox
+              articleId={id}
+              initial={article.summaryDraft}
+              summary={summary}
+              canRegenerate={original !== null}
+              fillWhenEmpty
+              sourceName={article.sourceName}
+              disabled={action.busy}
+              onUse={adoptDraft}
+            />
+          )}
+
+          {/* Why the publisher's photo is not here, when promoting tried. Gone
+              as soon as a picture is attached. */}
+          {article.photoNote !== null && image === null && !locked && (
+            <Banner tone="info" live={false}>
+              <strong>Their photo was not copied.</strong> {article.photoNote}
+            </Banner>
+          )}
 
           {/*
             * Saved the moment it changes rather than on the autosave timer. An
