@@ -155,14 +155,32 @@ describe('summarise with Gemini', () => {
     expect(countWords(out.text)).toBeGreaterThanOrEqual(45);
   });
 
-  it('falls back on an outage without trying every model', async () => {
-    const generate = scripted([new ApiError({ message: 'down', status: 503 })]);
+  it('moves to the next model when the first is busy', async () => {
+    const generate = scripted([new ApiError({ message: 'overloaded', status: 503 }), json(words(50))]);
+    const out = await summarise(
+      { text: ENGLISH, title: 'Sample', language: 'en', band: BAND },
+      { env: ENV, generate },
+    );
+    expect(out).toMatchObject({ source: 'gemini', model: 'gemini-3.5-flash-lite' });
+  });
+
+  it('falls back, and says the AI is busy, when every model is down', async () => {
+    const down = () => new ApiError({ message: 'down', status: 503 });
+    const out = await summarise(
+      { text: ENGLISH, title: 'Sample', language: 'en', band: BAND },
+      { env: ENV, generate: scripted([down(), down()]) },
+    );
+    expect(out.source).toBe('key_sentences');
+    expect(out.note).toMatch(/busy.*503/);
+  });
+
+  it('does not try another model when the request itself is refused', async () => {
+    const generate = scripted([new ApiError({ message: 'bad', status: 400 })]);
     const out = await summarise(
       { text: ENGLISH, title: 'Sample', language: 'en', band: BAND },
       { env: ENV, generate },
     );
     expect(out.source).toBe('key_sentences');
-    expect(out.note).toMatch(/503/);
     expect(generate.calls).toHaveLength(1);
   });
 

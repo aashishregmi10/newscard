@@ -137,6 +137,17 @@ function isQuota(e: unknown): boolean {
   return e instanceof ApiError && (e.status === 429 || e.status === 403);
 }
 
+/**
+ * The model is busy or down, not the request wrong: another model may well
+ * answer. On the free tier the flagship is the one most often overloaded (a
+ * 503 was the first thing seen with a real key), and the lighter models are
+ * usually free at the same moment.
+ */
+function isServerSide(e: unknown): boolean {
+  if (e instanceof ApiError) return e.status >= 500;
+  return e instanceof Error && /timed?\s*out|abort|fetch failed|network/i.test(e.message);
+}
+
 export async function geminiSummarise(
   req: GeminiRequest,
   generate: GenerateFn,
@@ -191,14 +202,19 @@ export async function geminiSummarise(
         lastReason = `The free daily limit for ${model} is used up.`;
         continue;
       }
+      if (isServerSide(e)) {
+        lastReason =
+          e instanceof ApiError
+            ? `The AI service is busy (it answered ${e.status}).`
+            : 'The AI took too long to answer, or could not be reached.';
+        continue;
+      }
+      /* The request itself was refused (400 and the like): every model would
+         refuse it the same way, so stop and let the fallback take over. */
       lastReason =
         e instanceof ApiError
-          ? `The AI service answered ${e.status}.`
-          : e instanceof Error && /timed?\s*out|abort/i.test(e.message)
-            ? 'The AI took too long to answer.'
-            : 'The AI service could not be reached.';
-      /* Not a quota problem, so the next model would very likely fail the
-         same way; stop here and let the fallback take over. */
+          ? `The AI service refused the request (${e.status}).`
+          : 'The AI could not be used.';
       break;
     }
   }
