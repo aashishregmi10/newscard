@@ -1,8 +1,9 @@
 import { memo } from 'react';
-import { Image, Linking, Pressable, StyleSheet, Text } from 'react-native';
+import { Image, Linking, Pressable, StyleSheet } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { resolveMediaUrl, type InlineAd as InlineAdData } from '../api/client';
 import { fontFor, type Theme, textSize } from '../theme/tokens';
+import { Ticker } from './Ticker';
 
 /**
  * The small ad on a story: the advertiser's logo and name, in the row with
@@ -16,9 +17,10 @@ import { fontFor, type Theme, textSize } from '../theme/tokens';
  *   • outlined in the ad colour (theme.adMark), never the accent blue the
  *     publisher's name is set in
  *   • shorter than the credit is allowed to become: the publisher's name keeps
- *     its room and this line gives way, with an ellipsis, when space is short.
- *     Crediting the publisher is what the licence requires; the ad is what is
- *     negotiable.
+ *     its room and this line gives way when space is short. Crediting the
+ *     publisher is what the licence requires; the ad is what is negotiable.
+ *     A name too long for the room it is left slides slowly sideways (Ticker)
+ *     rather than being cut off.
  *
  * It carried a printed "विज्ञापन" / "Ad" label until 4 Oct 2026, when the
  * owner chose the name alone. A screen reader still announces it as an ad.
@@ -59,12 +61,10 @@ function InlineAdInner({ ad, theme, lang, onPress }: Props) {
       accessibilityLabel={`${SPOKEN[lang]}: ${ad.advertiser}. ${ad.text}`}
     >
       {logo !== null && <Image source={{ uri: logo }} style={styles.logo} resizeMode="contain" />}
-      <Text
+      <Ticker
+        text={ad.advertiser}
         style={[styles.text, { color: theme.textSecondary, fontFamily: fontFor(ad.language) }]}
-        numberOfLines={1}
-      >
-        {ad.advertiser}
-      </Text>
+      />
       <MaterialCommunityIcons name="chevron-right" size={14} color={theme.adMark} />
     </Pressable>
   );
@@ -87,5 +87,5 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   logo: { width: 14, height: 14, borderRadius: 3 },
-  text: { flexShrink: 1, fontSize: textSize(12), fontWeight: '500' },
+  text: { fontSize: textSize(12), fontWeight: '500' },
 });
