@@ -34,7 +34,9 @@
       "expo-video",
       "expo-sqlite",
       "expo-notifications",
-      "expo-web-browser"
+      "expo-web-browser",
+      "react-native-nitro-google-signin",
+      "expo-secure-store"
     ],
     "scheme": "saar",
     "_comment_extra": "eas.projectId is what getExpoPushTokenAsync reads (src/state/DeviceContext.tsx). Without it the call throws and no device ever registers a token. This is the id from the Expo dashboard; `eas init --id` writes the same value.",

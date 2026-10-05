@@ -8,6 +8,7 @@ import { SettingsProvider, useSettings } from '../src/state/SettingsContext';
 import { BookmarksProvider } from '../src/state/BookmarksContext';
 import { FiltersProvider } from '../src/state/FiltersContext';
 import { NetworkProvider } from '../src/state/NetworkContext';
+import { ReaderProvider } from '../src/state/ReaderContext';
 import { DeviceProvider } from '../src/state/DeviceContext';
 import { useNotificationRouting } from '../src/hooks/useNotificationRouting';
 import { useRetractionPurge } from '../src/hooks/useRetractionPurge';
@@ -99,7 +100,9 @@ export default function RootLayout() {
             <BookmarksProvider>
               <FiltersProvider>
                 <NetworkProvider>
-                  <Root />
+                  <ReaderProvider>
+                    <Root />
+                  </ReaderProvider>
                 </NetworkProvider>
               </FiltersProvider>
             </BookmarksProvider>

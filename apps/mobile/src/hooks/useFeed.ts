@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { fetchFeed, isAd } from '../api/client';
+import { fetchFeed, isStory } from '../api/client';
 import { putCards, getCards, evict } from '../db/cache';
 import { adsShownToday, inlineShownToday, loadAdBudget } from '../lib/adTracker';
 import {
@@ -92,7 +92,7 @@ export function useFeed(languages: Array<'ne' | 'en'>, category: string) {
       // Deduplicated on append — see appendPage for why the cursor alone is not
       // the same guarantee.
       setState((s) => ({ ...s, cards: appendPage(s.cards, page.items) }));
-      contentSeen.current += page.items.filter((i) => !isAd(i)).length;
+      contentSeen.current += page.items.filter((i) => isStory(i)).length;
       cursor.current = page.nextCursor;
       hasMore.current = page.hasMore;
       void putCards(cacheable(page.items), category).catch(() => undefined);

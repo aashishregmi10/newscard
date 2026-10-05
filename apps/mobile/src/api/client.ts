@@ -7,7 +7,17 @@
  */
 
 import Constants from 'expo-constants';
-import type { AdCardDto, ArticleCardDto, InlineAdDto, VideoCardDto, VideoRendition } from './generated/dto';
+import type {
+  AdCardDto,
+  ArticleCardDto,
+  InlineAdDto,
+  InteractionCardDto,
+  InteractionResultsDto,
+  InteractionStateDto,
+  ReaderSessionDto,
+  VideoCardDto,
+  VideoRendition,
+} from './generated/dto';
 
 /**
  * Where the API lives.
@@ -69,6 +79,9 @@ export type AdCard = AdCardDto;
 export type InlineAd = InlineAdDto;
 export type AdPlacement = 'card' | 'inline';
 export type VideoCard = VideoCardDto;
+export type InteractionCard = InteractionCardDto;
+export type InteractionState = InteractionStateDto;
+export type InteractionResults = InteractionResultsDto;
 export type { VideoRendition } from './generated/dto';
 
 /**
@@ -80,9 +93,17 @@ export type { VideoRendition } from './generated/dto';
  * stripped before a story is cached (cacheable, in hooks/feedLoad) so an
  * ended campaign is never replayed offline.
  */
-export type FeedEntry = (Card & { kind?: 'article'; inlineAd?: InlineAd }) | AdCard;
+export type FeedEntry = (Card & { kind?: 'article'; inlineAd?: InlineAd }) | AdCard | InteractionCard;
 
 export const isAd = (e: FeedEntry): e is AdCard => (e as AdCard).kind === 'ad';
+
+/** A rating or a vote, as a card between stories. */
+export const isInteraction = (e: FeedEntry): e is InteractionCard =>
+  (e as InteractionCard).kind === 'interaction';
+
+/** A story — not an ad, not an Interaction. Only stories are read, muted, counted and cached. */
+export const isStory = (e: FeedEntry): e is Card & { kind?: 'article'; inlineAd?: InlineAd } =>
+  !isAd(e) && !isInteraction(e);
 
 export interface FeedPage {
   items: FeedEntry[];
@@ -123,6 +144,9 @@ export async function fetchFeed(opts: {
     seen: String(opts.seen ?? 0),
     adsToday: String(opts.adsToday ?? 0),
     inlineToday: String(opts.inlineToday ?? 0),
+    /* This app can draw a rating or a vote; older ones cannot, and the server
+       sends them none unless asked. */
+    interactions: '1',
   });
   if (opts.cursor) params.set('cursor', opts.cursor);
 
@@ -164,8 +188,11 @@ export async function fetchFeed(opts: {
   if (!page || !Array.isArray(page.items)) {
     throw new FeedError('bad-response', 'That did not look like our server.');
   }
+  /* An Interaction has a title where a story or an ad has a headline. */
   const bad = page.items.find(
-    (i) => typeof i?.id !== 'string' || typeof (i as { headline?: unknown }).headline !== 'string',
+    (i) =>
+      typeof i?.id !== 'string' ||
+      typeof (isInteraction(i) ? i.title : (i as { headline?: unknown }).headline) !== 'string',
   );
   if (bad) throw new FeedError('bad-response', 'That did not look like our server.');
 
@@ -349,4 +376,90 @@ export function pickRendition(
 export function formatSize(bytes: number): string {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/* ── Interactions, and the reader's sign-in ───────────────────────────────── */
+
+/**
+ * A refusal from the server about an answer, by status: 401 sign in again,
+ * 409 already answered (with where the reader stands), 410 closed.
+ */
+export class AnswerError extends Error {
+  constructor(
+    readonly status: number,
+    message: string,
+    readonly state: InteractionState | null,
+  ) {
+    super(message);
+  }
+}
+
+async function readerCall<T>(path: string, init: RequestInit & { token?: string | null } = {}): Promise<T> {
+  const { token, headers, ...rest } = init;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}${path}`, {
+      ...rest,
+      signal: controller.signal,
+      headers: {
+        ...(rest.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(token ? { Authorization: `Reader ${token}` } : {}),
+        ...(headers ?? {}),
+      },
+    });
+  } catch {
+    throw new AnswerError(0, 'Could not reach the server.', null);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (res.status === 204) return undefined as T;
+  const body = (await res.json().catch(() => null)) as
+    | (T & { error?: { message?: string; details?: { state?: InteractionState } } })
+    | null;
+  if (!res.ok) {
+    throw new AnswerError(
+      res.status,
+      body?.error?.message ?? `The server returned ${res.status}.`,
+      body?.error?.details?.state ?? null,
+    );
+  }
+  return body as T;
+}
+
+/** The Google Web client ID sign-in must use, from the server's settings — one place to change it. */
+export function fetchReaderConfig(): Promise<{ googleWebClientId: string | null }> {
+  return readerCall('/v1/readers/config');
+}
+
+/** Swap a Google ID token for our own session. */
+export function startReaderSession(idToken: string): Promise<ReaderSessionDto> {
+  return readerCall('/v1/readers/session', { method: 'POST', body: JSON.stringify({ idToken }) });
+}
+
+export function endReaderSession(token: string): Promise<void> {
+  return readerCall('/v1/readers/session', { method: 'DELETE', token });
+}
+
+/** Where this reader stands; without a session, what anyone may see. */
+export function fetchInteractionState(id: string, token: string | null): Promise<InteractionState> {
+  const path = `/v1/interactions/${encodeURIComponent(id)}/${token ? 'me' : 'results'}`;
+  return readerCall(path, { token });
+}
+
+export function answerVote(id: string, optionId: string, token: string): Promise<InteractionState> {
+  return readerCall(`/v1/interactions/${encodeURIComponent(id)}/vote`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ optionId }),
+  });
+}
+
+export function answerRating(id: string, optionId: string, stars: number, token: string): Promise<InteractionState> {
+  return readerCall(`/v1/interactions/${encodeURIComponent(id)}/rating`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ optionId, stars }),
+  });
 }

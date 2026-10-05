@@ -5,6 +5,7 @@ import { useSettings, type ThemeMode } from '../../src/state/SettingsContext';
 import { useBookmarks } from '../../src/state/BookmarksContext';
 import { useFilters } from '../../src/state/FiltersContext';
 import { useDevice } from '../../src/state/DeviceContext';
+import { useReader } from '../../src/state/ReaderContext';
 import { TEXT_SCALE, type TextSizeSetting, textSize } from '../../src/theme/tokens';
 import type { Theme } from '../../src/theme/tokens';
 
@@ -126,6 +127,7 @@ export default function SettingsScreen() {
   const { items, clear } = useBookmarks();
   const filters = useFilters();
   const device = useDevice();
+  const reader = useReader();
   const insets = useSafeAreaInsets();
   const t = s.theme;
   const ne = s.languages.includes('ne');
@@ -335,6 +337,42 @@ export default function SettingsScreen() {
             }
           />
         </Section>
+
+        {/* Only once someone has signed in, from a vote or rating card — the
+            app never asks anyone to sign in from here. */}
+        {reader.session !== null && (
+          <Section title={ne ? 'खाता' : 'ACCOUNT'} theme={t}>
+            <Row
+              label={
+                reader.session.name !== null
+                  ? `${ne ? 'साइन इन' : 'Signed in as'} ${reader.session.name}`
+                  : ne
+                    ? 'Google बाट साइन इन'
+                    : 'Signed in with Google'
+              }
+              hint={
+                ne
+                  ? 'मत र रेटिङका लागि मात्र। हामीसँग तपाईंको नाम वा इमेल छैन।'
+                  : 'For votes and ratings only. We do not have your name or email.'
+              }
+              theme={t}
+              last
+              right={
+                <Pressable
+                  onPress={() =>
+                    Alert.alert(ne ? 'साइन आउट गर्ने?' : 'Sign out?', undefined, [
+                      { text: ne ? 'रद्द' : 'Cancel', style: 'cancel' },
+                      { text: ne ? 'साइन आउट' : 'Sign out', onPress: () => void reader.signOut() },
+                    ])
+                  }
+                  accessibilityRole="button"
+                >
+                  <Text style={{ color: t.accent, fontWeight: '600' }}>{ne ? 'साइन आउट' : 'Sign out'}</Text>
+                </Pressable>
+              }
+            />
+          </Section>
+        )}
 
         <Section title={ne ? 'सुरक्षित समाचार' : 'SAVED STORIES'} theme={t}>
           <Row

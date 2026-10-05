@@ -215,6 +215,24 @@ describe('runFeedLoad — cache first', () => {
     // would bill nobody and mislead the reader after the campaign ended.
     expect(persisted[0]!.map((c) => c.id)).toEqual(['story-1']);
   });
+
+  it('neither caches an Interaction nor counts it as a story passed', async () => {
+    const persisted: Card[][] = [];
+    const vote = { kind: 'interaction', id: 'ix-1', type: 'vote', title: 'नमुना मतदान', options: [] } as unknown as FeedEntry;
+
+    const r = await runFeedLoad(
+      params,
+      deps({
+        fetchPage: async () => page([card('story-1'), vote, card('story-2')]),
+        persist: (articles) => persisted.push(articles),
+      }),
+      recorder().emit,
+    );
+
+    /* Its state is one reader's and live; the server places cards by stories passed. */
+    expect(persisted[0]!.map((c) => c.id)).toEqual(['story-1', 'story-2']);
+    expect(r?.contentSeen).toBe(2);
+  });
 });
 
 describe('appendPage — the page boundary', () => {

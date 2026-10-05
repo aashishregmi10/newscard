@@ -54,6 +54,16 @@ export const isAdEntry = (e: FeedEntry): boolean =>
   (e as { kind?: string }).kind === 'ad';
 
 /**
+ * A story, structurally: not an ad and not an Interaction. Only stories are
+ * cached for offline reading and counted towards `seen` — an Interaction's
+ * state is per reader and live, and the server places cards by stories passed.
+ */
+export const isStoryEntry = (e: FeedEntry): boolean => {
+  const kind = (e as { kind?: string }).kind;
+  return kind !== 'ad' && kind !== 'interaction';
+};
+
+/**
  * The part of a page that may be cached for offline reading: the stories,
  * without any ad.
  *
@@ -64,7 +74,7 @@ export const isAdEntry = (e: FeedEntry): boolean =>
  */
 export function cacheable(entries: FeedEntry[]): Card[] {
   return entries
-    .filter((e) => !isAdEntry(e))
+    .filter(isStoryEntry)
     .map((e) => {
       const { inlineAd: _dropped, ...card } = e as Card & { inlineAd?: unknown };
       return card as Card;
@@ -192,7 +202,7 @@ export async function runFeedLoad(
     return {
       nextCursor: page.nextCursor,
       hasMore: page.hasMore,
-      contentSeen: page.items.filter((i) => !isAdEntry(i)).length,
+      contentSeen: page.items.filter(isStoryEntry).length,
     };
   } catch (e) {
     if (!isCurrent()) return null;

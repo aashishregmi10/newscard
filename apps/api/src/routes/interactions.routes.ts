@@ -5,6 +5,7 @@ import { getDb, interactionCollections, interactionPhase, type InteractionDoc } 
 import { AppError } from '@saar/shared';
 import { Stars, type InteractionStateDto } from '@saar/schemas';
 import { asyncRoute } from '../middleware/index.js';
+import { loadEnv } from '../config/index.js';
 import { interactionAnswerLimit, readerSessionLimit } from '../middleware/rateLimit.js';
 import { forgetInteractionCaches, resultsOf, toResultsDto } from '../services/interactions.service.js';
 import { requireReader, signInWithGoogle, signOut } from '../services/readers.service.js';
@@ -12,6 +13,7 @@ import { requireReader, signInWithGoogle, signOut } from '../services/readers.se
 /**
  * Reader sign-in, and answering Interactions.
  *
+ *   GET    /v1/readers/config             the Google client ID the app signs in with
  *   POST   /v1/readers/session            Google ID token in, our session out
  *   DELETE /v1/readers/session            sign out
  *   GET    /v1/interactions/:id/me        this reader's answers, and the results they may see
@@ -79,6 +81,20 @@ function assertOpen(doc: InteractionDoc): void {
 
 const isDuplicate = (e: unknown) =>
   typeof e === 'object' && e !== null && (e as { code?: number }).code === 11000;
+
+/**
+ * The Google Web client ID the app asks Google for a token for. From the
+ * server's settings, so it is changed in one place (.env), not in every build.
+ * Not a secret: Google prints it in every sign-in page that uses it.
+ */
+interactionRoutes.get('/readers/config', (_req, res) => {
+  const first = loadEnv()
+    .GOOGLE_WEB_CLIENT_ID.split(',')
+    .map((s) => s.trim())
+    .find(Boolean);
+  res.setHeader('Cache-Control', 'public, max-age=300');
+  res.json({ googleWebClientId: first ?? null });
+});
 
 interactionRoutes.post(
   '/readers/session',

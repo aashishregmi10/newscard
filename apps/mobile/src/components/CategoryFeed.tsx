@@ -16,11 +16,12 @@ import * as Haptics from 'expo-haptics';
 import { NewsCard } from './NewsCard';
 import { CardSkeleton } from './CardSkeleton';
 import { SponsoredCard } from './SponsoredCard';
+import { InteractionCard } from './InteractionCard';
 import { useFeed } from '../hooks/useFeed';
 import { useFilters } from '../state/FiltersContext';
 import { useDevice } from '../state/DeviceContext';
 import { useNetwork } from '../state/NetworkContext';
-import { isAd, type AdCard, type Card, type FeedEntry, type InlineAd } from '../api/client';
+import { isAd, isInteraction, isStory, type AdCard, type Card, type FeedEntry, type InlineAd } from '../api/client';
 import {
   noteAdVisible,
   noteAdHidden,
@@ -118,7 +119,7 @@ function CategoryFeedInner({
   // rebuild its cells, and this component re-renders on every horizontal swipe.
   const cards: FeedEntry[] | null = useMemo(
     () =>
-      raw?.filter((c) => isAd(c) || !filters.isMuted(c.category.slug, c.source.name, category)) ??
+      raw?.filter((c) => !isStory(c) || !filters.isMuted(c.category.slug, c.source.name, category)) ??
       null,
     [raw, filters, category],
   );
@@ -236,7 +237,15 @@ function CategoryFeedInner({
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<FeedEntry>) =>
-      isAd(item) ? (
+      isInteraction(item) ? (
+        <InteractionCard
+          card={item}
+          theme={theme}
+          height={height}
+          textScale={textScale}
+          dataSaver={dataSaver}
+        />
+      ) : isAd(item) ? (
         <SponsoredCard
           ad={item}
           theme={theme}
@@ -292,6 +301,9 @@ function CategoryFeedInner({
         noteAdVisible(item, categoryRef.current, 'card');
         continue;
       }
+
+      /* Not a story either: it is neither read nor counted. */
+      if (isInteraction(item)) continue;
 
       /*
        * The small ad on this story is on screen exactly when the story is — it
