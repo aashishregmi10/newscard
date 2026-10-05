@@ -25,6 +25,16 @@ import type { Band } from './keySentences.js';
  * Each free model has its own daily limit. When the first is spent (HTTP 429)
  * the next is tried, so the larger, better-at-Nepali model is used while it
  * lasts and a lighter one carries the rest of the day.
+ *
+ * ── A model that just said no is left alone for a while ─────────────────────
+ *
+ * On 5 Oct 2026 the flagship answered "503, high demand" to nearly every
+ * request, and took five or six seconds to say so. The lighter model then
+ * wrote the summary in about one and a half. Asking the busy one first every
+ * time made every editor wait for a refusal. So a model that answers busy,
+ * slow or spent rests — ten minutes, or an hour for a spent limit — and is
+ * asked last until then. It is still asked if nothing else answers: resting
+ * changes the order, never whether a model can be used.
  */
 
 export const DEFAULT_MODELS = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
@@ -39,6 +49,22 @@ export interface GeminiRequest {
   band: Band;
   /** What the result is for: a story card, or a short's caption. */
   kind: 'summary' | 'caption';
+}
+
+/** Until when each model is asked last, in this process. */
+const restingUntil = new Map<string, number>();
+const REST_WHEN_BUSY_MS = 10 * 60_000;
+const REST_WHEN_SPENT_MS = 60 * 60_000;
+
+/** Forget which models are resting. For tests. */
+export function forgetRestingModels(): void {
+  restingUntil.clear();
+}
+
+/** The models in the order to ask them now: rested ones first, in their order. */
+function askingOrder(models: readonly string[], now: number): string[] {
+  const resting = (m: string) => (restingUntil.get(m) ?? 0) > now;
+  return [...models.filter((m) => !resting(m)), ...models.filter(resting)];
 }
 
 export interface GeminiResult {
@@ -152,12 +178,13 @@ export async function geminiSummarise(
   req: GeminiRequest,
   generate: GenerateFn,
   models: readonly string[] = DEFAULT_MODELS,
+  now: () => number = Date.now,
 ): Promise<GeminiResult> {
   const system = systemPrompt(req);
   const first = sourceMessage(req);
   let lastReason = 'No model was configured.';
 
-  for (const model of models) {
+  for (const model of askingOrder(models, now())) {
     try {
       const raw = await generate({ model, system, turns: [{ role: 'user', text: first }] });
       let text = parseSummary(raw);
@@ -196,13 +223,16 @@ export async function geminiSummarise(
         if (again !== null) text = again;
       }
 
+      restingUntil.delete(model);
       return { text, model };
     } catch (e) {
       if (isQuota(e)) {
+        restingUntil.set(model, now() + REST_WHEN_SPENT_MS);
         lastReason = `The free daily limit for ${model} is used up.`;
         continue;
       }
       if (isServerSide(e)) {
+        restingUntil.set(model, now() + REST_WHEN_BUSY_MS);
         lastReason =
           e instanceof ApiError
             ? `The AI service is busy (it answered ${e.status}).`

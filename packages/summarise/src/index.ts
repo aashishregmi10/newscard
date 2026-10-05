@@ -31,7 +31,13 @@ import {
 
 export { keySentences, splitSentences } from './keySentences.js';
 export type { Band } from './keySentences.js';
-export { DEFAULT_MODELS, geminiSummarise, systemPrompt, SummariserUnavailable } from './gemini.js';
+export {
+  DEFAULT_MODELS,
+  forgetRestingModels,
+  geminiSummarise,
+  systemPrompt,
+  SummariserUnavailable,
+} from './gemini.js';
 export type { GenerateFn, GeminiRequest, GeminiResult } from './gemini.js';
 
 export interface SummariseInput {
@@ -55,6 +61,8 @@ export interface SummariseOptions {
   env?: Record<string, string | undefined>;
   /** Stands in for Google in tests. */
   generate?: GenerateFn;
+  /** The clock, for tests of how long a busy model rests. */
+  now?: () => number;
 }
 
 export function summariserConfigured(env: Record<string, string | undefined> = process.env): boolean {
@@ -104,6 +112,7 @@ export async function summarise(
       { text: input.text, title: input.title, language: input.language, band: input.band, kind },
       generate,
       models.length > 0 ? models : DEFAULT_MODELS,
+      options.now,
     );
     return { text: out.text, source: 'gemini', model: out.model, note: null };
   } catch (e) {

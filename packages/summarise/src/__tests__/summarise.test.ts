@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import { ApiError } from '@google/genai';
 import { countWords } from '@saar/shared';
 import {
+  forgetRestingModels,
   keySentences,
   splitSentences,
   summarise,
@@ -94,6 +95,10 @@ describe('keySentences', () => {
 });
 
 describe('summarise with Gemini', () => {
+  /* Which models are resting is remembered for the process; each test starts
+     with none. */
+  beforeEach(() => forgetRestingModels());
+
   it('returns the model’s summary when it is the right length', async () => {
     const generate = scripted([json(words(52))]);
     const out = await summarise(
@@ -172,6 +177,39 @@ describe('summarise with Gemini', () => {
     );
     expect(out.source).toBe('key_sentences');
     expect(out.note).toMatch(/busy.*503/);
+  });
+
+  it('asks a model that was just busy last, so nobody waits for it to say no again', async () => {
+    let clock = 1_000_000;
+    const now = () => clock;
+    const input = { text: ENGLISH, title: 'Sample', language: 'en' as const, band: BAND };
+
+    const first = scripted([new ApiError({ message: 'overloaded', status: 503 }), json(words(50))]);
+    await summarise(input, { env: ENV, generate: first, now });
+    expect(first.calls).toEqual(['gemini-3.8-flash', 'gemini-3.5-flash-lite']);
+
+    clock += 60_000;
+    const second = scripted([json(words(50))]);
+    const out = await summarise(input, { env: ENV, generate: second, now });
+    expect(second.calls).toEqual(['gemini-3.5-flash-lite']);
+    expect(out.model).toBe('gemini-3.5-flash-lite');
+
+    /* Rested: asked first again. */
+    clock += 10 * 60_000;
+    const third = scripted([json(words(50))]);
+    expect((await summarise(input, { env: ENV, generate: third, now })).model).toBe('gemini-3.8-flash');
+  });
+
+  it('still asks a resting model when the others fail too', async () => {
+    const now = () => 5_000_000;
+    const input = { text: ENGLISH, title: 'Sample', language: 'en' as const, band: BAND };
+    const busy = () => new ApiError({ message: 'overloaded', status: 503 });
+    await summarise(input, { env: ENV, generate: scripted([busy(), json(words(50))]), now });
+
+    const generate = scripted([busy(), json(words(50))]);
+    const out = await summarise(input, { env: ENV, generate, now });
+    expect(generate.calls).toEqual(['gemini-3.5-flash-lite', 'gemini-3.8-flash']);
+    expect(out.model).toBe('gemini-3.8-flash');
   });
 
   it('does not try another model when the request itself is refused', async () => {
