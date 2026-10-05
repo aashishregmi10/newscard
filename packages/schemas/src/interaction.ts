@@ -100,3 +100,88 @@ export const Interaction = z.object({
 export type Interaction = z.infer<typeof Interaction>;
 
 export const Stars = z.number().int().min(1).max(5);
+
+/* ── what the app receives ─────────────────────────────────────────────────── */
+
+export const InteractionOptionDto = z.object({
+  id: z.string(),
+  name: z.string(),
+  detail: z.string().nullable(),
+  image: z
+    .object({
+      credit: z.string(),
+      blurHash: z.string().nullable(),
+      urls: z.object({
+        sm: z.string().nullable(),
+        md: z.string().nullable(),
+        lg: z.string().nullable(),
+      }),
+    })
+    .nullable(),
+});
+export type InteractionOptionDto = z.infer<typeof InteractionOptionDto>;
+
+/**
+ * An Interaction as a card in the feed. Discriminated from stories and ads on
+ * `kind`, and sent only to an app that asks for it (`interactions=1`): an older
+ * app would try to draw it as a story.
+ *
+ * Nothing about the reader is in here — the feed is cached and shared — so the
+ * card asks for its own state (InteractionStateDto) once it is on screen.
+ */
+export const InteractionCardDto = z.object({
+  kind: z.literal('interaction'),
+  id: z.string(),
+  type: InteractionTypeEnum,
+  language: LanguageEnum,
+  title: z.string(),
+  options: z.array(InteractionOptionDto),
+  /** ISO. Null: a rating with no closing date. */
+  closesAt: z.string().nullable(),
+});
+export type InteractionCardDto = z.infer<typeof InteractionCardDto>;
+
+/**
+ * Results, one shape for both kinds, in the order of the options. A vote fills
+ * `votes` and `percent` (whole numbers adding up to 100); a rating fills
+ * `ratings` and `average` (one decimal, null before the first).
+ */
+export const InteractionResultsDto = z.object({
+  type: InteractionTypeEnum,
+  /** Votes in all, or ratings in all. */
+  total: z.number(),
+  options: z.array(
+    z.object({
+      id: z.string(),
+      votes: z.number(),
+      percent: z.number(),
+      ratings: z.number(),
+      average: z.number().nullable(),
+    }),
+  ),
+});
+export type InteractionResultsDto = z.infer<typeof InteractionResultsDto>;
+
+/** Where one reader stands with one Interaction, and what they may see of it. */
+export const InteractionStateDto = z.object({
+  id: z.string(),
+  /** No more answers: closed by an editor, or past its closing date. */
+  closed: z.boolean(),
+  /** The candidate this reader voted for. */
+  myVote: z.string().nullable(),
+  /** The businesses this reader has rated, and how. */
+  myRatings: z.array(z.object({ optionId: z.string(), stars: z.number() })),
+  /**
+   * A rating's averages are always shown. A vote's totals only once the reader
+   * has voted, or it has closed, so early votes do not steer later ones.
+   */
+  results: InteractionResultsDto.nullable(),
+});
+export type InteractionStateDto = z.infer<typeof InteractionStateDto>;
+
+/** A signed-in reader's session, as POST /v1/readers/session returns it. */
+export const ReaderSessionDto = z.object({
+  token: z.string(),
+  expiresAt: z.string(),
+});
+export type ReaderSessionDto = z.infer<typeof ReaderSessionDto>;

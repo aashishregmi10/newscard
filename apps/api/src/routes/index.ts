@@ -8,6 +8,7 @@ import { adRoutes } from './ads.routes.js';
 import { clientErrorRoutes } from './clientErrors.routes.js';
 import { eventRoutes } from './events.routes.js';
 import { videoRoutes } from './videos.routes.js';
+import { interactionRoutes } from './interactions.routes.js';
 import { getArticleBySlug } from '../services/feed.service.js';
 import { toArticleCard } from '../dto/articleCard.dto.js';
 import { asyncRoute } from '../middleware/index.js';
@@ -21,6 +22,7 @@ v1.use(adRoutes);
 v1.use(clientErrorRoutes);
 v1.use(eventRoutes);
 v1.use(videoRoutes);
+v1.use(interactionRoutes);
 
 /** GET /v1/articles/:slug — deep-link resolution. Spec Ch. 6.6. */
 v1.get(

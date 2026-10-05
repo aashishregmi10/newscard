@@ -2,7 +2,18 @@ import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { z } from 'zod';
-import { ArticleCardDto, AdCardDto, InlineAdDto, VideoCardDto, VideoRendition } from '@saar/schemas';
+import {
+  ArticleCardDto,
+  AdCardDto,
+  InlineAdDto,
+  InteractionCardDto,
+  InteractionOptionDto,
+  InteractionResultsDto,
+  InteractionStateDto,
+  ReaderSessionDto,
+  VideoCardDto,
+  VideoRendition,
+} from '@saar/schemas';
 
 /**
  * Generate the mobile app's DTO types from the Zod schemas.
@@ -61,6 +72,11 @@ const NAMED = new Map<z.ZodTypeAny, string>([
   [AdCardDto, 'AdCardDto'],
   [InlineAdDto, 'InlineAdDto'],
   [VideoCardDto, 'VideoCardDto'],
+  [InteractionOptionDto, 'InteractionOptionDto'],
+  [InteractionCardDto, 'InteractionCardDto'],
+  [InteractionResultsDto, 'InteractionResultsDto'],
+  [InteractionStateDto, 'InteractionStateDto'],
+  [ReaderSessionDto, 'ReaderSessionDto'],
 ]);
 
 /**
@@ -170,6 +186,23 @@ const body = [
     '/** The small ad carried on a story, beside save and share. On the feed entry, never the card. */',
   ),
   declare('VideoCardDto', VideoCardDto, '/** A short, as GET /v1/videos returns it. */'),
+  declare('InteractionOptionDto', InteractionOptionDto, '/** A business or candidate on an Interaction card. */'),
+  declare(
+    'InteractionCardDto',
+    InteractionCardDto,
+    '/** A rating or a vote as a feed card. Sent only with interactions=1. */',
+  ),
+  declare(
+    'InteractionResultsDto',
+    InteractionResultsDto,
+    '/** Results in option order: votes and percent for a vote, ratings and average for a rating. */',
+  ),
+  declare(
+    'InteractionStateDto',
+    InteractionStateDto,
+    "/** One reader's answers to an Interaction, and the results they may see. */",
+  ),
+  declare('ReaderSessionDto', ReaderSessionDto, "/** A signed-in reader's session (POST /v1/readers/session). */"),
 ].join('\n');
 
 if (!existsSync(OUT_DIR)) mkdirSync(OUT_DIR, { recursive: true });

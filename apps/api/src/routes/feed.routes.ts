@@ -4,6 +4,8 @@ import { AppError, FEED_PAGE_SIZE } from '@saar/shared';
 import { LanguageEnum } from '@saar/schemas';
 import { getFeed } from '../services/feed.service.js';
 import { injectAds } from '../services/ads.service.js';
+import { injectInteractions, interactionsForFeed } from '../services/interactions.service.js';
+import { getDb } from '@saar/db';
 import { DEFAULT_AD_DENSITY, DEFAULT_INLINE_ADS } from '@saar/shared';
 import { asyncRoute } from '../middleware/index.js';
 import { loadEnv } from '../config/index.js';
@@ -30,6 +32,12 @@ const QuerySchema = z.object({
   /** Small ads shown today. Counted separately: at one per story, sharing the
    *  full-card counter would spend its allowance of twelve in twelve stories. */
   inlineToday: z.coerce.number().int().nonnegative().default(0),
+  /**
+   * '1' from an app that can draw an Interaction card (a rating or a vote).
+   * An older app would draw one as a broken story, so it gets none unless it
+   * asks — the same arrangement as YouTube shorts on /v1/videos.
+   */
+  interactions: z.enum(['0', '1']).default('0'),
 });
 
 export const feedRoutes = Router();
@@ -70,6 +78,18 @@ feedRoutes.get(
       inlineBlocked,
     });
 
+    /* Interactions after ads, placed by the same absolute position and never
+       beside a full-card ad. Not personalised: the card fetches its reader's
+       own state once it is on screen. */
+    const items =
+      parsed.data.interactions === '1'
+        ? injectInteractions(
+            entries,
+            parsed.data.seen,
+            await interactionsForFeed(getDb(), { languages: lang, categorySlug: category }),
+          )
+        : entries;
+
     // Personalised by ad allowance, so this response is NOT shared cache-safe.
     res.setHeader(
       'Cache-Control',
@@ -77,6 +97,6 @@ feedRoutes.get(
         ? 'private, max-age=30'
         : 'public, max-age=60, stale-while-revalidate=300',
     );
-    res.json({ ...page, items: entries, adCount, inlineCount });
+    res.json({ ...page, items, adCount, inlineCount });
   }),
 );

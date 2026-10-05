@@ -85,3 +85,27 @@ export const deviceRegisterLimit = rateLimit({
   windowMs: 60 * 60_000,
   key: byIp,
 });
+
+/**
+ * Signing in. Each one is a check against Google and a new session, so a
+ * client hammering it is either broken or forging tokens; twenty an hour from
+ * one address is far beyond a family sharing a connection.
+ */
+export const readerSessionLimit = rateLimit({
+  name: 'rsess',
+  limit: 20,
+  windowMs: 60 * 60_000,
+  key: byIp,
+});
+
+/**
+ * Votes and ratings. A reader rates six businesses at most per card, so thirty
+ * a minute from one address — one CGNAT cell may be many readers — is roomy,
+ * and the one-per-reader rule is the database's, not this limit's.
+ */
+export const interactionAnswerLimit = rateLimit({
+  name: 'ixans',
+  limit: 30,
+  windowMs: 60_000,
+  key: byIp,
+});

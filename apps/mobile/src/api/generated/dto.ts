@@ -123,3 +123,61 @@ export interface VideoCardDto {
   };
   publishedAt: string;
 }
+
+/** A business or candidate on an Interaction card. */
+export interface InteractionOptionDto {
+  id: string;
+  name: string;
+  detail: string | null;
+  image: {
+    credit: string;
+    blurHash: string | null;
+    urls: {
+      sm: string | null;
+      md: string | null;
+      lg: string | null;
+    };
+  } | null;
+}
+
+/** A rating or a vote as a feed card. Sent only with interactions=1. */
+export interface InteractionCardDto {
+  kind: "interaction";
+  id: string;
+  type: "rating" | "vote";
+  language: "ne" | "en";
+  title: string;
+  options: InteractionOptionDto[];
+  closesAt: string | null;
+}
+
+/** Results in option order: votes and percent for a vote, ratings and average for a rating. */
+export interface InteractionResultsDto {
+  type: "rating" | "vote";
+  total: number;
+  options: ({
+    id: string;
+    votes: number;
+    percent: number;
+    ratings: number;
+    average: number | null;
+  })[];
+}
+
+/** One reader's answers to an Interaction, and the results they may see. */
+export interface InteractionStateDto {
+  id: string;
+  closed: boolean;
+  myVote: string | null;
+  myRatings: {
+    optionId: string;
+    stars: number;
+  }[];
+  results: InteractionResultsDto | null;
+}
+
+/** A signed-in reader's session (POST /v1/readers/session). */
+export interface ReaderSessionDto {
+  token: string;
+  expiresAt: string;
+}

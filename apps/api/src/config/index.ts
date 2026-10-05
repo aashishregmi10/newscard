@@ -16,6 +16,18 @@ const EnvSchema = z.object({
     .string()
     .min(32, 'CURSOR_SECRET must be at least 32 characters — generate with: openssl rand -base64 32'),
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  /**
+   * The Google OAuth Web client ID(s) a reader's sign-in token must be issued
+   * for, comma-separated. Unset: sign-in is refused with a message saying so,
+   * and everything else works.
+   */
+  GOOGLE_WEB_CLIENT_ID: z.string().default(''),
+  /**
+   * The key that turns a Google account number into a reader id. Its own
+   * secret, not CURSOR_SECRET: rotating this would make every reader new, and
+   * every vote castable again. Unset in development: CURSOR_SECRET stands in.
+   */
+  READER_ID_SECRET: z.string().min(32, 'READER_ID_SECRET must be at least 32 characters').optional(),
   /** Ch. 10.9 — defaults to false everywhere. Only production sets it true. */
   NOTIFICATIONS_ENABLED: z
     .string()
