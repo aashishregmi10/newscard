@@ -47,3 +47,27 @@ happens while the module graph is being evaluated, before any function runs.
 `npm run demo:check` and CI's `expo export` will not catch this. Both run
 against JavaScript, and this is the one class of failure that only a real
 handset sees.
+
+# react-native-worklets is pinned to 0.10.4 — do not "fix" it
+
+Reanimated's worklets have three halves that must be the SAME version: the
+native code in the installed APK, the JavaScript in node_modules, and the Babel
+plugin Metro loaded when it started. Any difference and every module that
+touches Reanimated throws while loading:
+
+```
+[Worklets] Mismatch between JavaScript code version and Worklets Babel plugin version (0.10.1 vs. 0.10.4)
+```
+
+followed by `Cannot read property 'ErrorBoundary' of undefined` from the tabs
+layout, because the route failed to evaluate (see above).
+
+The development builds up to and including dc91b425 (4 Oct 2026) were built with
+0.10.4, pulled in by reanimated. `npx expo install` prefers the SDK's 0.10.1, and
+installing that on 5 Oct produced exactly the error above. So the package is
+pinned to 0.10.4 and listed in `expo.install.exclude` in package.json, which
+keeps `expo install --check` (and `npm run mobile`'s doctor) from asking for
+0.10.1.
+
+To change the version: change it, rebuild the APK, and restart Metro with
+`npm run mobile -- --clear` — all three, together.
