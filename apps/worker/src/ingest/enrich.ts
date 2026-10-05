@@ -9,9 +9,10 @@ import { bodyText, politeGet } from './politeGet.js';
  * ── When this runs at all ───────────────────────────────────────────────────
  *
  * Only for a publisher whose licence says `images` or `fullText`, only for a
- * story that is new on this poll, and only for what the feed did not already
- * give us. A publisher on the WordPress API never needs it. It is one request
- * per new story, paced by the caller — the same guest's manners as the feed.
+ * story still in Incoming that lacks what the feed did not give us, and at most
+ * twice per story (see enrichWaiting in pollSources.ts). A post from the
+ * WordPress API already has everything. It is one request per story, paced by
+ * the caller — the same guest's manners as the feed.
  *
  * ── What it reads ───────────────────────────────────────────────────────────
  *

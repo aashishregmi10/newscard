@@ -94,6 +94,13 @@ export const Lead = z.object({
   sortAt: z.date().optional(),
 
   /**
+   * How many times the collector has read this story's own page for the photo
+   * or text the feed lacked, and when it last did. It stops at two.
+   */
+  enrichAttempts: z.number().int().min(0).optional(),
+  enrichTriedAt: z.date().optional(),
+
+  /**
    * Stable hash of the normalised headline and URL.
    *
    * The unique index on `canonicalUrl` already stops the same link arriving

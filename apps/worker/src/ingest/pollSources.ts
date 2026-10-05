@@ -6,7 +6,7 @@ import { fetchFeed, FeedFetchError } from './fetchFeed.js';
 import { fetchWordPressPosts } from './wordpress.js';
 import { readArticlePage, MAX_ARTICLE_CHARS } from './enrich.js';
 import { pollYouTubeSource, type YouTubePollReport } from './youtube.js';
-import { toLead, type RejectReason, type SourceContext } from './toLead.js';
+import { MAX_LEAD_AGE_DAYS, toLead, type RejectReason, type SourceContext } from './toLead.js';
 
 /**
  * The collector.
@@ -235,6 +235,9 @@ async function pollOne(source: SourceRecord, now: Date): Promise<PollReport> {
       { _id: source._id as never },
       { $set: { 'ingest.lastSuccessAt': now, 'ingest.consecutiveFailures': 0, updatedAt: now } },
     );
+    /* Nothing new in the feed, but stories already collected may still be
+       waiting for their photo. */
+    report.enriched = await enrichWaiting(source, viaWordPress, now);
     return report;
   }
 
@@ -248,8 +251,6 @@ async function pollOne(source: SourceRecord, now: Date): Promise<PollReport> {
 
   const items = result.items;
   report.fetched = items.length;
-  /** New leads whose photo or full text the story page might supply. */
-  const toEnrich: EnrichJob[] = [];
 
   for (const item of items) {
     const outcome = toLead(item, context, now);
@@ -259,29 +260,13 @@ async function pollOne(source: SourceRecord, now: Date): Promise<PollReport> {
     }
 
     try {
-      const inserted = await c.leads.insertOne({
+      await c.leads.insertOne({
         ...outcome.lead,
         sourceId: source._id as never,
         createdAt: now,
         updatedAt: now,
       } as never);
       report.inserted += 1;
-
-      /* Only an RSS story can be missing what the page has; the WordPress
-         API already gave everything the licence lets us keep. */
-      const needImage = !viaWordPress && mayUseImages && outcome.lead.feedImageUrl === null;
-      const needText =
-        !viaWordPress &&
-        mayUseFullText &&
-        (outcome.lead.feedContent?.length ?? 0) < SHORT_TEXT_CHARS;
-      if (needImage || needText) {
-        toEnrich.push({
-          id: inserted.insertedId,
-          url: outcome.lead.canonicalUrl,
-          needImage,
-          needText,
-        });
-      }
     } catch (e) {
       /*
        * A duplicate is the normal case, not an error: a feed carries the same
@@ -310,7 +295,7 @@ async function pollOne(source: SourceRecord, now: Date): Promise<PollReport> {
     },
   );
 
-  report.enriched = await enrichLeads(source.slug, toEnrich);
+  report.enriched = await enrichWaiting(source, viaWordPress, now);
 
   log.info('feed polled', {
     source: source.slug,
@@ -326,52 +311,97 @@ async function pollOne(source: SourceRecord, now: Date): Promise<PollReport> {
 /** Below this, a feed's "content" is an excerpt and the page has the story. */
 const SHORT_TEXT_CHARS = 600;
 
-/** Story pages read per poll, at most. The rest wait: a lead is never lost
- *  for lacking a photo, it is only shown without one. */
+/** Story pages read per poll, at most. The rest wait for the next poll: a
+ *  lead is never lost for lacking a photo, it is only shown without one. */
 const MAX_ENRICH_PER_POLL = 20;
 
 /** One page a second from any one publisher. */
 const ENRICH_GAP_MS = 1_000;
 
-interface EnrichJob {
-  id: unknown;
-  url: string;
-  needImage: boolean;
-  needText: boolean;
-}
+/** A page read twice without giving what was missing will not give it. */
+const MAX_ENRICH_ATTEMPTS = 2;
 
 /**
- * Read the story pages a new batch of leads needs, one at a time.
+ * Read story pages for this publisher's leads that are still missing what the
+ * licence lets us have — newest first, up to MAX_ENRICH_PER_POLL a poll.
  *
- * Runs after the poll's own writes, so a slow or failing page can delay only
- * itself. Each lead is updated on its own; a failure leaves it exactly as the
- * feed made it.
+ * ── Why it looks at every waiting lead, not only this poll's new ones ───────
+ *
+ * It used to read pages only for the stories a poll had just inserted, and only
+ * the first twenty. On 4 Oct 2026 Kathmandu Post's first good read brought 40
+ * stories: 20 got photos, the other 20 never would, and nor would anything
+ * collected before the publisher's photo switch was turned on. Incoming showed
+ * empty frames for stories whose photo promote then fetched without trouble.
+ * Asking the database "what is still missing?" fixes all three: the overflow,
+ * the stories from before the switch, and a page that failed once.
+ *
+ * ── Bounds ──────────────────────────────────────────────────────────────────
+ *
+ *   • Only stories still in Incoming, and no older than a first poll would
+ *     accept (MAX_LEAD_AGE_DAYS): older news is not worth a request.
+ *   • At most MAX_ENRICH_ATTEMPTS reads of any one page, counted on the lead,
+ *     so a story whose page has no photo is not fetched every fifteen minutes
+ *     for a month.
+ *   • Never for a publisher read through the WordPress API: its posts came
+ *     with everything attached. A post without a featured image has none, and
+ *     the page's share image would be the site's own logo; a short post is
+ *     short on the page too.
+ *
+ * Each lead is updated on its own; a failure leaves it exactly as it was.
  */
-async function enrichLeads(sourceSlug: string, queue: EnrichJob[]): Promise<number> {
+async function enrichWaiting(source: SourceRecord, viaWordPress: boolean, now: Date): Promise<number> {
+  const mayUseImages = source.licence?.images === true;
+  const mayUseFullText = source.licence?.fullText === true;
+
+  const noImage = { feedImageUrl: { $in: [null, ''] } };
+  const shortText = {
+    $expr: { $lt: [{ $strLenCP: { $ifNull: ['$feedContent', ''] } }, SHORT_TEXT_CHARS] },
+  };
+  const lacking = [...(mayUseImages ? [noImage] : []), ...(mayUseFullText ? [shortText] : [])];
+  if (viaWordPress || lacking.length === 0) return 0;
+
   const c = collections(getDb());
+  const waiting = await c.leads
+    .find({
+      sourceId: source._id as never,
+      status: 'new',
+      fetchedAt: { $gte: new Date(now.getTime() - MAX_LEAD_AGE_DAYS * 86_400_000) },
+      enrichAttempts: { $not: { $gte: MAX_ENRICH_ATTEMPTS } },
+      $or: lacking,
+    } as never)
+    .sort({ fetchedAt: -1 })
+    .limit(MAX_ENRICH_PER_POLL)
+    .project<{ _id: unknown; canonicalUrl: string; feedImageUrl?: string | null; feedContent?: string | null }>({
+      canonicalUrl: 1,
+      feedImageUrl: 1,
+      feedContent: 1,
+    })
+    .toArray();
+
   let enriched = 0;
-  for (const [i, job] of queue.slice(0, MAX_ENRICH_PER_POLL).entries()) {
+  for (const [i, lead] of waiting.entries()) {
     if (i > 0) await new Promise((r) => setTimeout(r, ENRICH_GAP_MS));
+    const needImage = mayUseImages && !lead.feedImageUrl;
+    const needText = mayUseFullText && (lead.feedContent?.length ?? 0) < SHORT_TEXT_CHARS;
+    const set: Record<string, unknown> = { enrichTriedAt: new Date(), updatedAt: new Date() };
     try {
-      const page = await readArticlePage(job.url);
-      const set: Record<string, unknown> = {};
-      if (job.needImage && page.imageUrl !== null) set.feedImageUrl = page.imageUrl;
-      if (job.needText && page.text !== null) {
+      const page = await readArticlePage(lead.canonicalUrl);
+      if (needImage && page.imageUrl !== null) set.feedImageUrl = page.imageUrl;
+      if (needText && page.text !== null && page.text.length > (lead.feedContent?.length ?? 0)) {
         set.feedContent = page.text.slice(0, MAX_ARTICLE_CHARS);
       }
-      if (Object.keys(set).length === 0) continue;
-      await c.leads.updateOne(
-        { _id: job.id as never },
-        { $set: { ...set, updatedAt: new Date() } },
-      );
-      enriched += 1;
+      if ('feedImageUrl' in set || 'feedContent' in set) enriched += 1;
     } catch (e) {
       log.warn('story page unreadable', {
-        source: sourceSlug,
-        url: job.url,
+        source: source.slug,
+        url: lead.canonicalUrl,
         reason: e instanceof Error ? e.message : String(e),
       });
     }
+    await c.leads.updateOne(
+      { _id: lead._id as never },
+      { $set: set, $inc: { enrichAttempts: 1 } } as never,
+    );
   }
   return enriched;
 }

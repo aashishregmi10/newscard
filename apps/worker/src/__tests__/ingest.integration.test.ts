@@ -425,4 +425,58 @@ describe('photos and full text, by licence', () => {
     await pollDueSources();
     expect(pageRequests).toBe(3);
   });
+
+  /* The Kathmandu Post case: stories collected before the photo switch was on
+     — or past one poll's share of page reads — must still get their photo. */
+  it('fills in stories collected before the photo switch was on, even when the feed has not changed', async () => {
+    await seedSource({ homepageUrl: origin });
+    await pollDueSources();
+    expect(pageRequests).toBe(0);
+
+    await collections(getDb()).sources.updateOne(
+      { _id: sourceId },
+      {
+        $set: {
+          licence: { status: 'agreed', contactEmail: 'legal@namuna.example.invalid', images: true },
+          'ingest.lastPolledAt': new Date(0),
+          'ingest.etag': '"abc"',
+        },
+      },
+    );
+    const serve = respond;
+    respond = (req) =>
+      ((req as { url?: string }).url ?? '').startsWith('/news/') ? serve(req) : { status: 304, body: '' };
+
+    const [report] = await pollDueSources();
+    expect(report?.notModified).toBe(true);
+    expect(report?.enriched).toBe(3);
+    const lead = await collections(getDb()).leads.findOne({ canonicalUrl: `${origin}/news/2` });
+    expect(lead?.feedImageUrl).toBe(`${origin}/share/2.jpg`);
+  });
+
+  it('reads a page twice at most when it has no photo to give', async () => {
+    await seedSource({
+      homepageUrl: origin,
+      licence: { status: 'agreed', contactEmail: 'legal@namuna.example.invalid', images: true },
+    });
+    const serve = respond;
+    respond = (req) => {
+      const out = serve(req);
+      return ((req as { url?: string }).url ?? '').startsWith('/news/')
+        ? { ...out, body: out.body.replace(/<meta property="og:image"[^>]*>/, '') }
+        : out;
+    };
+
+    for (let i = 0; i < 3; i++) {
+      await collections(getDb()).sources.updateOne(
+        { _id: sourceId },
+        { $set: { 'ingest.lastPolledAt': new Date(0) } },
+      );
+      await pollDueSources();
+    }
+    expect(pageRequests).toBe(6);
+    const lead = await collections(getDb()).leads.findOne({});
+    expect(lead?.feedImageUrl).toBeNull();
+    expect(lead?.enrichAttempts).toBe(2);
+  });
 });
