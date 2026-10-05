@@ -3,11 +3,12 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Router } from 'express';
 import multer from 'multer';
-import { AppError } from '@saar/shared';
+import { AppError, INTERACTION_LIMITS } from '@saar/shared';
 import { ImageLicenceEnum } from '@saar/schemas';
 import {
   processAdImage,
   processImage,
+  processSquareImage,
   storeImage,
   transcodeShort,
   describeStoredVideo,
@@ -185,6 +186,62 @@ mediaRoutes.post(
 
     res.status(201).json({
       image: {
+        blurHash: stored.blurHash,
+        width: stored.width,
+        height: stored.height,
+        urls: stored.urls,
+      },
+    });
+  }),
+);
+
+/**
+ * POST /cms/media/option-image
+ *
+ * A business's or candidate's photo for an Interaction: cropped square for a
+ * tile in the 2×2 vote grid or a rating row (processSquareImage). A credit is
+ * required, as for a story's photograph — a candidate's portrait is somebody's
+ * work, and the card prints whose.
+ */
+mediaRoutes.post(
+  '/cms/media/option-image',
+  uploadLimit,
+  imageUpload.single('file'),
+  asyncRoute(async (req, res) => {
+    const file = req.file;
+    if (!file) throw new AppError('BAD_REQUEST', 'No file was uploaded.');
+
+    const credit = String(req.body?.credit ?? '').trim();
+    const { min, max } = INTERACTION_LIMITS.credit;
+    if (credit.length < min || credit.length > max) {
+      throw new AppError(
+        'VALIDATION_FAILED',
+        'Say who took or owns this photo — the credit is printed with it on the card.',
+      );
+    }
+
+    let stored;
+    try {
+      stored = await storeImage(await processSquareImage(file.buffer));
+    } catch (e) {
+      if (e instanceof ImageRejected) throw new AppError('VALIDATION_FAILED', e.message);
+      throw e;
+    }
+
+    await writeAudit({
+      action: 'media.optionImage.upload',
+      entityType: 'media',
+      entityId: stored.key,
+      actorId: req.staff!.staffId,
+      actorEmail: req.staff!.email,
+      before: null,
+      after: { bytes: file.size, originalName: file.originalname },
+      ip: req.ip ?? null,
+    });
+
+    res.status(201).json({
+      image: {
+        credit,
         blurHash: stored.blurHash,
         width: stored.width,
         height: stored.height,

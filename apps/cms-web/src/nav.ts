@@ -118,6 +118,13 @@ export const SHORTS_PER_PAGE: PerPage = 10;
  * would go stale at midnight.
  */
 export const AD_TABS = ['running', 'scheduled', 'paused', 'finished', 'draft'] as const;
+
+/** Interactions: live (open, or scheduled to open), drafts, and closed. */
+export const INTERACTION_TABS = ['live', 'drafts', 'closed'] as const;
+export type InteractionTab = (typeof INTERACTION_TABS)[number];
+
+/** Ten, like the other lists: each row is a whole card. Matches the server's page. */
+export const INTERACTIONS_PER_PAGE: PerPage = 10;
 export type AdTab = (typeof AD_TABS)[number];
 
 /** Ten, like every other list here. */
@@ -180,6 +187,9 @@ export type Route =
   | { name: 'adNew' }
   | { name: 'ad'; id: string }
   | { name: 'advertisers' }
+  | { name: 'interactions'; tab: InteractionTab; page: number }
+  | { name: 'interactionNew' }
+  | { name: 'interaction'; id: string }
   | { name: 'shortNew' }
   | { name: 'sources'; tab: LicenceTab; page: number; q: string }
   | { name: 'sourceNew' }
@@ -197,6 +207,7 @@ export type Section =
   | 'shorts'
   | 'sources'
   | 'ads'
+  | 'interactions'
   | 'notifications';
 
 /**
@@ -234,6 +245,13 @@ export const Routes = {
   adNew: (): Route => ({ name: 'adNew' }),
   ad: (id: string): Route => ({ name: 'ad', id }),
   advertisers: (): Route => ({ name: 'advertisers' }),
+  interactions: (params: { tab?: InteractionTab; page?: number } = {}): Route => ({
+    name: 'interactions',
+    tab: params.tab ?? 'live',
+    page: params.page ?? 1,
+  }),
+  interactionNew: (): Route => ({ name: 'interactionNew' }),
+  interaction: (id: string): Route => ({ name: 'interaction', id }),
   sources: (params: { tab?: LicenceTab; page?: number; q?: string } = {}): Route => ({
     name: 'sources',
     tab: params.tab ?? 'all',
@@ -352,6 +370,19 @@ export function parseRoute(hash: string): Route {
     }
   }
 
+  if (section === 'interactions') {
+    return Routes.interactions({ tab: readInteractionTab(query), page: readPage(query) });
+  }
+  /* Before the id branch, as `ads/new` is. */
+  if (section === 'interactions/new') return Routes.interactionNew();
+  if (section.startsWith('interactions/')) {
+    const rest = path.slice('interactions/'.length);
+    if (rest !== '' && !rest.includes('/')) {
+      const id = decodeSegment(rest);
+      if (id !== '') return Routes.interaction(id);
+    }
+  }
+
   if (section === 'published') {
     return Routes.published({ tab: readPublishedTab(query), page: readPage(query) });
   }
@@ -462,6 +493,15 @@ export function routeToHash(route: Route): string {
       return `#/ads/${encodeURIComponent(route.id)}`;
     case 'advertisers':
       return '#/ads/advertisers';
+    case 'interactions':
+      return withQuery('#/interactions', {
+        tab: route.tab === 'live' ? null : route.tab,
+        page: route.page === 1 ? null : String(route.page),
+      });
+    case 'interactionNew':
+      return '#/interactions/new';
+    case 'interaction':
+      return `#/interactions/${encodeURIComponent(route.id)}`;
     case 'published':
       return withQuery('#/published', {
         tab: route.tab === 'published' ? null : route.tab,
@@ -513,6 +553,10 @@ export function sectionOf(route: Route): Section {
     case 'ad':
     case 'advertisers':
       return 'ads';
+    case 'interactions':
+    case 'interactionNew':
+    case 'interaction':
+      return 'interactions';
     case 'leads':
       return 'leads';
     case 'notifications':
@@ -566,6 +610,12 @@ export function screenKeyOf(route: Route): string {
       return `ad:${route.id}`;
     case 'advertisers':
       return 'advertisers';
+    case 'interactions':
+      return `interactions:${route.tab}`;
+    case 'interactionNew':
+      return 'interactionNew';
+    case 'interaction':
+      return `interaction:${route.id}`;
     case 'leads':
       return `leads:${route.tab}`;
     case 'notifications':
@@ -656,6 +706,11 @@ function readTab(query: URLSearchParams): ArticleTab {
 function readAdTab(query: URLSearchParams): AdTab {
   const raw = (query.get('tab') ?? '').toLowerCase();
   return AD_TABS.find((tab) => tab === raw) ?? 'running';
+}
+
+function readInteractionTab(query: URLSearchParams): InteractionTab {
+  const raw = (query.get('tab') ?? '').toLowerCase();
+  return INTERACTION_TABS.find((tab) => tab === raw) ?? 'live';
 }
 
 function readPublishedTab(query: URLSearchParams): PublishedTab {

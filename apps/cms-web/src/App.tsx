@@ -16,6 +16,8 @@ import { EditShort } from './components/EditShort';
 import { Ads } from './components/Ads';
 import { AdCampaign } from './components/AdCampaign';
 import { Advertisers } from './components/Advertisers';
+import { Interactions } from './components/Interactions';
+import { InteractionEditor } from './components/InteractionEditor';
 import { NewSource } from './components/NewSource';
 import { NewStory } from './components/NewStory';
 import { Leads } from './components/Leads';
@@ -197,6 +199,13 @@ function Screen({
     case 'ad':
       /* Keyed by id so moving between two campaigns rebuilds the form. */
       return <AdCampaign key={route.id} id={route.id} />;
+    case 'interactions':
+      return <Interactions tab={route.tab} page={route.page} />;
+    case 'interactionNew':
+      return <InteractionEditor key="new" id={null} />;
+    case 'interaction':
+      /* Keyed by id so moving between two Interactions rebuilds the form. */
+      return <InteractionEditor key={route.id} id={route.id} />;
     case 'advertisers':
       return <Advertisers />;
     case 'source':

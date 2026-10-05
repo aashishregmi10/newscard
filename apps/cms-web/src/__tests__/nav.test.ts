@@ -51,6 +51,10 @@ const ALL_ROUTES: readonly Route[] = [
   Routes.adNew(),
   Routes.ad('65f1c2a4b8e9d0123456789c'),
   Routes.advertisers(),
+  Routes.interactions(),
+  Routes.interactions({ tab: 'closed', page: 2 }),
+  Routes.interactionNew(),
+  Routes.interaction('65f1c2a4b8e9d0123456789d'),
 ];
 
 describe('parseRoute and routeToHash', () => {
@@ -226,6 +230,20 @@ describe('the tab in the URL', () => {
     expect(parseRoute('#/ads/a/b')).toEqual(DEFAULT_ROUTE);
     for (const r of [Routes.ads(), Routes.adNew(), Routes.ad('x'), Routes.advertisers()]) {
       expect(sectionOf(r)).toBe('ads');
+    }
+  });
+
+  it('separates the Interactions list, the new form and one Interaction', () => {
+    expect(parseRoute('#/interactions')).toEqual(Routes.interactions());
+    expect(parseRoute('#/interactions?tab=drafts')).toEqual(Routes.interactions({ tab: 'drafts' }));
+    expect(parseRoute('#/interactions?tab=nonsense')).toEqual(Routes.interactions());
+    expect(parseRoute('#/interactions/new')).toEqual(Routes.interactionNew());
+    expect(parseRoute('#/interactions/65f1c2a4b8e9d0123456789d')).toEqual(
+      Routes.interaction('65f1c2a4b8e9d0123456789d'),
+    );
+    expect(parseRoute('#/interactions/a/b')).toEqual(DEFAULT_ROUTE);
+    for (const r of [Routes.interactions(), Routes.interactionNew(), Routes.interaction('x')]) {
+      expect(sectionOf(r)).toBe('interactions');
     }
   });
 

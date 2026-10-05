@@ -34,6 +34,7 @@ import { shortRoutes } from './routes/shorts.routes.js';
 import { shortLeadRoutes } from './routes/shortLeads.routes.js';
 import { sourceRoutes } from './routes/sources.routes.js';
 import { adRoutes } from './routes/ads.routes.js';
+import { interactionRoutes } from './routes/interactions.routes.js';
 import { createLogger, drainHttpServer } from '@saar/shared';
 import { startDeferredSweep, startIngestion, startReceiptReconciliation } from '@saar/worker';
 import { ensureSessionIndexes } from './auth/session.js';
@@ -86,6 +87,7 @@ export function createCmsApp(ORIGIN = 'http://localhost:5173') {
   app.use('/api', shortLeadRoutes);
   app.use('/api', sourceRoutes);
   app.use('/api', adRoutes);
+  app.use('/api', interactionRoutes);
 
   app.use(notFoundHandler);
   app.use(errorHandler);

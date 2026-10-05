@@ -302,6 +302,58 @@ const SHORT_LEADS: IndexSpec[] = [
   },
 ];
 
+const INTERACTIONS: IndexSpec[] = [
+  {
+    key: { status: 1, opensAt: -1 },
+    name: 'interaction_live',
+    serves: 'The feed: what is live now; the editorial list by tab',
+  },
+];
+
+const VOTES: IndexSpec[] = [
+  {
+    /* The rule "one vote per reader" lives here, not in a read-then-write two
+       taps could both pass. */
+    key: { interactionId: 1, readerId: 1 },
+    name: 'vote_one_per_reader',
+    unique: true,
+    serves: 'POST /v1/interactions/:id/vote; GET …/me',
+  },
+  {
+    key: { interactionId: 1, optionId: 1 },
+    name: 'vote_tally',
+    serves: 'Counting a vote',
+  },
+];
+
+const RATINGS: IndexSpec[] = [
+  {
+    key: { interactionId: 1, optionId: 1, readerId: 1 },
+    name: 'rating_one_per_reader',
+    unique: true,
+    serves: 'POST /v1/interactions/:id/rating — one rating per reader per business',
+  },
+  {
+    key: { interactionId: 1, readerId: 1 },
+    name: 'rating_by_reader',
+    serves: 'GET /v1/interactions/:id/me',
+  },
+];
+
+const READERS: IndexSpec[] = [
+  { key: { subHash: 1 }, name: 'reader_sub_unique', unique: true, serves: 'Sign-in: one reader per Google account' },
+];
+
+const READER_SESSIONS: IndexSpec[] = [
+  { key: { tokenHash: 1 }, name: 'reader_session_token', unique: true, serves: 'Every signed-in request' },
+  {
+    key: { expiresAt: 1 },
+    name: 'reader_session_expiry',
+    expireAfterSeconds: 0,
+    serves: 'A session ends on its own date',
+  },
+];
+
 export const ALL_INDEXES = {
   articles: ARTICLES,
   sources: SOURCES,
@@ -318,6 +370,11 @@ export const ALL_INDEXES = {
   clientErrors: CLIENT_ERRORS,
   videos: VIDEOS,
   shortLeads: SHORT_LEADS,
+  interactions: INTERACTIONS,
+  votes: VOTES,
+  ratings: RATINGS,
+  readers: READERS,
+  readerSessions: READER_SESSIONS,
 } as const;
 
 export interface SyncResult {

@@ -13,3 +13,4 @@ export * from './ad.js';
 export * from './video.js';
 export * from './shortLead.js';
 export * from './mongoValidator.js';
+export * from './interaction.js';

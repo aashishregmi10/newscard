@@ -12,3 +12,4 @@ export * from './logger.js';
 export * from './mediaPath.js';
 export * from './constants.js';
 export * from './overlap.js';
+export * from './interactions.js';

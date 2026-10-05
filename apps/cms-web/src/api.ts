@@ -627,6 +627,71 @@ export interface LicenceResult {
  * have happened and the application would have no idea. The right thing for an
  * in-flight write is to let it finish and ignore the result.
  */
+/* ------------------------------------------------------------ interactions */
+
+export type InteractionType = 'rating' | 'vote';
+export type InteractionTabName = 'live' | 'drafts' | 'closed';
+
+export interface OptionImageData {
+  credit: string;
+  blurHash: string | null;
+  width: number;
+  height: number;
+  urls: { sm: string | null; md: string | null; lg: string | null };
+}
+
+export interface InteractionOptionData {
+  id: string;
+  name: string;
+  detail: string | null;
+  image: OptionImageData | null;
+}
+
+export type InteractionResultsData =
+  | { type: 'vote'; total: number; options: Array<{ id: string; votes: number; percent: number }> }
+  | { type: 'rating'; options: Array<{ id: string; ratings: number; average: number | null }> };
+
+export interface InteractionRow {
+  id: string;
+  type: InteractionType;
+  status: 'draft' | 'live' | 'closed';
+  /** From the status AND the dates: a live one past its closing date is closed. */
+  phase: 'draft' | 'scheduled' | 'open' | 'closed';
+  language: 'ne' | 'en';
+  categorySlug: string | null;
+  title: string;
+  options: InteractionOptionData[];
+  opensAt: string | null;
+  closesAt: string | null;
+  publishedAt: string | null;
+  closedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  results: InteractionResultsData;
+}
+
+export interface InteractionInputData {
+  type: InteractionType;
+  language: 'ne' | 'en';
+  categorySlug: string | null;
+  title: string;
+  options: Array<{ id?: string; name: string; detail: string | null; image: OptionImageData | null }>;
+  opensAt: string | null;
+  closesAt: string | null;
+}
+
+/** The server's field-by-field refusal: the same words the site shows on each field. */
+export interface FieldProblem {
+  field: string;
+  message: string;
+}
+
+export function problemsOf(e: unknown): FieldProblem[] {
+  if (!(e instanceof ApiError)) return [];
+  const details = e.details as { problems?: unknown } | null;
+  return Array.isArray(details?.problems) ? (details.problems as FieldProblem[]) : [];
+}
+
 export const api = {
   me: (signal?: AbortSignal) => req<{ staff: Staff }>('/auth/me', { signal }),
 
@@ -876,6 +941,49 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(body),
     }),
+
+  /* -------------------------------------------------------- interactions */
+
+  interactions: (tab: InteractionTabName, page: number, signal?: AbortSignal) =>
+    req<{ items: InteractionRow[]; total: number; perPage: number; counts: Record<InteractionTabName, number> }>(
+      `/cms/interactions?tab=${tab}&page=${page}`,
+      { signal },
+    ),
+
+  interaction: (id: string, signal?: AbortSignal) =>
+    req<{ interaction: InteractionRow }>(`/cms/interactions/${encodeURIComponent(id)}`, { signal }),
+
+  createInteraction: (body: InteractionInputData) =>
+    req<{ interaction: InteractionRow }>('/cms/interactions', { method: 'POST', body: JSON.stringify(body) }),
+
+  /** A draft: the whole thing. Live: `{ closesAt }` only. */
+  editInteraction: (id: string, body: InteractionInputData | { closesAt: string | null }) =>
+    req<{ interaction: InteractionRow }>(`/cms/interactions/${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  publishInteraction: (id: string) =>
+    req<{ interaction: InteractionRow }>(`/cms/interactions/${encodeURIComponent(id)}/publish`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
+  closeInteraction: (id: string) =>
+    req<{ interaction: InteractionRow }>(`/cms/interactions/${encodeURIComponent(id)}/close`, {
+      method: 'POST',
+      body: JSON.stringify({}),
+    }),
+
+  deleteInteraction: (id: string) =>
+    req<void>(`/cms/interactions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  uploadOptionImage: (file: File, credit: string) => {
+    const form = new FormData();
+    form.append('credit', credit);
+    form.append('file', file);
+    return upload<{ image: OptionImageData }>('/cms/media/option-image', form);
+  },
 
   /* ---------------------------------------------------------- publishers */
 

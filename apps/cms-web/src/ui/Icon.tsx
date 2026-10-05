@@ -60,6 +60,7 @@ export type IconName =
   | 'search'
   | 'send'
   | 'smartphone'
+  | 'star'
   | 'tag'
   | 'trash'
   | 'upload'
@@ -113,6 +114,11 @@ const SHAPES: Record<IconName, ReactNode> = {
     </>
   ),
   check: <path d="M5.4 12.5 9.8 17l8.8-9.4" />,
+  /* Stroked like the rest: a filled star would be the one shape in the set that
+     is not drawn the same way. */
+  star: (
+    <path d="m12 3.6 2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" />
+  ),
   checkCircle: (
     <>
       <circle cx="12" cy="12" r="8.4" />
