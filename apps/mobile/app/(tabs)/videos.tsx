@@ -55,7 +55,9 @@ export default function VideosScreen() {
   const [items, setItems] = useState<VideoCardType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [muted, setMuted] = useState(true);
+  /* With sound from the start (decided 6 Oct 2026); the reader's choice on the
+     speaker then carries from short to short. */
+  const [muted, setMuted] = useState(false);
   const [focused, setFocused] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   /** Shown for a moment when a pull could not reach the server. */
@@ -163,6 +165,9 @@ export default function VideosScreen() {
   // Stable, so a scroll that moves the active short does not also hand every
   // mounted card a new function and defeat its memo.
   const toggleMute = useCallback(() => setMuted((m) => !m), []);
+  /* The phone would not start a video with sound, so it started muted: the
+     speaker should say so, and the next short should not try again. */
+  const mutedByPhone = useCallback(() => setMuted(true), []);
 
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<VideoCardType>) => (
@@ -176,9 +181,10 @@ export default function VideosScreen() {
         active={focused && item.id === activeId}
         muted={muted}
         onToggleMute={toggleMute}
+        onMutedByPhone={mutedByPhone}
       />
     ),
-    [theme, pageHeight, textScale, dataSaver, unmetered, focused, activeId, muted, toggleMute],
+    [theme, pageHeight, textScale, dataSaver, unmetered, focused, activeId, muted, toggleMute, mutedByPhone],
   );
 
   const getItemLayout = useCallback(
@@ -230,8 +236,8 @@ export default function VideosScreen() {
 
   return (
     <View style={[styles.fill, { backgroundColor: '#000', paddingTop: insets.top }]}>
-      {/* Told once, and only when it matters: on mobile data nothing has been
-          downloaded yet and tapping is what spends it. */}
+      {/* Told once, and only when it matters: with Data Saver on, nothing has
+          been downloaded yet and tapping is what spends it. */}
       {refreshFailed ? (
         <View style={styles.dataNote}>
           <MaterialCommunityIcons name="wifi-off" size={13} color="rgba(255,255,255,0.8)" />
@@ -239,13 +245,11 @@ export default function VideosScreen() {
             {ne ? 'नयाँ भिडियो ल्याउन सकिएन' : 'Could not get new videos'}
           </Text>
         </View>
-      ) : !unmetered && (
+      ) : dataSaver && (
         <View style={styles.dataNote}>
           <MaterialCommunityIcons name="information-outline" size={13} color="rgba(255,255,255,0.8)" />
           <Text style={styles.dataNoteText}>
-            {ne
-              ? 'मोबाइल डाटामा — चलाउन ट्याप गर्नुहोस्'
-              : 'On mobile data — tap to play'}
+            {ne ? 'डाटा सेभर — चलाउन ट्याप गर्नुहोस्' : 'Data Saver — tap to play'}
           </Text>
         </View>
       )}

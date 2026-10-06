@@ -10,28 +10,27 @@ import {
   type VideoCard as VideoCardType,
 } from '../api/client';
 import { type Theme } from '../theme/tokens';
-import { PosterImage, ShortText, shortStyles } from './ShortParts';
+import { PosterImage, ShortText, shareShort, shortStyles } from './ShortParts';
 import { YouTubeShortCard } from './YouTubeShortCard';
 
 /**
  * One short, full screen.
  *
- * ── The rule this component exists to enforce ───────────────────────────────
+ * ── Starting ────────────────────────────────────────────────────────────────
  *
- *   Video NEVER costs the reader data they did not agree to spend.
+ * The visible short plays by itself, with sound, on Wi-Fi and on mobile data —
+ * the format, as readers know it from every short-video app (decided 6 Oct
+ * 2026, from a recording of Inshorts' video tab). On mobile data the smaller
+ * rendition is chosen (pickRendition).
  *
- * On a metered connection nothing is fetched until the reader taps play. The
- * poster — a still, tens of kilobytes — is all that loads, and the play button
- * is labelled with the size of what tapping it will download. That label is the
- * whole design: a reader on a 1 GB monthly plan can see "1.4 MB" and decide.
+ * Data Saver is the reader's way to say no: then nothing is fetched until they
+ * tap play, and the button is labelled with the size of what that will
+ * download, so a reader on a 1 GB monthly plan can see "1.4 MB" and decide.
  *
- * On an unmetered connection the visible short autoplays, muted, because that
- * is what the format is and a tap-to-start wall on Wi-Fi is friction for no
- * benefit.
+ * The sound button carries its choice from short to short (the tab holds it).
  *
- * Muted either way until the reader asks otherwise. Sound that starts on its
- * own in a quiet room is the fastest way to have an app closed and not
- * reopened.
+ * This is our own player on our own file, so — unlike a YouTube short, whose
+ * player must be left clear — the words, sound and Share sit over the video.
  */
 
 export interface ShortCardProps {
@@ -45,6 +44,8 @@ export interface ShortCardProps {
   active: boolean;
   muted: boolean;
   onToggleMute: () => void;
+  /** The phone would not start a video with sound; it was started muted. */
+  onMutedByPhone: () => void;
 }
 
 function VideoCardInner({
@@ -62,13 +63,11 @@ function VideoCardInner({
   const uri = resolveMediaUrl(rendition?.url) ?? '';
 
   /**
-   * Whether this short has been allowed to load.
-   *
-   * On Wi-Fi it starts true, so the format works as a format. On mobile data it
-   * starts false and only a deliberate tap changes it — and once changed it
-   * stays changed for that card, so scrolling back does not re-ask.
+   * Whether this short has been allowed to load: from the start, unless Data
+   * Saver is on, when only a tap allows it — and once allowed it stays allowed
+   * for that card, so scrolling back does not re-ask.
    */
-  const [allowed, setAllowed] = useState(unmetered && !dataSaver);
+  const [allowed, setAllowed] = useState(!dataSaver);
   const [ready, setReady] = useState(false);
 
   /** Paused by the reader, as distinct from paused because it scrolled away. */
@@ -251,6 +250,16 @@ function VideoCardInner({
         </Pressable>
       ) : null}
 
+      {/* Share, under the sound control. */}
+      <Pressable
+        style={[styles.mute, styles.share]}
+        onPress={() => shareShort(video)}
+        accessibilityRole="button"
+        accessibilityLabel={video.language === 'ne' ? 'सेयर गर्नुहोस्' : 'Share'}
+      >
+        <MaterialCommunityIcons name="share-variant-outline" size={18} color="#fff" />
+      </Pressable>
+
       {/*
         * The scrub bar.
         *
@@ -337,6 +346,7 @@ export const VideoCard = memo(ShortCard);
 
 const styles = StyleSheet.create({
   ...shortStyles,
+  share: { top: 60 },
 
   // 28pt of touch around a 3pt line. The target is the point; the line is only
   // what the reader sees.

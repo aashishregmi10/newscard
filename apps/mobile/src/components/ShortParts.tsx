@@ -1,15 +1,142 @@
 import { memo } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { VideoCard as VideoCardType } from '../api/client';
+import { relativeTime } from '../lib/relativeTime';
 import { LINE_HEIGHT, fontFor, textSize } from '../theme/tokens';
 
 /**
  * What every short shows, whoever plays the video.
  *
- * An uploaded short (VideoCard) and a YouTube one (YouTubeShortCard) differ in
- * the player and nothing else a reader reads: the poster underneath and the
- * words over it are the same, from here, so the two cannot drift.
+ * Our own uploaded shorts (VideoCard) carry their words over the video, in
+ * ShortText. A YouTube short cannot: YouTube's rules forbid anything drawn in
+ * front of its player, so its words go in ShortInfoStrip, underneath. Both are
+ * built from here, so the two say the same things the same way.
  */
+
+/**
+ * Share a short: its title, who made it, and — for a YouTube short — the
+ * Short's own address, so the credit travels with it.
+ */
+export function shareShort(video: VideoCardType): void {
+  const link = video.youtubeId ? `https://www.youtube.com/shorts/${video.youtubeId}` : null;
+  const via = video.language === 'ne' ? 'SAAR मा हेरिएको' : 'Seen on SAAR';
+  void Share.share({
+    message: [video.title, '', `${video.source.name}${link ? ' · YouTube' : ''}`, link ?? via].join('\n'),
+  }).catch(() => undefined);
+}
+
+/** A steady colour per publisher for the initial in their circle. */
+function avatarColour(name: string): string {
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.codePointAt(0)!) % 360;
+  return `hsl(${h}, 45%, 38%)`;
+}
+
+/**
+ * The strip under a YouTube short: who made it and when, Share and sound, the
+ * title and the caption, and a thin progress line along its top edge.
+ *
+ * Laid out in the space a vertical video leaves on a phone, so the player above
+ * stays clear of anything of ours.
+ */
+export function ShortInfoStrip({
+  video,
+  textScale,
+  height,
+  muted,
+  onToggleMute,
+  progress,
+  source,
+}: {
+  video: VideoCardType;
+  textScale: number;
+  height: number;
+  muted: boolean;
+  onToggleMute: () => void;
+  /** 0–1, or null before the video has started. */
+  progress: Animated.Value | null;
+  /** Where it was published, after the time: "YouTube". */
+  source: string | null;
+}) {
+  const ne = video.language === 'ne';
+  const lh = LINE_HEIGHT[video.language];
+  const fontFamily = fontFor(video.language);
+  const scale = Math.min(Math.max(textScale, 0.85), 1.4);
+  const titleSize = textSize(16) * scale;
+  const capSize = textSize(13.5) * scale;
+  const initial = [...video.source.name.trim()][0] ?? '·';
+  const when = relativeTime(new Date(video.publishedAt), video.language);
+
+  return (
+    <View style={[stripStyles.strip, { height }]}>
+      <View style={stripStyles.track}>
+        {progress !== null && (
+          <Animated.View
+            style={[stripStyles.fill, { transformOrigin: 'left', transform: [{ scaleX: progress }] }]}
+          />
+        )}
+      </View>
+
+      <View style={stripStyles.head}>
+        <View style={[stripStyles.avatar, { backgroundColor: avatarColour(video.source.name) }]}>
+          <Text style={stripStyles.avatarText}>{initial}</Text>
+        </View>
+        <Text style={stripStyles.meta} numberOfLines={1}>
+          <Text style={stripStyles.name}>{video.source.name}</Text>
+          {`  ·  ${when}${source !== null ? `  ·  ${source}` : ''}`}
+        </Text>
+        <Pressable
+          onPress={() => shareShort(video)}
+          hitSlop={8}
+          style={stripStyles.action}
+          accessibilityRole="button"
+          accessibilityLabel={ne ? 'सेयर गर्नुहोस्' : 'Share'}
+        >
+          <MaterialCommunityIcons name="share-variant-outline" size={21} color="#fff" />
+        </Pressable>
+        <Pressable
+          onPress={onToggleMute}
+          hitSlop={8}
+          style={stripStyles.action}
+          accessibilityRole="button"
+          accessibilityLabel={muted ? (ne ? 'आवाज खोल्नुहोस्' : 'Unmute') : ne ? 'आवाज बन्द गर्नुहोस्' : 'Mute'}
+        >
+          <MaterialCommunityIcons name={muted ? 'volume-off' : 'volume-high'} size={22} color="#fff" />
+        </Pressable>
+      </View>
+
+      <Text
+        style={[stripStyles.title, { fontSize: titleSize, lineHeight: titleSize * 1.28, fontFamily }]}
+        numberOfLines={2}
+      >
+        {video.title}
+      </Text>
+      {video.caption ? (
+        <Text
+          style={[stripStyles.caption, { fontSize: capSize, lineHeight: capSize * lh, fontFamily }]}
+          numberOfLines={2}
+        >
+          {video.caption}
+        </Text>
+      ) : null}
+    </View>
+  );
+}
+
+const stripStyles = StyleSheet.create({
+  strip: { paddingHorizontal: 16, backgroundColor: '#000' },
+  track: { height: 2, marginBottom: 10, backgroundColor: 'rgba(255,255,255,0.18)', overflow: 'hidden' },
+  fill: { height: 2, width: '100%', backgroundColor: '#fff' },
+  head: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 6 },
+  avatar: { width: 26, height: 26, borderRadius: 13, alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: '#fff', fontSize: textSize(13), fontWeight: '700' },
+  meta: { flex: 1, color: 'rgba(255,255,255,0.7)', fontSize: textSize(12) },
+  name: { color: '#fff', fontWeight: '700' },
+  action: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  title: { color: '#fff', fontWeight: '700', marginBottom: 4 },
+  caption: { color: 'rgba(255,255,255,0.82)' },
+});
 
 /** Split out so the poster keeps its own load state and never re-mounts when
  *  the player above it appears. */
