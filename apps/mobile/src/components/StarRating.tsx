@@ -54,7 +54,7 @@ function StarRatingInner({
           key={n}
           disabled={disabled}
           hitSlop={4}
-          style={styles.target}
+          style={[styles.target, { width: Math.max(36, size + 12) }]}
           onPress={() => {
             void Haptics.selectionAsync();
             onChange(n);

@@ -25,14 +25,21 @@ import {
   Button,
   Counter,
   Field,
-  FileDrop,
   Fieldset,
+  Icon,
   Listbox,
   Panel,
   Segmented,
   Skeleton,
 } from '../ui';
-import { InteractionCard, TYPE_LABEL } from './Interactions';
+import { PhonePreview, RatingResults, TYPE_ICON, TYPE_LABEL, VoteResults } from './Interactions';
+
+/** The list with two entries swapped — for moving a candidate up or down. */
+function swap<T>(list: readonly T[], a: number, b: number): T[] {
+  const next = [...list];
+  [next[a], next[b]] = [next[b]!, next[a]!];
+  return next;
+}
 
 /**
  * Making and running one Interaction.
@@ -148,6 +155,13 @@ function toInput(d: Draft): InteractionInputData {
 
 /* ─────────────────────────────────────────────────────────── one option */
 
+const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+/**
+ * One candidate or business as a compact card: its square photo on the left —
+ * click or drop to add or replace it, the credit beneath — and its name and
+ * detail on the right, with up, down and remove.
+ */
 function OptionEditor({
   index,
   type,
@@ -156,6 +170,8 @@ function OptionEditor({
   problem,
   onChange,
   onRemove,
+  onMoveUp,
+  onMoveDown,
   onTouch,
 }: {
   index: number;
@@ -165,17 +181,27 @@ function OptionEditor({
   problem: (field: string) => string | null;
   onChange: (next: OptionDraft) => void;
   onRemove: (() => void) | null;
+  onMoveUp: (() => void) | null;
+  onMoveDown: (() => void) | null;
   onTouch: (field: string) => void;
 }) {
   const [busy, setBusy] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
-  const noun = type === 'vote' ? 'Candidate' : 'Business';
+  const [dragging, setDragging] = useState(false);
+  const fileInput = useRef<HTMLInputElement | null>(null);
+  const noun = type === 'vote' ? 'candidate' : 'business';
+  const Noun = type === 'vote' ? 'Candidate' : 'Business';
   const nameProblem = problem(`options.${index}.name`);
   const detailProblem = problem(`options.${index}.detail`);
   const imageProblem = problem(`options.${index}.image`);
   const src = mediaUrl(o.image?.urls.md ?? o.image?.urls.sm ?? null);
+  const photoNote = uploadError ?? imageProblem;
 
   const onFile = async (file: File) => {
+    if (!PHOTO_TYPES.includes(file.type)) {
+      setUploadError('Use a JPEG, PNG or WebP photo.');
+      return;
+    }
     const credit = o.credit.trim();
     if (credit.length < INTERACTION_LIMITS.credit.min) {
       setUploadError('Write the photo credit first — who took it, or whose it is.');
@@ -199,19 +225,116 @@ function OptionEditor({
   };
 
   return (
-    <div className="ix-option">
-      <div className="ix-option-head">
-        <p className="field-heading">
-          {noun} {index + 1}
-        </p>
-        {onRemove !== null && (
-          <Button size="sm" variant="ghost" icon="trash" disabled={disabled} onClick={onRemove}>
-            Remove
-          </Button>
+    <div className="ix-opt">
+      <div className="ix-opt-photo-col">
+        <button
+          type="button"
+          className={`ix-opt-photo${dragging ? ' ix-opt-photo-drop' : ''}${photoNote !== null ? ' ix-opt-photo-bad' : ''}`}
+          disabled={disabled || busy}
+          onClick={() => fileInput.current?.click()}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDragging(false);
+            const file = e.dataTransfer.files[0];
+            if (file) void onFile(file);
+          }}
+          aria-label={src !== null ? `Replace the photo of ${noun} ${index + 1}` : `Add a photo for ${noun} ${index + 1}`}
+        >
+          {busy ? (
+            <span className="spinner" aria-hidden="true" />
+          ) : src !== null ? (
+            <img src={src} alt="" />
+          ) : (
+            <span className="ix-opt-photo-empty">
+              <Icon name="image" />
+              Add photo
+            </span>
+          )}
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept={PHOTO_TYPES.join(',')}
+          hidden
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (file) void onFile(file);
+          }}
+        />
+        {o.image !== null ? (
+          <span className="ix-opt-credit">
+            Photo: {o.image.credit}{' '}
+            <button
+              type="button"
+              className="ix-link"
+              disabled={disabled || busy}
+              onClick={() => onChange({ ...o, image: null })}
+            >
+              Remove
+            </button>
+          </span>
+        ) : (
+          <Field label="Credit">
+            {(f) => (
+              <input
+                {...f}
+                className="input"
+                disabled={disabled || busy}
+                maxLength={INTERACTION_LIMITS.credit.max}
+                aria-label={`Photo credit for ${noun} ${index + 1}`}
+                value={o.credit}
+                onChange={(e) => onChange({ ...o, credit: e.target.value })}
+              />
+            )}
+          </Field>
         )}
       </div>
-      <div className="grid">
-        <div className="col-6">
+
+      <div className="ix-opt-fields">
+        <div className="ix-opt-head">
+          <span className="field-heading">
+            {Noun} {index + 1}
+          </span>
+          <span className="ix-opt-tools">
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="chevronDown"
+              className="ix-up"
+              aria-label="Move up"
+              title="Move up"
+              disabled={disabled || onMoveUp === null}
+              onClick={onMoveUp ?? undefined}
+            />
+            <Button
+              size="sm"
+              variant="ghost"
+              icon="chevronDown"
+              aria-label="Move down"
+              title="Move down"
+              disabled={disabled || onMoveDown === null}
+              onClick={onMoveDown ?? undefined}
+            />
+            {onRemove !== null && (
+              <Button
+                size="sm"
+                variant="ghost"
+                icon="trash"
+                aria-label={`Remove ${noun} ${index + 1}`}
+                title="Remove"
+                disabled={disabled}
+                onClick={onRemove}
+              />
+            )}
+          </span>
+        </div>
+        <div className="ix-opt-inputs">
           <Field
             label="Name"
             invalid={nameProblem !== null}
@@ -231,8 +354,6 @@ function OptionEditor({
               />
             )}
           </Field>
-        </div>
-        <div className="col-6">
           <Field
             label="Detail"
             optional="optional"
@@ -253,68 +374,11 @@ function OptionEditor({
             )}
           </Field>
         </div>
-
-        <div className="col-12">
-          {uploadError !== null && <Banner tone="error">{uploadError}</Banner>}
-          {src !== null ? (
-            <div className="ad-image">
-              <img className="ix-option-photo" src={src} alt="" />
-              <div className="ad-image-actions">
-                <p className="meta-line">
-                  <span>Photo: {o.image?.credit}</span>
-                  <span>cropped square</span>
-                </p>
-                <Button
-                  size="sm"
-                  icon="trash"
-                  disabled={disabled || busy}
-                  onClick={() => onChange({ ...o, image: null })}
-                >
-                  Remove photo
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="grid">
-              <div className="col-6">
-                <Field
-                  label="Photo credit"
-                  optional={type === 'rating' ? 'optional' : undefined}
-                  invalid={imageProblem !== null}
-                  note={imageProblem ?? 'Printed with the photo. Needed before uploading.'}
-                  noteTone={imageProblem !== null ? 'bad' : 'default'}
-                >
-                  {(f) => (
-                    <input
-                      {...f}
-                      className="input"
-                      disabled={disabled || busy}
-                      maxLength={INTERACTION_LIMITS.credit.max}
-                      value={o.credit}
-                      onChange={(e) => onChange({ ...o, credit: e.target.value })}
-                    />
-                  )}
-                </Field>
-              </div>
-              <div className="col-6">
-                <FileDrop
-                  accept="image/jpeg,image/png,image/webp"
-                  disabled={disabled || busy}
-                  icon="image"
-                  title={type === 'vote' ? 'Choose the candidate’s photo' : 'Choose a photo or logo'}
-                  hint="JPEG, PNG or WebP, at most 15 MB, at least 320px on the shorter side. It is cropped square."
-                  onSelect={(file) => void onFile(file)}
-                  onReject={setUploadError}
-                />
-                {busy && (
-                  <p className="field-note" role="status">
-                    <span className="spinner" aria-hidden="true" /> Uploading…
-                  </p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+        {photoNote !== null && (
+          <p className="field-note ix-bad" role="alert">
+            {photoNote}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -542,28 +606,35 @@ export function InteractionEditor({ id }: { id: string | null }) {
       <div className="grid">
         <div className="col-7">
           {isDraft ? (
-            <Panel title="The question">
+            <>
+            <Panel title="1 · Kind">
+              <div className="ix-kinds" role="radiogroup" aria-label="Kind">
+                {(['vote', 'rating'] as const).map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    role="radio"
+                    aria-checked={d.type === k}
+                    className={d.type === k ? 'ix-kind-card ix-kind-card-on' : 'ix-kind-card'}
+                    onClick={() => {
+                      set('type', k);
+                      if (k === 'vote' && d.closesAt === '') set('closesAt', aWeekOn());
+                    }}
+                  >
+                    <Icon name={TYPE_ICON[k]} className="ix-kind-icon" />
+                    <span>
+                      <span className="ix-kind-name">{TYPE_LABEL[k]}</span>
+                      <span className="ix-kind-hint">
+                        {k === 'vote' ? '2–4 photos, readers pick one' : '2–6 places, 1–5 stars each'}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </Panel>
+            <Panel title="2 · Question">
               <div className="grid">
-                <div className="col-6">
-                  <Fieldset legend="Kind">
-                    {(g) => (
-                      <Segmented
-                        {...g}
-                        aria-label="Kind"
-                        value={d.type}
-                        onChange={(v) => {
-                          set('type', v);
-                          if (v === 'vote' && d.closesAt === '') set('closesAt', aWeekOn());
-                        }}
-                        options={[
-                          { value: 'vote', label: 'Vote' },
-                          { value: 'rating', label: 'Rating' },
-                        ]}
-                      />
-                    )}
-                  </Fieldset>
-                </div>
-                <div className="col-6">
+                <div className="col-12">
                   <Fieldset legend="Readers">
                     {(g) => (
                       <Segmented
@@ -674,6 +745,7 @@ export function InteractionEditor({ id }: { id: string | null }) {
                 </Banner>
               )}
             </Panel>
+            </>
           ) : (
             row !== null && (
               <Panel title="Running">
@@ -685,7 +757,7 @@ export function InteractionEditor({ id }: { id: string | null }) {
                   {row.opensAt !== null && <span>Opened {dateTime(row.opensAt)}</span>}
                   {row.closedAt !== null && <span>Closed {dateTime(row.closedAt)}</span>}
                 </p>
-                <p className="field-note">
+                <p className="field-note ix-locked-note">
                   Readers have answered what they saw, so its {noun === 'business' ? 'businesses' : 'candidates'}{' '}
                   and photos are locked.
                 </p>
@@ -724,9 +796,24 @@ export function InteractionEditor({ id }: { id: string | null }) {
             )
           )}
 
+          {!isDraft && row !== null && (
+            <Panel
+              title="Results"
+              note={`${row.results.total.toLocaleString()} ${row.type === 'vote' ? 'votes' : 'ratings'}${
+                row.results.today > 0 ? ` · ${row.results.today.toLocaleString()} today` : ''
+              }`}
+            >
+              {row.type === 'vote' ? (
+                <VoteResults options={row.options} results={row.results} />
+              ) : (
+                <RatingResults options={row.options} results={row.results} />
+              )}
+            </Panel>
+          )}
+
           {isDraft && (
             <Panel
-              title={d.type === 'vote' ? 'Candidates' : 'Businesses'}
+              title={`3 · ${d.type === 'vote' ? 'Candidates' : 'Businesses'}`}
               note={`${d.options.length} of ${range.max}${d.type === 'vote' ? ' · each needs a photo' : ' · photos optional'}`}
             >
               {optionsProblem !== null && <Banner tone="error">{optionsProblem}</Banner>}
@@ -745,36 +832,41 @@ export function InteractionEditor({ id }: { id: string | null }) {
                       ? () => set('options', d.options.filter((x) => x.key !== o.key))
                       : null
                   }
+                  onMoveUp={i > 0 ? () => set('options', swap(d.options, i, i - 1)) : null}
+                  onMoveDown={i < d.options.length - 1 ? () => set('options', swap(d.options, i, i + 1)) : null}
                 />
               ))}
-              <div className="actions actions-plain">
-                <Button
-                  icon="plus"
-                  disabled={action.busy || d.options.length >= range.max}
-                  title={d.options.length >= range.max ? `At most ${range.max}` : undefined}
+              {d.options.length < range.max && (
+                <button
+                  type="button"
+                  className="ix-opt-add"
+                  disabled={action.busy}
                   onClick={() => set('options', [...d.options, blankOption()])}
                 >
+                  <Icon name="plus" />
                   Add a {noun}
-                </Button>
-              </div>
+                </button>
+              )}
             </Panel>
           )}
         </div>
 
-        <div className="col-5">
-          <Panel title={isDraft ? 'In the app' : 'Results'} note={isDraft ? 'How readers will see it' : undefined}>
-            <InteractionCard
-              type={isDraft ? d.type : row!.type}
-              language={isDraft ? d.language : row!.language}
-              title={isDraft ? d.title : row!.title}
-              options={
-                isDraft
-                  ? d.options.map((o) => ({ name: o.name, detail: o.detail.trim() || null, image: o.image }))
-                  : row!.options
-              }
-              results={isDraft ? null : row!.results}
-            />
-          </Panel>
+        <div className="col-5 ix-side">
+          <div className="ix-sticky">
+            <Panel title="How readers see it">
+              <PhonePreview
+                type={isDraft ? d.type : row!.type}
+                language={isDraft ? d.language : row!.language}
+                title={isDraft ? d.title : row!.title}
+                options={
+                  isDraft
+                    ? d.options.map((o) => ({ name: o.name, detail: o.detail.trim() || null, image: o.image }))
+                    : row!.options
+                }
+                results={isDraft || row!.type === 'vote' ? null : row!.results}
+              />
+            </Panel>
+          </div>
         </div>
       </div>
     </div>

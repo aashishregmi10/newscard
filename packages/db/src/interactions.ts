@@ -88,12 +88,27 @@ export function interactionPhase(
 export interface VoteResults {
   type: 'vote';
   total: number;
+  /** Votes since midnight in Nepal. For the newsroom; readers are not shown it. */
+  today: number;
   options: Array<{ id: string; votes: number; percent: number }>;
 }
 
 export interface RatingResults {
   type: 'rating';
+  /** Ratings in all, across every business. */
+  total: number;
+  /** Ratings since midnight in Nepal. */
+  today: number;
   options: Array<{ id: string; ratings: number; average: number | null }>;
+}
+
+/** Nepal is UTC+5:45 all year (no daylight saving). */
+const NEPAL_OFFSET_MS = (5 * 60 + 45) * 60_000;
+
+/** The moment today began in Nepal, whatever the server's own time zone. */
+export function startOfNepalDay(now: Date = new Date()): Date {
+  const local = now.getTime() + NEPAL_OFFSET_MS;
+  return new Date(local - (local % 86_400_000) - NEPAL_OFFSET_MS);
 }
 
 export type InteractionResults = VoteResults | RatingResults;
@@ -102,37 +117,44 @@ export type InteractionResults = VoteResults | RatingResults;
 export async function countInteractionResults(
   db: Db,
   i: Pick<InteractionDoc, '_id' | 'type' | 'options'>,
+  now: Date = new Date(),
 ): Promise<InteractionResults> {
   const c = interactionCollections(db);
   const ids = i.options.map((o: InteractionOption) => o.id);
+  const sinceToday = { interactionId: i._id, createdAt: { $gte: startOfNepalDay(now) } };
 
   if (i.type === 'vote') {
-    const rows = await c.votes
-      .aggregate<{ _id: string; n: number }>([
-        { $match: { interactionId: i._id } },
-        { $group: { _id: '$optionId', n: { $sum: 1 } } },
-      ])
-      .toArray();
+    const [rows, today] = await Promise.all([
+      c.votes
+        .aggregate<{ _id: string; n: number }>([
+          { $match: { interactionId: i._id } },
+          { $group: { _id: '$optionId', n: { $sum: 1 } } },
+        ])
+        .toArray(),
+      c.votes.countDocuments(sinceToday),
+    ]);
     const counts = ids.map((id) => rows.find((r) => r._id === id)?.n ?? 0);
     const percents = votePercentages(counts);
     return {
       type: 'vote',
       total: counts.reduce((a, b) => a + b, 0),
+      today,
       options: ids.map((id, k) => ({ id, votes: counts[k]!, percent: percents[k]! })),
     };
   }
 
-  const rows = await c.ratings
-    .aggregate<{ _id: string; n: number; sum: number }>([
-      { $match: { interactionId: i._id } },
-      { $group: { _id: '$optionId', n: { $sum: 1 }, sum: { $sum: '$stars' } } },
-    ])
-    .toArray();
-  return {
-    type: 'rating',
-    options: ids.map((id) => {
-      const r = rows.find((x) => x._id === id);
-      return { id, ratings: r?.n ?? 0, average: averageStars(r?.sum ?? 0, r?.n ?? 0) };
-    }),
-  };
+  const [rows, today] = await Promise.all([
+    c.ratings
+      .aggregate<{ _id: string; n: number; sum: number }>([
+        { $match: { interactionId: i._id } },
+        { $group: { _id: '$optionId', n: { $sum: 1 }, sum: { $sum: '$stars' } } },
+      ])
+      .toArray(),
+    c.ratings.countDocuments(sinceToday),
+  ]);
+  const options = ids.map((id) => {
+    const r = rows.find((x) => x._id === id);
+    return { id, ratings: r?.n ?? 0, average: averageStars(r?.sum ?? 0, r?.n ?? 0) };
+  });
+  return { type: 'rating', total: options.reduce((a, o) => a + o.ratings, 0), today, options };
 }

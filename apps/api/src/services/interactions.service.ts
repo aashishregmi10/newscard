@@ -144,7 +144,7 @@ export function toResultsDto(r: InteractionResults): InteractionResultsDto {
   }
   return {
     type: 'rating',
-    total: r.options.reduce((a, o) => a + o.ratings, 0),
+    total: r.total,
     options: r.options.map((o) => ({ id: o.id, votes: 0, percent: 0, ratings: o.ratings, average: o.average })),
   };
 }

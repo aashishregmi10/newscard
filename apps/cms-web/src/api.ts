@@ -647,9 +647,10 @@ export interface InteractionOptionData {
   image: OptionImageData | null;
 }
 
+/** `today` is answers since midnight in Nepal. */
 export type InteractionResultsData =
-  | { type: 'vote'; total: number; options: Array<{ id: string; votes: number; percent: number }> }
-  | { type: 'rating'; options: Array<{ id: string; ratings: number; average: number | null }> };
+  | { type: 'vote'; total: number; today: number; options: Array<{ id: string; votes: number; percent: number }> }
+  | { type: 'rating'; total: number; today: number; options: Array<{ id: string; ratings: number; average: number | null }> };
 
 export interface InteractionRow {
   id: string;

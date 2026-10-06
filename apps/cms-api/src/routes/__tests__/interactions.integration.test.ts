@@ -218,6 +218,19 @@ describe('publishing, and what is locked after', () => {
     expect((await send('get', `/api/cms/interactions/${id}`)).status).toBe(404);
   });
 
+  it('counts today’s answers apart from the rest, by Nepal’s midnight', async () => {
+    const { id, interaction } = await published();
+    const [a, b] = interaction.options.map((o: { id: string }) => o.id);
+    const votes = interactionCollections(getDb()).votes;
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000);
+    await votes.insertMany([
+      { _id: new ObjectId(), interactionId: new ObjectId(id), optionId: a, readerId: new ObjectId(), createdAt: new Date() },
+      { _id: new ObjectId(), interactionId: new ObjectId(id), optionId: b, readerId: new ObjectId(), createdAt: twoDaysAgo },
+    ]);
+    const r = await send('get', `/api/cms/interactions/${id}`);
+    expect(r.body.interaction.results).toMatchObject({ total: 2, today: 1 });
+  });
+
   it('counts the votes into percentages that add up to 100', async () => {
     const { id, interaction } = await published();
     const [a, b, c] = interaction.options.map((o: { id: string }) => o.id);

@@ -18,6 +18,7 @@ import {
   Breadcrumbs,
   Button,
   EmptyState,
+  Icon,
   LangTag,
   Pagination,
   Skeleton,
@@ -31,10 +32,17 @@ import {
 /**
  * Interactions: star ratings and votes that readers answer in the app's feed.
  *
- * Each one is drawn here as a full-width card, laid out as a reader meets it —
- * a vote's 2×2 grid of candidates, a rating's rows of businesses — with what
- * readers have answered so far on it. The tabs are where each stands: live
- * (open, or published to open later), drafts, and closed.
+ * ── The list is results first ───────────────────────────────────────────────
+ *
+ * What an editor opens this screen to learn is "how is it going": so each row
+ * is the question, where it stands, and then the answers — a vote's candidates
+ * as bars, leader first, with percent and count (as X shows a poll's results);
+ * a rating's businesses with their average in a coloured pill and in stars,
+ * and how many rated (as Google Play and food apps show a rating). A draft,
+ * which has no answers yet, shows its candidates' photos instead.
+ *
+ * How the card looks to a reader is the editor's business while making it, so
+ * the phone preview (PhonePreview) lives in the editor, beside the form.
  */
 
 const PHASE_LOOK: Record<InteractionRow['phase'], { label: string; tone: BadgeTone; icon: IconName }> = {
@@ -45,13 +53,122 @@ const PHASE_LOOK: Record<InteractionRow['phase'], { label: string; tone: BadgeTo
 };
 
 export const TYPE_LABEL: Record<InteractionType, string> = { vote: 'Vote', rating: 'Rating' };
+export const TYPE_ICON: Record<InteractionType, IconName> = { vote: 'layers', rating: 'star' };
+
+type Option = Pick<InteractionOptionData, 'name' | 'detail' | 'image'> & { id?: string };
+
+/** "3 days left", "5 hours left", from now to a date — or null when past. */
+export function timeLeft(iso: string | null, now = Date.now()): string | null {
+  if (iso === null) return null;
+  const ms = Date.parse(iso) - now;
+  if (ms <= 0) return null;
+  const days = Math.floor(ms / 86_400_000);
+  if (days >= 1) return `${days} day${days === 1 ? '' : 's'} left`;
+  const hours = Math.floor(ms / 3_600_000);
+  return hours >= 1 ? `${hours} hour${hours === 1 ? '' : 's'} left` : 'Closing soon';
+}
+
+/** The colour of an average, as the app shows it. */
+export function toneOf(average: number | null): 'good' | 'fair' | 'poor' | 'new' {
+  if (average === null) return 'new';
+  if (average >= 4) return 'good';
+  if (average >= 3) return 'fair';
+  return 'poor';
+}
+
+/** A steady colour for an option without a photo, from its name. */
+function initialColour(name: string): string {
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.codePointAt(0)!) % 360;
+  return `hsl(${h}, 42%, 42%)`;
+}
+
+export function OptionThumb({ option, size = 36 }: { option: Option; size?: number }) {
+  const src = mediaUrl(option.image?.urls.sm ?? option.image?.urls.md ?? null);
+  return (
+    <span
+      className="ix-thumb"
+      style={{ width: size, height: size, background: src === null ? initialColour(option.name || '?') : undefined }}
+      aria-hidden="true"
+    >
+      {src !== null ? <img src={src} alt="" /> : <span>{[...(option.name.trim() || '?')][0]}</span>}
+    </span>
+  );
+}
+
+function Stars({ value, size = 14 }: { value: number; size?: number }) {
+  const full = Math.round(value);
+  return (
+    <span className="ix-stars" style={{ fontSize: size }} aria-label={`${value.toFixed(1)} out of 5`}>
+      {'★'.repeat(full)}
+      <span className="ix-stars-empty">{'★'.repeat(5 - full)}</span>
+    </span>
+  );
+}
+
+/* ── results ──────────────────────────────────────────────────────────────── */
+
+export function VoteResults({ options, results }: { options: readonly Option[]; results: InteractionResultsData }) {
+  if (results.type !== 'vote') return null;
+  const rows = options
+    .map((o, i) => ({ o, r: results.options[i] ?? { votes: 0, percent: 0 } }))
+    .sort((a, b) => b.r.votes - a.r.votes);
+  const top = rows[0]?.r.votes ?? 0;
+  const tied = rows.filter((x) => x.r.votes === top).length > 1;
+  return (
+    <ul className="ix-bars">
+      {rows.map(({ o, r }, k) => {
+        const lead = k === 0 && top > 0 && !tied;
+        return (
+          <li key={o.id ?? o.name} className={lead ? 'ix-bar ix-bar-lead' : 'ix-bar'}>
+            <OptionThumb option={o} size={28} />
+            <span className="ix-bar-name">{o.name}</span>
+            <span className="ix-bar-track" aria-hidden="true">
+              <span style={{ width: `${Math.max(r.percent, r.votes > 0 ? 2 : 0)}%` }} />
+            </span>
+            <span className="ix-bar-figure">
+              <strong>{r.percent}%</strong> · {r.votes.toLocaleString()}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+export function RatingResults({ options, results }: { options: readonly Option[]; results: InteractionResultsData }) {
+  if (results.type !== 'rating') return null;
+  return (
+    <ul className="ix-rates">
+      {options.map((o, i) => {
+        const r = results.options[i] ?? { ratings: 0, average: null };
+        const tone = toneOf(r.average);
+        return (
+          <li key={o.id ?? o.name} className="ix-rate">
+            <OptionThumb option={o} size={32} />
+            <span className="ix-rate-text">
+              <span className="ix-rate-name">{o.name}</span>
+              {o.detail && <span className="ix-rate-detail">{o.detail}</span>}
+            </span>
+            {r.average !== null && <Stars value={r.average} />}
+            <span className="ix-rate-count">{countOf(r.ratings, 'rating')}</span>
+            <span className={`ix-avg ix-avg-${tone}`}>{r.average !== null ? `${r.average.toFixed(1)} ★` : 'New'}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/* ── the phone preview, as the app draws it ─────────────────────────────────── */
 
 /**
- * One Interaction as a full-width card: the question and its options, and —
- * when there are any — the results beside each option. Shared with the editor,
- * where it previews what is being typed.
+ * The card as a reader meets it in the app — the redesign of 6 Oct 2026: a
+ * vote's photo tiles with their names, the confirm bar, the results washed over
+ * the photos; a rating's rows with the average pill and stars. Drawn from the
+ * same fields the app receives, so what the editor sees is what readers get.
  */
-export function InteractionCard({
+export function PhonePreview({
   type,
   language,
   title,
@@ -61,91 +178,81 @@ export function InteractionCard({
   type: InteractionType;
   language: 'ne' | 'en';
   title: string;
-  options: ReadonlyArray<Pick<InteractionOptionData, 'name' | 'detail' | 'image'> & { id?: string }>;
+  options: readonly Option[];
   results: InteractionResultsData | null;
 }) {
   const ne = language === 'ne';
-  const voteOf = (i: number) =>
-    results?.type === 'vote' ? (results.options[i] ?? null) : null;
-  const ratingOf = (i: number) =>
-    results?.type === 'rating' ? (results.options[i] ?? null) : null;
-
+  const voteShown = type === 'vote' && results?.type === 'vote';
   return (
-    <article className={`ix-card ix-${type}`} lang={language}>
-      <p className="ix-kicker">
-        <span className="ix-kicker-icon" aria-hidden="true">
-          {type === 'vote' ? '✓' : '★'}
+    <div className="ix-phone" lang={language}>
+      <div className="ix-phone-head">
+        <span className="ix-phone-pill">
+          <Icon name={TYPE_ICON[type]} />
+          {type === 'vote' ? (ne ? 'मतदान' : 'Vote') : ne ? 'रेटिङ' : 'Rate'}
         </span>
-        {type === 'vote' ? (ne ? 'मत दिनुहोस्' : 'Vote') : ne ? 'रेटिङ दिनुहोस्' : 'Rate'}
-      </p>
-      <h3 className="ix-title">{title.trim() || (ne ? 'प्रश्न' : 'Your question')}</h3>
+      </div>
+      <p className="ix-phone-title">{title.trim() || (ne ? 'प्रश्न' : 'Your question')}</p>
 
       {type === 'vote' ? (
-        <ul className={`ix-grid ix-grid-${Math.max(2, options.length)}`}>
-          {options.map((o, i) => {
-            const r = voteOf(i);
-            const src = mediaUrl(o.image?.urls.md ?? o.image?.urls.sm ?? null);
-            return (
-              <li className="ix-tile" key={o.id ?? i}>
-                <span className="ix-photo">{src !== null ? <img src={src} alt="" /> : <span>Photo</span>}</span>
-                <span className="ix-name">{o.name.trim() || `${ne ? 'उम्मेदवार' : 'Candidate'} ${i + 1}`}</span>
-                {o.detail && <span className="ix-detail">{o.detail}</span>}
-                {r !== null ? (
-                  <span className="ix-result">
-                    <span className="ix-bar" aria-hidden="true">
-                      <span style={{ width: `${r.percent}%` }} />
-                    </span>
-                    <strong>{r.percent}%</strong> <span>{countOf(r.votes, 'vote')}</span>
-                  </span>
-                ) : (
-                  <span className="ix-button">{ne ? 'मत दिनुहोस्' : 'Vote'}</span>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        <>
+          <div className={`ix-phone-grid ix-phone-grid-${Math.min(4, Math.max(2, options.length))}`}>
+            {options.map((o, i) => {
+              const src = mediaUrl(o.image?.urls.md ?? o.image?.urls.sm ?? null);
+              const r = voteShown ? (results.options[i] ?? null) : null;
+              return (
+                <div key={o.id ?? i} className="ix-phone-tile" style={{ background: src === null ? 'var(--surface-sunk)' : undefined }}>
+                  {src !== null ? <img src={src} alt="" /> : <span className="ix-phone-empty">Photo</span>}
+                  {r !== null && <span className="ix-phone-wash">{r.percent}%</span>}
+                  <span className="ix-phone-caption">{o.name.trim() || `${ne ? 'उम्मेदवार' : 'Candidate'} ${i + 1}`}</span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="ix-phone-confirm">{ne ? 'मत दिनुहोस्' : 'Vote'}</div>
+        </>
       ) : (
-        <ul className="ix-rows">
+        <div className="ix-phone-rows">
           {options.map((o, i) => {
-            const r = ratingOf(i);
-            const src = mediaUrl(o.image?.urls.sm ?? o.image?.urls.md ?? null);
+            const r = results?.type === 'rating' ? (results.options[i] ?? null) : null;
+            const tone = toneOf(r?.average ?? null);
             return (
-              <li className="ix-row" key={o.id ?? i}>
-                <span className="ix-thumb">{src !== null ? <img src={src} alt="" /> : null}</span>
-                <span className="ix-row-text">
-                  <span className="ix-name">{o.name.trim() || `${ne ? 'व्यवसाय' : 'Business'} ${i + 1}`}</span>
-                  {o.detail && <span className="ix-detail">{o.detail}</span>}
+              <div key={o.id ?? i} className="ix-phone-row">
+                <OptionThumb option={o} size={30} />
+                <span className="ix-phone-row-text">
+                  <span className="ix-phone-row-name">{o.name.trim() || `${ne ? 'व्यवसाय' : 'Business'} ${i + 1}`}</span>
+                  <span className="ix-phone-row-stars">☆☆☆☆☆</span>
                 </span>
-                <span className="ix-average">
-                  {r !== null && r.average !== null ? (
-                    <>
-                      <strong>★ {r.average.toFixed(1)}</strong> <span>({countOf(r.ratings, 'rating')})</span>
-                    </>
-                  ) : (
-                    <span className="ix-stars" aria-hidden="true">
-                      ☆☆☆☆☆
-                    </span>
-                  )}
+                <span className={`ix-avg ix-avg-${tone}`}>
+                  {r?.average != null ? `${r.average.toFixed(1)} ★` : ne ? 'नयाँ' : 'New'}
                 </span>
-              </li>
+              </div>
             );
           })}
-        </ul>
+        </div>
       )}
-
-      {results?.type === 'vote' && <p className="ix-total">{countOf(results.total, 'vote')} in all</p>}
-    </article>
+      <p className="ix-phone-foot">
+        {type === 'vote'
+          ? ne
+            ? 'एउटा Google खाता, एउटा मत · फेर्न मिल्दैन'
+            : 'One vote per Google account · final'
+          : ne
+            ? 'ताराहरू छुनुहोस्, अनि पठाउनुहोस्'
+            : 'Pick stars, then send'}
+      </p>
+    </div>
   );
 }
 
+/* ── the list ──────────────────────────────────────────────────────────────── */
+
 function ListSkeleton() {
   return (
-    <div aria-busy="true" aria-label="Loading Interactions">
+    <div aria-busy="true" aria-label="Loading Interactions" className="ix-list">
       {[0, 1].map((i) => (
-        <div className="ix-card" key={i} style={{ opacity: 1 - i * 0.3 }}>
-          <Skeleton height={14} width="20%" />
-          <Skeleton height={20} width="60%" style={{ marginTop: 10 }} />
-          <Skeleton height={90} style={{ marginTop: 16 }} />
+        <div className="ix-row" key={i} style={{ opacity: 1 - i * 0.3 }}>
+          <Skeleton height={16} width="45%" />
+          <Skeleton height={10} width="90%" style={{ marginTop: 14 }} />
+          <Skeleton height={10} width="70%" style={{ marginTop: 10 }} />
         </div>
       ))}
     </div>
@@ -159,14 +266,26 @@ interface ListData {
   counts: Record<InteractionTabName, number>;
 }
 
-/** "Closes 12 Oct, 6:00 PM", "Opens …", "Closed …" — the date that matters now. */
-function when(row: InteractionRow): string | null {
-  if (row.phase === 'scheduled') return row.opensAt === null ? null : `Opens ${dateTime(row.opensAt)}`;
+function statusOf(row: InteractionRow): string {
+  if (row.phase === 'draft') return 'Draft';
+  if (row.phase === 'scheduled') return row.opensAt === null ? 'Opens later' : `Opens ${dateTime(row.opensAt)}`;
+  if (row.phase === 'closed') return 'Closed';
+  return timeLeft(row.closesAt) ?? 'Open';
+}
+
+function footOf(row: InteractionRow): string {
+  const noun = row.type === 'vote' ? 'vote' : 'rating';
+  const parts = [countOf(row.results.total, noun)];
+  if (row.phase === 'open' && row.results.today > 0) parts.push(`${row.results.today.toLocaleString()} today`);
   if (row.phase === 'closed') {
     const at = row.closedAt ?? row.closesAt;
-    return at === null ? 'Closed' : `Closed ${dateTime(at)}`;
+    if (at !== null) parts.push(`closed ${dateTime(at)}`);
+  } else if (row.closesAt !== null) {
+    parts.push(`closes ${dateTime(row.closesAt)}`);
+  } else {
+    parts.push('no closing date');
   }
-  return row.closesAt === null ? 'No closing date' : `Closes ${dateTime(row.closesAt)}`;
+  return parts.join(' · ');
 }
 
 export function Interactions({ tab, page }: { tab: InteractionTab; page: number }) {
@@ -197,11 +316,6 @@ export function Interactions({ tab, page }: { tab: InteractionTab; page: number 
           </Button>
         </div>
       </div>
-
-      <p className="field-note ads-explainer">
-        Ratings and votes appear as cards in the app’s feed, after the 6th story and every 12th after
-        that. Readers sign in with Google to answer, once each, and cannot change an answer.
-      </p>
 
       {list.error !== null && (
         <>
@@ -235,52 +349,64 @@ export function Interactions({ tab, page }: { tab: InteractionTab; page: number 
               </Button>
             }
           >
-            A rating lets readers give businesses one to five stars. A vote lets them choose one of up to
-            four candidates.
+            A vote asks readers to pick one of up to four photos. A rating lets them give each of up to six
+            places one to five stars. Both appear as cards in the app’s feed.
           </EmptyState>
         ) : (
           <>
             <ul className="ix-list">
               {list.data.items.map((row) => {
                 const look = PHASE_LOOK[row.phase];
-                const total =
-                  row.results.type === 'vote'
-                    ? countOf(row.results.total, 'vote')
-                    : countOf(
-                        row.results.options.reduce((a, o) => a + o.ratings, 0),
-                        'rating',
-                      );
                 return (
-                  <li key={row.id} className="ix-list-item">
-                    <div className="ix-list-head">
-                      <span className="item-meta">
-                        <span>{TYPE_LABEL[row.type]}</span>
-                        {row.status !== 'draft' && <span>{total}</span>}
-                        {when(row) !== null && <span>{when(row)}</span>}
-                        {row.categorySlug !== null && <span>{row.categorySlug}</span>}
+                  <li key={row.id} className="ix-row">
+                    <div className="ix-row-head">
+                      <span className={`ix-kind ix-kind-${row.type}`}>
+                        <Icon name={TYPE_ICON[row.type]} />
+                        {TYPE_LABEL[row.type]}
                       </span>
-                      <span className="item-tail published-tail">
+                      <button
+                        type="button"
+                        className="ix-row-title"
+                        onClick={() => navigate(Routes.interaction(row.id))}
+                        lang={row.language}
+                      >
+                        {row.title}
+                      </button>
+                      <span className="ix-row-tail">
                         <LangTag language={row.language} />
                         <Badge tone={look.tone} icon={look.icon}>
-                          {look.label}
+                          {statusOf(row)}
                         </Badge>
                         <Button
                           size="sm"
-                          variant="ghost"
                           icon="pencil"
                           aria-label={`Open “${row.title}”`}
-                          title={row.status === 'draft' ? 'Edit the draft' : 'See it, change its closing date, or close it'}
                           onClick={() => navigate(Routes.interaction(row.id))}
-                        />
+                        >
+                          Open
+                        </Button>
                       </span>
                     </div>
-                    <InteractionCard
-                      type={row.type}
-                      language={row.language}
-                      title={row.title}
-                      options={row.options}
-                      results={row.status === 'draft' ? null : row.results}
-                    />
+
+                    {row.status === 'draft' ? (
+                      <div className="ix-draft-thumbs">
+                        {row.options.map((o) => (
+                          <span key={o.id} className="ix-draft-thumb">
+                            <OptionThumb option={o} size={44} />
+                            <span>{o.name}</span>
+                          </span>
+                        ))}
+                      </div>
+                    ) : row.type === 'vote' ? (
+                      <VoteResults options={row.options} results={row.results} />
+                    ) : (
+                      <RatingResults options={row.options} results={row.results} />
+                    )}
+
+                    <p className="ix-row-foot">
+                      {row.status === 'draft' ? `${row.options.length} ${row.type === 'vote' ? 'candidates' : 'businesses'} · not published` : footOf(row)}
+                      {row.categorySlug !== null && ` · ${row.categorySlug}`}
+                    </p>
                   </li>
                 );
               })}
