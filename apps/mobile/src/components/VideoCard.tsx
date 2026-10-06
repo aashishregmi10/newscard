@@ -42,10 +42,14 @@ export interface ShortCardProps {
   unmetered: boolean;
   /** Only the short actually on screen plays; the rest hold their poster. */
   active: boolean;
+  /**
+   * The short after the one on screen: a YouTube short gets its player ready,
+   * paused, so a swipe starts it at once. (Our own player already loads the
+   * neighbours it is mounted with.)
+   */
+  preload: boolean;
   muted: boolean;
   onToggleMute: () => void;
-  /** The phone would not start a video with sound; it was started muted. */
-  onMutedByPhone: () => void;
 }
 
 function VideoCardInner({

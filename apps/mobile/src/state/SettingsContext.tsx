@@ -27,6 +27,12 @@ interface Settings {
    * cannot be told apart from the value alone.
    */
   languageChosen: boolean;
+  /**
+   * Shorts play with sound unless the reader has turned it off. Their choice
+   * holds for every short after, and across restarts, until they change it
+   * (decided 6 Oct 2026).
+   */
+  shortsMuted: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -35,6 +41,7 @@ const DEFAULTS: Settings = {
   dataSaver: false,
   themeMode: 'system',
   languageChosen: false,
+  shortsMuted: false,
 };
 
 const KEY = 'saar.settings.v1';
@@ -50,6 +57,7 @@ interface Ctx extends Settings {
   setTextSize: (t: TextSizeSetting) => void;
   setDataSaver: (v: boolean) => void;
   setThemeMode: (m: ThemeMode) => void;
+  setShortsMuted: (muted: boolean) => void;
 }
 
 const SettingsCtx = createContext<Ctx | null>(null);
@@ -101,6 +109,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setTextSize: (textSize) => update({ textSize }),
       setDataSaver: (dataSaver) => update({ dataSaver }),
       setThemeMode: (themeMode) => update({ themeMode }),
+      setShortsMuted: (shortsMuted) => update({ shortsMuted }),
     }),
      
     [settings, ready, isDark],

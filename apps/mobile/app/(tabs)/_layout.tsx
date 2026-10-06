@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { View, StyleSheet, type ColorValue } from 'react-native';
+import { View, StyleSheet, Pressable, type ColorValue, type GestureResponderEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useSettings } from '../../src/state/SettingsContext';
@@ -95,6 +95,28 @@ export default function TabsLayout() {
           paddingTop: 6,
         },
         tabBarLabelStyle: { fontSize: textSize(11), fontWeight: '600' },
+        /*
+         * A light tint inside the tab, not Android's default press effect.
+         *
+         * The default is an unbounded ripple at 32% black, drawn as a circle
+         * wider than the tab itself; on a light bar it read as the screen going
+         * dark on every tap (a reader's recording, 6 Oct 2026). Bounded and in
+         * the accent at about 12%, it still acknowledges the touch at once.
+         */
+        tabBarButton: ({ children, style, onPress, onLongPress, testID, ...rest }) => (
+          <Pressable
+            onPress={onPress as ((e: GestureResponderEvent) => void) | undefined}
+            onLongPress={onLongPress as ((e: GestureResponderEvent) => void) | null | undefined}
+            testID={testID}
+            style={style}
+            android_ripple={{ color: `${theme.accent}1F`, borderless: false }}
+            accessibilityRole="tab"
+            accessibilityLabel={rest['aria-label']}
+            accessibilityState={{ selected: rest['aria-selected'] === true }}
+          >
+            {children}
+          </Pressable>
+        ),
       }}
     >
       <Tabs.Screen

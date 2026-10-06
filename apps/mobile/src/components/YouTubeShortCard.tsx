@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Image,
   Linking,
   Pressable,
   StyleSheet,
@@ -18,7 +19,7 @@ import { blurHashAverageColor, resolveMediaUrl } from '../api/client';
 import { shortPlayerBox, shortStripHeight } from '../lib/shortLayout';
 import { reportError } from '../lib/telemetry';
 import { textSize } from '../theme/tokens';
-import { PosterImage, ShortInfoStrip, shortStyles } from './ShortParts';
+import { ShortInfoStrip, shortStyles } from './ShortParts';
 import type { ShortCardProps } from './VideoCard';
 
 /**
@@ -39,40 +40,42 @@ import type { ShortCardProps } from './VideoCard';
  *   - The player takes its own touches: tapping the video is YouTube's pause
  *     and play, and its small logo — a link to YouTube — works as YouTube
  *     intends. A swipe still moves the feed.
- *   - Nothing of ours sends a reader to YouTube. There is no "Watch on YouTube"
- *     button, here or anywhere; only YouTube's own logo, if the reader taps it.
+ *   - Nothing of ours sends a reader to YouTube; only YouTube's own logo, if
+ *     the reader taps it.
  *
- * Until 6 Oct 2026 this card drew the title, caption, a sound button and a
- * tap-to-pause layer over the player, and offered "Open in YouTube" when it
- * failed. All of that broke the rules above; the reader asked for an
- * Inshorts-like screen, and this is that screen within them.
+ * ── Smooth, not loading ─────────────────────────────────────────────────────
  *
- * ── Playing ─────────────────────────────────────────────────────────────────
+ * A reader's recording (6 Oct 2026) showed a spinner on every short, a still
+ * that "blinked" into the video, and sound switching itself off. So:
  *
- *   - Only the short on screen has a player; the rest are posters.
- *   - It starts by itself, WITH SOUND, on Wi-Fi and on mobile data. Only Data
- *     Saver makes it wait for a tap. If the phone refuses to start a video with
- *     sound, the page starts it muted and says so ('forced-mute'), and the
- *     speaker in the strip shows muted.
- *   - The poster stays until the video is actually moving, so the reader never
- *     sees YouTube's loading screen.
+ *   - The NEXT short's player is loaded in advance (`preload`), paused — the
+ *     page, YouTube's player and the video cued — and only told to play once
+ *     it is the one on screen. YouTube allows one playing player at a time and
+ *     playback only once it is visible; a cued player is neither. Measured in
+ *     a browser: a cued embed starts within half a second of being told to.
+ *   - The poster is YouTube's own vertical thumbnail (oar2.jpg, the Short's
+ *     shape and sharp), and the player FADES in over it once the video is
+ *     moving, rather than replacing it in one frame.
+ *   - Sound is the reader's choice, kept in the settings (on by default). If a
+ *     phone refuses to start one short with sound, THAT short plays muted and
+ *     its speaker says so; the reader's choice is untouched for the next one.
+ *     Only a refusal counts: a slow start is not one. (The first version took
+ *     any slow start for a refusal and muted every short after it.)
  *
  * ── Staying in the app ──────────────────────────────────────────────────────
  *
  * YouTube plays an embed only when the app identifies itself, and documents
- * two ways for an app to do that ("API Client identity"). This tries both:
+ * two ways for an app to do that ("API Client identity"):
  *
  *   1. embed  — YouTube's own embed page, loaded with the app in the Referer
- *      header, watched through the page's video element.
+ *      header, driven through its player element (#movie_player).
  *   2. inline — our own page running YouTube's IFrame API, with the app as its
  *      base address.
  *
- * If one is refused, or nothing moves within START_TIMEOUT_MS, the other is
- * tried; whichever last worked goes first next time. If both fail, the card
- * says so and offers Try again — never YouTube. Every refusal is reported
- * (telemetry.reportError) with YouTube's error code.
- *
- * ── A build without the web view ────────────────────────────────────────────
+ * If one is refused, or nothing moves within START_TIMEOUT_MS of being asked,
+ * the other is tried; whichever last worked goes first next time. If both
+ * fail, the card says so and offers Try again — never YouTube. Every refusal
+ * is reported (telemetry.reportError) with YouTube's error code.
  *
  * The web view is a native module, looked up lazily (apps/mobile/AGENTS.md).
  * Without it the card says to update the app.
@@ -123,55 +126,75 @@ function triedInOrder(): Mode[] {
   return [first, ...MODES.filter((m) => m !== first)];
 }
 
-/** Long enough for a slow mobile connection to start a short. */
+/** From being asked to play. Long enough for a slow mobile connection. */
 const START_TIMEOUT_MS = 15_000;
-/** How often the page says where the video has got to, for the progress line. */
-const TIME_EVERY_MS = 500;
 
 /*
- * Messages back from either page, the same words for both:
+ * Both pages answer to the same three calls, injected by the card:
+ *   window.__saarPlay(muted)   start (or resume) with sound or without
+ *   window.__saarPause()       stop — the card has left the screen
+ *   window.__saarMute(muted)   the reader pressed the speaker
+ *
+ * and send back the same words:
+ *   'ready'             the player is loaded and cued; it can be told to play
  *   'playing'           the video is moving (each time it starts or resumes)
  *   'paused'            it stopped (YouTube's own tap, usually)
  *   'time:<cur>/<len>'  where it has got to, every half second while playing
- *   'forced-mute'       the phone would not start it with sound; it is muted
+ *   'forced-mute'       asked to play with sound, it would not start until
+ *                       muted: this short plays muted
  *   'error:<why>'       refused; <why> is YouTube's code, or 'embed' for its
  *                       error screen on the embed page
+ *
+ * "Would not start" means neither moving nor buffering three seconds after
+ * being asked — a phone's refusal. A buffering player is a slow network, and
+ * is left to buffer.
  */
+const PAGE_LOOP = `
+var wantPlay=false,wantMuted=false,askedAt=0,moved=false,fellBack=false,readySent=false,last=-9,tick=0;
+function send(m){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(m);}}
+function go(p){if(wantMuted)p.mute();else p.unMute();p.playVideo();}
+window.__saarPlay=function(muted){wantPlay=true;wantMuted=muted;askedAt=Date.now();var p=P();if(p)go(p);};
+window.__saarPause=function(){wantPlay=false;var p=P();if(p)p.pauseVideo();};
+window.__saarMute=function(muted){wantMuted=muted;var p=P();if(p){if(muted)p.mute();else p.unMute();}};
+setInterval(function(){
+  if(E())return;
+  var p=P();if(!p)return;
+  if(!readySent){readySent=true;send('ready');if(wantPlay)go(p);}
+  var s=p.getPlayerState();
+  if(s!==last){last=s;if(s===1){moved=true;send('playing');}else if(s===2&&moved){send('paused');}}
+  tick++;
+  if(s===1&&tick%2===0){send('time:'+p.getCurrentTime().toFixed(2)+'/'+p.getDuration().toFixed(2));}
+  if(wantPlay&&!moved&&!fellBack&&!wantMuted&&askedAt>0&&Date.now()-askedAt>3000&&s!==1&&s!==3){
+    fellBack=true;wantMuted=true;p.mute();p.playVideo();send('forced-mute');
+  }
+},250);`;
 
 /** Way 1: our page, YouTube's IFrame API, the app as the base address. */
-function inlineHtml(videoId: string, muted: boolean): string {
+function inlineHtml(videoId: string): string {
   return `<!DOCTYPE html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>html,body{margin:0;padding:0;height:100%;background:#000;overflow:hidden}#p{position:absolute;top:0;left:0;width:100%;height:100%}</style>
 </head><body><div id="p"></div><script>
-var player,moved=false;
-function send(m){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(m);}}
+var player=null,failedSent=false;
+function P(){return player&&player.getPlayerState?player:null;}
+function E(){return failedSent;}
 function onYouTubeIframeAPIReady(){
-  player=new YT.Player('p',{width:'100%',height:'100%',videoId:'${videoId}',
-    playerVars:{autoplay:1,mute:${muted ? 1 : 0},playsinline:1,loop:1,playlist:'${videoId}',controls:0,rel:0,fs:0,iv_load_policy:3,disablekb:1,origin:'${PLAYER_ORIGIN}',widget_referrer:'${PLAYER_ORIGIN}'},
+  new YT.Player('p',{width:'100%',height:'100%',videoId:'${videoId}',
+    playerVars:{autoplay:0,playsinline:1,loop:1,playlist:'${videoId}',controls:0,rel:0,fs:0,iv_load_policy:3,disablekb:1,origin:'${PLAYER_ORIGIN}',widget_referrer:'${PLAYER_ORIGIN}'},
     events:{
-      onReady:function(e){
-        ${muted ? 'e.target.mute();' : 'e.target.unMute();'}e.target.playVideo();
-        ${
-          muted
-            ? ''
-            : `setTimeout(function(){if(!moved){e.target.mute();e.target.playVideo();send('forced-mute');}},2500);`
-        }
-      },
-      onStateChange:function(e){if(e.data===1){moved=true;send('playing');}else if(e.data===2)send('paused');},
-      onError:function(e){send('error:'+e.data);}
+      onReady:function(e){player=e.target;},
+      onError:function(e){if(!failedSent){failedSent=true;send('error:'+e.data);}}
     }});
 }
-setInterval(function(){if(player&&player.getPlayerState&&player.getPlayerState()===1){send('time:'+player.getCurrentTime().toFixed(2)+'/'+player.getDuration().toFixed(2));}},${TIME_EVERY_MS});
+${PAGE_LOOP}
 var s=document.createElement('script');s.src='https://www.youtube.com/iframe_api';document.head.appendChild(s);
 </script></body></html>`;
 }
 
-/** Way 2: YouTube's own embed page, the app in the Referer header. */
-function embedUrl(videoId: string, muted: boolean): string {
+/** Way 2: YouTube's own embed page, cued and waiting, the app in the Referer header. */
+function embedUrl(videoId: string): string {
   const params = new URLSearchParams({
-    autoplay: '1',
-    mute: muted ? '1' : '0',
+    autoplay: '0',
     playsinline: '1',
     loop: '1',
     playlist: videoId,
@@ -186,58 +209,19 @@ function embedUrl(videoId: string, muted: boolean): string {
   return `https://www.youtube.com/embed/${videoId}?${params}`;
 }
 
-/**
- * Run inside the embed page.
- *
- * Starts the video — with sound if asked, falling back to muted if the phone
- * refuses — and then leaves it to YouTube: once it has moved, a pause is the
- * reader's (YouTube's own tap) and is not undone. Reports moving, stopping,
- * time and YouTube's error screen.
- */
-function embedScript(muted: boolean): string {
-  return `(function(){
+/** Run inside the embed page, driving YouTube's own player element. */
+const EMBED_SCRIPT = `(function(){
 if(window.__saar)return;window.__saar=true;
-window.__saarMuted=${muted ? 'true' : 'false'};
-function send(m){if(window.ReactNativeWebView){window.ReactNativeWebView.postMessage(m);}}
-var failed=false,moved=false,tries=0;
-function start(v){
-  v.muted=window.__saarMuted;
-  var p=v.play();
-  if(p&&p.catch)p.catch(function(){
-    if(!v.muted){v.muted=true;window.__saarMuted=true;send('forced-mute');var q=v.play();if(q&&q.catch)q.catch(function(){});}
-  });
-}
-function tick(){
+var failedSent=false;
+function P(){var p=document.getElementById('movie_player');return p&&typeof p.playVideo==='function'&&typeof p.getPlayerState==='function'?p:null;}
+function E(){
+  if(failedSent)return true;
   var err=document.querySelector('.ytp-error');
-  if(err&&err.offsetParent!==null){if(!failed){failed=true;send('error:embed');}return;}
-  var v=document.querySelector('video');
-  if(v){
-    if(!v.__saar){v.__saar=true;
-      v.addEventListener('playing',function(){moved=true;send('playing');});
-      v.addEventListener('pause',function(){send('paused');});}
-    /* YouTube may have started it before this ran, so no 'playing' event will
-       come: moving now counts as started, and from here a pause is the
-       reader's and is left alone. */
-    if(!moved&&!v.paused){moved=true;send('playing');}
-    if(!moved&&v.paused){tries++;
-      if(tries>4&&!v.muted){v.muted=true;window.__saarMuted=true;send('forced-mute');}
-      start(v);}
-  }
-  if(!moved)setTimeout(tick,600);
+  if(err&&err.offsetParent!==null){failedSent=true;send('error:embed');return true;}
+  return false;
 }
-tick();
-setInterval(function(){var v=document.querySelector('video');if(v&&!v.paused&&v.duration>0){send('time:'+v.currentTime.toFixed(2)+'/'+v.duration.toFixed(2));}},${TIME_EVERY_MS});
+${PAGE_LOOP}
 })();true;`;
-}
-
-/** What to run in the page to mute or unmute. Pausing is YouTube's own tap. */
-function command(mode: Mode, what: 'mute' | 'unmute'): string {
-  if (mode === 'inline') {
-    const fn = what === 'mute' ? 'mute' : 'unMute';
-    return `window.player && player.${fn} && player.${fn}(); true;`;
-  }
-  return `(function(){var v=document.querySelector('video');window.__saarMuted=${what === 'mute'};if(v)v.muted=window.__saarMuted;})(); true;`;
-}
 
 const VIDEO_ID = /^[A-Za-z0-9_-]{11}$/;
 
@@ -253,9 +237,9 @@ export function YouTubeShortCard({
   dataSaver,
   unmetered,
   active,
+  preload,
   muted,
   onToggleMute,
-  onMutedByPhone,
 }: ShortCardProps) {
   const videoId = video.youtubeId !== null && VIDEO_ID.test(video.youtubeId) ? video.youtubeId : null;
   const WebView = getWebView();
@@ -274,36 +258,64 @@ export function YouTubeShortCard({
   const mode = order[attempt] ?? MODES[0]!;
   /** Both ways were refused. */
   const [failed, setFailed] = useState(false);
-  /** The video has moved at least once on this mount: the poster can go. */
+  /** The page's player is loaded and cued. */
+  const [ready, setReady] = useState(false);
+  /** The video has moved at least once on this mount. */
   const [started, setStarted] = useState(false);
+  /** This short would only start muted, whatever the reader's choice. */
+  const [phoneMuted, setPhoneMuted] = useState(false);
+  const shownMuted = muted || phoneMuted;
+
   const web = useRef<{ injectJavaScript: (js: string) => void } | null>(null);
   const progress = useRef(new Animated.Value(0)).current;
+  const fade = useRef(new Animated.Value(0)).current;
   const lastFraction = useRef(0);
 
-  /* Each page is built once per video and way. Mute is sent to the running
-     player rather than rebuilding it, which would restart the clip. */
+  /* The poster: YouTube's vertical thumbnail, sharp and in the Short's shape;
+     their 4:3 one (the server's) if this Short has none, or with Data Saver. */
+  const tallPoster = videoId !== null && !dataSaver ? `https://i.ytimg.com/vi/${videoId}/oar2.jpg` : null;
+  const [posterFailed, setPosterFailed] = useState(false);
+  const posterUri = tallPoster !== null && !posterFailed ? tallPoster : (resolveMediaUrl(video.posterUrl) ?? '');
+
+  /* Each page is built once per video and way, and never autoplays: the card
+     tells it to play once it is the one on screen. */
   const page = useMemo(
-    () =>
-      videoId === null ? null : mode === 'inline' ? inlineHtml(videoId, muted) : embedUrl(videoId, muted),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    () => (videoId === null ? null : mode === 'inline' ? inlineHtml(videoId) : embedUrl(videoId)),
     [videoId, mode],
   );
-  const injected = useMemo(
-    () => (mode === 'embed' ? embedScript(muted) : undefined),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [mode],
-  );
 
-  const playing = WebView !== null && videoId !== null && allowed && active && !failed;
+  /* Mounted on screen, and one ahead. Gone otherwise: a player off screen is
+     memory and data the reader is not using. */
+  const mounted = WebView !== null && videoId !== null && allowed && (active || preload) && !failed;
 
-  /* Off screen: the player is gone, so is what it had reached. */
+  /* A card leaving both roles starts over next time it is mounted. */
   useEffect(() => {
-    if (!active) {
-      setStarted(false);
-      progress.setValue(0);
-      lastFraction.current = 0;
-    }
-  }, [active, progress]);
+    if (mounted) return;
+    setReady(false);
+    setStarted(false);
+    setPhoneMuted(false);
+    fade.setValue(0);
+    progress.setValue(0);
+    lastFraction.current = 0;
+  }, [mounted, fade, progress]);
+
+  const inject = (js: string) => web.current?.injectJavaScript(`${js}; true;`);
+
+  /* On screen and ready: play, with the reader's sound choice. Off screen but
+     still mounted (one ahead, after a swipe back): pause. */
+  useEffect(() => {
+    if (!mounted || !ready) return;
+    if (active) inject(`window.__saarPlay && window.__saarPlay(${muted})`);
+    else inject(`window.__saarPause && window.__saarPause()`);
+    // `muted` is sent separately below; it must not restart playback.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mounted, ready, active]);
+
+  useEffect(() => {
+    if (!mounted || !ready || phoneMuted) return;
+    inject(`window.__saarMute && window.__saarMute(${muted})`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [muted]);
 
   /** One way was refused: say so, then try the next, or give up. */
   const refused = (why: string) => {
@@ -311,6 +323,7 @@ export function YouTubeShortCard({
       new Error(`YouTube would not play ${videoId ?? '?'}: ${why} (${mode}, ${unmetered ? 'wifi' : 'mobile data'})`),
       'youtube-player',
     );
+    setReady(false);
     setStarted(false);
     if (attempt + 1 < order.length) setAttempt(attempt + 1);
     else setFailed(true);
@@ -318,18 +331,14 @@ export function YouTubeShortCard({
   const refusedNow = useRef(refused);
   refusedNow.current = refused;
 
-  /* Nothing moving after a while counts as a refusal too: a player stuck on
-     its loading screen is no better than an error, and says less. */
+  /* Asked to play and nothing moving after a while counts as a refusal: a
+     player stuck on its loading screen is no better than an error. Counted
+     from being on screen, not from preloading. */
   useEffect(() => {
-    if (!playing || started) return;
+    if (!mounted || !active || started) return;
     const t = setTimeout(() => refusedNow.current(`did not start within ${START_TIMEOUT_MS / 1000}s`), START_TIMEOUT_MS);
     return () => clearTimeout(t);
-  }, [playing, started, mode]);
-
-  useEffect(() => {
-    if (!started) return;
-    web.current?.injectJavaScript(command(mode, muted ? 'mute' : 'unmute'));
-  }, [muted, started, mode]);
+  }, [mounted, active, started, mode]);
 
   /** Where the video has got to, glided between the half-second reports. */
   const moveTo = (fraction: number) => {
@@ -338,41 +347,57 @@ export function YouTubeShortCard({
       /* Looped back to the start. */
       progress.setValue(f);
     } else {
-      Animated.timing(progress, {
-        toValue: f,
-        duration: 500,
-        easing: Easing.linear,
-        useNativeDriver: true,
-      }).start();
+      Animated.timing(progress, { toValue: f, duration: 500, easing: Easing.linear, useNativeDriver: true }).start();
     }
     lastFraction.current = f;
   };
 
   const onMessage = (e: WebViewMessageEvent) => {
     const m = e.nativeEvent.data;
-    if (m === 'playing') {
-      setStarted(true);
-      lastWorked = mode;
+    if (m === 'ready') {
+      setReady(true);
+    } else if (m === 'playing') {
+      if (!started) {
+        setStarted(true);
+        lastWorked = mode;
+        /* A beat for the first frame to reach the screen, then fade in over
+           the poster — no hard cut. */
+        Animated.timing(fade, { toValue: 1, duration: 220, delay: 120, useNativeDriver: true }).start();
+      }
     } else if (m.startsWith('time:')) {
       const [cur, len] = m.slice(5).split('/').map(Number);
       if (cur !== undefined && len !== undefined && len > 0) moveTo(cur / len);
     } else if (m === 'forced-mute') {
-      if (!muted) onMutedByPhone();
+      setPhoneMuted(true);
     } else if (m.startsWith('error:')) {
       refused(`error ${m.slice(6)}`);
     }
+  };
+
+  /* The speaker on a short the phone muted: sound on for this one, and the
+     reader's choice is "sound on". */
+  const onSpeaker = () => {
+    if (phoneMuted) {
+      setPhoneMuted(false);
+      inject(`window.__saarMute && window.__saarMute(false)`);
+      if (muted) onToggleMute();
+      return;
+    }
+    onToggleMute();
   };
 
   const tryAgain = () => {
     setOrder(triedInOrder());
     setAttempt(0);
     setFailed(false);
+    setReady(false);
     setStarted(false);
     setAllowed(true);
   };
 
   const posterColor = blurHashAverageColor(video.posterBlurHash) ?? '#111';
   const noPlayer = WebView === null || videoId === null;
+  const waiting = mounted && active && !started;
 
   return (
     <View style={[styles.card, { height }]}>
@@ -382,13 +407,21 @@ export function YouTubeShortCard({
           { left: box.left, top: box.top, width: box.width, height: box.height, backgroundColor: posterColor },
         ]}
       >
-        <PosterImage uri={resolveMediaUrl(video.posterUrl) ?? ''} />
+        {posterUri ? (
+          <Image
+            source={{ uri: posterUri }}
+            style={StyleSheet.absoluteFill}
+            resizeMode="cover"
+            onError={() => setPosterFailed(true)}
+            fadeDuration={0}
+          />
+        ) : null}
 
-        {playing && WebView !== null && page !== null && (
-          /* Hidden until the video moves, and untouchable until then: a page
-             still loading must not swallow a swipe. Once it moves it is
+        {mounted && WebView !== null && page !== null && (
+          /* Invisible and untouchable until the video moves: a page still
+             loading must not swallow a swipe. Then it fades in and is
              YouTube's, touches and all, with nothing of ours in front of it. */
-          <View style={[StyleSheet.absoluteFill, !started && styles.hidden]} pointerEvents={started ? 'auto' : 'none'}>
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: fade }]} pointerEvents={started ? 'auto' : 'none'}>
             <WebView
               key={mode}
               ref={web as never}
@@ -397,7 +430,7 @@ export function YouTubeShortCard({
                   ? { html: page, baseUrl: PLAYER_ORIGIN }
                   : { uri: page, headers: { Referer: `${PLAYER_ORIGIN}/` } }
               }
-              injectedJavaScript={injected}
+              injectedJavaScript={mode === 'embed' ? EMBED_SCRIPT : undefined}
               style={styles.web}
               originWhitelist={['https://*']}
               javaScriptEnabled
@@ -429,17 +462,17 @@ export function YouTubeShortCard({
                 return true;
               }}
             />
-          </View>
+          </Animated.View>
         )}
 
-        {/* On the poster only — the player is not showing yet, or not at all. */}
-        {playing && !started && (
+        {/* On the poster only — the player is not showing yet. */}
+        {waiting && (
           <View style={shortStyles.centre} pointerEvents="none">
             <ActivityIndicator color="#fff" />
           </View>
         )}
 
-        {!playing && (
+        {!mounted && active && (
           <View style={shortStyles.centre}>
             {noPlayer ? (
               <Text style={styles.notice}>
@@ -490,8 +523,8 @@ export function YouTubeShortCard({
           video={video}
           textScale={textScale}
           height={strip}
-          muted={muted}
-          onToggleMute={onToggleMute}
+          muted={shownMuted}
+          onToggleMute={onSpeaker}
           progress={started ? progress : null}
           source="YouTube"
         />
@@ -504,9 +537,6 @@ const styles = StyleSheet.create({
   card: { backgroundColor: '#000', overflow: 'hidden' },
   player: { position: 'absolute', overflow: 'hidden' },
   web: { flex: 1, backgroundColor: '#000' },
-  /* Laid out but invisible until the video moves, so the poster — not a white
-     page, a black frame or YouTube's loading screen — is what shows. */
-  hidden: { opacity: 0 },
   stripWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   notice: {
     color: '#fff',

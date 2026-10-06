@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Pressable,
   ActivityIndicator,
-  Platform,
   RefreshControl,
   useWindowDimensions,
   type ListRenderItemInfo,
@@ -44,7 +43,7 @@ import { useMeasuredHeight } from '../../src/hooks/useMeasuredHeight';
 const VIEWABILITY = { itemVisiblePercentThreshold: 80 } as const;
 
 export default function VideosScreen() {
-  const { theme, textScale, dataSaver, languages } = useSettings();
+  const { theme, textScale, dataSaver, languages, shortsMuted, setShortsMuted } = useSettings();
   const { unmetered } = useNetwork();
   const { height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -55,9 +54,6 @@ export default function VideosScreen() {
   const [items, setItems] = useState<VideoCardType[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
-  /* With sound from the start (decided 6 Oct 2026); the reader's choice on the
-     speaker then carries from short to short. */
-  const [muted, setMuted] = useState(false);
   const [focused, setFocused] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   /** Shown for a moment when a pull could not reach the server. */
@@ -162,15 +158,23 @@ export default function VideosScreen() {
     if (first) setActiveId(first.id);
   }).current;
 
-  // Stable, so a scroll that moves the active short does not also hand every
-  // mounted card a new function and defeat its memo.
-  const toggleMute = useCallback(() => setMuted((m) => !m), []);
-  /* The phone would not start a video with sound, so it started muted: the
-     speaker should say so, and the next short should not try again. */
-  const mutedByPhone = useCallback(() => setMuted(true), []);
+  /*
+   * Sound: on unless the reader turns it off, and their choice holds for every
+   * short after — and after a restart — until they change it. It lives in the
+   * settings for that reason (SettingsContext.shortsMuted).
+   */
+  const muted = shortsMuted;
+  const toggleMute = useCallback(() => setShortsMuted(!shortsMuted), [setShortsMuted, shortsMuted]);
+
+  /* The short after the one on screen gets its player ready in advance, so a
+     swipe starts it at once instead of showing a spinner (YouTubeShortCard). */
+  const activeIndex = useMemo(
+    () => (items === null || activeId === null ? -1 : items.findIndex((v) => v.id === activeId)),
+    [items, activeId],
+  );
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<VideoCardType>) => (
+    ({ item, index }: ListRenderItemInfo<VideoCardType>) => (
       <VideoCard
         video={item}
         theme={theme}
@@ -179,12 +183,12 @@ export default function VideosScreen() {
         dataSaver={dataSaver}
         unmetered={unmetered}
         active={focused && item.id === activeId}
+        preload={focused && activeIndex >= 0 && index === activeIndex + 1}
         muted={muted}
         onToggleMute={toggleMute}
-        onMutedByPhone={mutedByPhone}
       />
     ),
-    [theme, pageHeight, textScale, dataSaver, unmetered, focused, activeId, muted, toggleMute, mutedByPhone],
+    [theme, pageHeight, textScale, dataSaver, unmetered, focused, activeId, activeIndex, muted, toggleMute],
   );
 
   const getItemLayout = useCallback(
@@ -277,7 +281,10 @@ export default function VideosScreen() {
         initialNumToRender={1}
         maxToRenderPerBatch={1}
         windowSize={3}
-        removeClippedSubviews={Platform.OS === 'android'}
+        // Not clipped: the next short is off screen while its player gets
+        // ready, and a web view detached from the window is not reliably
+        // loading. With three cards mounted at most, clipping saves nothing.
+        removeClippedSubviews={false}
       />
     </View>
   );
