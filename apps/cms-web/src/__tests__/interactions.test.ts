@@ -37,6 +37,18 @@ const CASES: Array<[string, server.InteractionShape]> = [
     { ...base, options: [base.options[0]!, { ...base.options[1]!, name: ' नमुना  एक ' }] },
   ],
   ['a candidate without a photo', { ...base, options: [base.options[0]!, { ...base.options[1]!, image: null }] }],
+  ['a vote of names', { ...base, options: base.options.map((o) => ({ ...o, image: null })) }],
+  [
+    'six names',
+    { ...base, options: ['क', 'ख', 'ग', 'घ', 'ङ', 'च'].map((n) => ({ name: `नमुना ${n}`, detail: null, image: null })) },
+  ],
+  [
+    'seven names',
+    {
+      ...base,
+      options: ['क', 'ख', 'ग', 'घ', 'ङ', 'च', 'छ'].map((n) => ({ name: `नमुना ${n}`, detail: null, image: null })),
+    },
+  ],
   ['a photo without a credit', { ...base, options: [base.options[0]!, { ...base.options[1]!, image: { credit: '' } }] }],
   ['a detail too long', { ...base, options: [base.options[0]!, { ...base.options[1]!, detail: 'x'.repeat(61) }] }],
   ['no closing date', { ...base, closesAt: null }],
@@ -63,5 +75,8 @@ describe('interactionProblems — server and site agree', () => {
 
   it('uses the same limits', () => {
     expect(site.INTERACTION_LIMITS).toEqual(server.INTERACTION_LIMITS);
+    for (const type of ['vote', 'rating'] as const) {
+      for (const photos of [true, false]) expect(site.optionRange(type, photos)).toEqual(server.optionRange(type, photos));
+    }
   });
 });

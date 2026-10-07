@@ -41,13 +41,17 @@ describe('interactionProblems', () => {
     ).toEqual([]);
   });
 
-  it('holds a vote to 2–4 candidates and a rating to 2–6 options', () => {
+  it('holds a vote of photos to 2–4, a vote of names and a rating to 2–6', () => {
     const one = vote({ options: [{ name: 'नमुना एक', detail: null, image: photo }] });
     expect(interactionProblems(one)[0]?.field).toBe('options');
-    const names = ['एक', 'दुई', 'तीन', 'चार', 'पाँच'].map((n) => ({ name: `नमुना ${n}`, detail: null, image: photo }));
-    expect(interactionProblems(vote({ options: names }))[0]?.message).toMatch(/At most 4 candidates/);
-    const seven = Array.from({ length: 7 }, (_, i) => ({ name: `Sample ${i + 1}`, detail: null, image: null }));
-    expect(interactionProblems({ ...vote({ options: seven }), type: 'rating' })[0]?.message).toMatch(/At most 6 options/);
+    const named = (n: number, image: { credit: string } | null) =>
+      Array.from({ length: n }, (_, i) => ({ name: `Sample ${i + 1}`, detail: null, image }));
+    expect(interactionProblems(vote({ options: named(5, photo) }))[0]?.message).toMatch(/At most 4 candidates with photos/);
+    expect(interactionProblems(vote({ options: named(6, null) }))).toEqual([]);
+    expect(interactionProblems(vote({ options: named(7, null) }))[0]?.message).toMatch(/At most 6 candidates/);
+    expect(interactionProblems({ ...vote({ options: named(7, null) }), type: 'rating' })[0]?.message).toMatch(
+      /At most 6 options/,
+    );
   });
 
   it('treats names that differ only in case, spacing or Unicode form as the same', () => {
@@ -62,7 +66,7 @@ describe('interactionProblems', () => {
     expect(p).toContainEqual({ field: 'options.1.name', message: 'Same name as candidate 1.' });
   });
 
-  it('wants a photo and a credit for every candidate, and a credit for any photo', () => {
+  it('wants a vote all photos or all names, and a credit for any photo', () => {
     const p = interactionProblems(
       vote({
         options: [

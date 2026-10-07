@@ -14,7 +14,7 @@ import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useResource } from '../hooks/useResource';
 import { crumbs } from '../lib/crumbs';
 import { countOf, dateTime } from '../lib/format';
-import { INTERACTION_LIMITS, interactionProblems } from '../lib/interactions';
+import { INTERACTION_LIMITS, interactionProblems, optionRange } from '../lib/interactions';
 import { mediaUrl } from '../lib/media';
 import { Routes } from '../nav';
 import { navigate } from '../useRoute';
@@ -448,7 +448,9 @@ export function InteractionEditor({ id }: { id: string | null }) {
 
   const row = detail.data?.interaction ?? null;
   const isDraft = row === null || row.status === 'draft';
-  const range = INTERACTION_LIMITS.options[d.type];
+  /* A vote with any photo is a vote of photos: a 2×2 grid, so four. */
+  const photoVote = d.type === 'vote' && d.options.some((o) => o.image !== null);
+  const range = optionRange(d.type, photoVote);
   const noun = d.type === 'vote' ? 'candidate' : 'option';
   const categories = options.data?.categories ?? [];
 
@@ -625,7 +627,7 @@ export function InteractionEditor({ id }: { id: string | null }) {
                     <span>
                       <span className="ix-kind-name">{TYPE_LABEL[k]}</span>
                       <span className="ix-kind-hint">
-                        {k === 'vote' ? '2–4 photos, readers pick one' : 'A question; 2–6 options, 1–5 stars each'}
+                        {k === 'vote' ? 'Readers pick one: 2–4 photos, or 2–6 names' : 'Readers rate the options they know, 1–5 stars'}
                       </span>
                     </span>
                   </button>
@@ -758,8 +760,8 @@ export function InteractionEditor({ id }: { id: string | null }) {
                   {row.closedAt !== null && <span>Closed {dateTime(row.closedAt)}</span>}
                 </p>
                 <p className="field-note ix-locked-note">
-                  Readers have answered what they saw, so its {noun}s{' '}
-                  and photos are locked.
+                  Readers have answered what they saw, so its {noun}s
+                  {row.options.some((o) => o.image !== null) ? ' and their photos are' : ' are'} locked.
                 </p>
                 {row.phase !== 'closed' && (
                   <div className="grid">
@@ -816,7 +818,7 @@ export function InteractionEditor({ id }: { id: string | null }) {
           {isDraft && (
             <Panel
               title={`3 · ${d.type === 'vote' ? 'Candidates' : 'Options'}`}
-              note={`${d.options.length} of ${range.max}${d.type === 'vote' ? ' · each needs a photo' : ' · photos optional'}`}
+              note={`${d.options.length} of ${range.max}${d.type === 'vote' ? (photoVote ? ' · photos on all' : ' · names only, or add photos to all') : ' · photos optional'}`}
             >
               {optionsProblem !== null && <Banner tone="error">{optionsProblem}</Banner>}
               {d.options.map((o, i) => (

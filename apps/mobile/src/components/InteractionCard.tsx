@@ -40,15 +40,18 @@ import { StarAverage, StarRating } from './StarRating';
  *
  *   Vote    YouTube's image polls (up to four photos, each with a caption) and
  *           X's polls (results the moment you vote, as percentages, with the
- *           total and the time left beneath). Photo tiles fill the card. A tap
- *           SELECTS — outline and check — and one button below confirms,
- *           because a vote is final and a stray tap while scrolling must not
- *           cast one. Then each photo shows its share, the reader's own pick
- *           marked, the leader badged.
+ *           total and the time left beneath). Photo tiles fill the card; a
+ *           vote of names ("your favourite sport?") is a list of up to six,
+ *           as X draws a poll. A tap SELECTS — outline and check — and one
+ *           button below confirms, because a vote is final and a stray tap
+ *           while scrolling must not cast one. Then each photo shows its
+ *           share, or each name fills to it, the reader's own pick marked,
+ *           the leader badged.
  *   Rating  A feedback form (redrawn 7 Oct 2026 from the newsroom's example):
  *           the question, then each option's name over a row of large stars.
- *           One Send for the whole form, once every option has stars — also
- *           final. Then each option shows its average, in part-filled stars
+ *           The reader rates the ones they know and skips the rest — a guess
+ *           about a player they have never seen would only blur the average —
+ *           then one Send, also final. Then each option shows its average, in part-filled stars
  *           and the coloured pill of food apps (green from 4, amber from 3,
  *           red below), with the reader's own stars beside; the bar beneath
  *           gives the overall score and how many rated.
@@ -79,7 +82,10 @@ const COPY = {
     tiedLine: 'बराबरी छ',
     yourVote: 'तपाईंको मत',
     send: 'पठाउनुहोस्',
-    rateAll: (done: number, all: number) => `सबैलाई तारा दिनुहोस् · ${done}/${all}`,
+    rateSome: 'कम्तीमा एउटालाई तारा दिनुहोस्',
+    sendSome: (done: number, all: number) => `पठाउनुहोस् · ${done}/${all}`,
+    pickHint: 'एउटा छान्नुहोस्, अनि मत दिनुहोस्',
+    rateHint: 'जानेकालाई १–५ तारा दिनुहोस्, नजानेकालाई छोड्नुहोस्',
     you: (n: number) => `तपाईं ${n} ★`,
     people: (n: number) => `${n} जनाले रेटिङ दिए`,
     overall: (avg: string, n: number) => `समग्र ${avg} ★ · ${n} जनाको औसत`,
@@ -90,7 +96,7 @@ const COPY = {
     ratings: (n: number) => `${n} रेटिङ`,
     fresh: 'नयाँ',
     voteRule: 'एउटा Google खाता, एउटा मत · फेर्न मिल्दैन',
-    rateRule: 'हरेकलाई तारा दिनुहोस्, अनि पठाउनुहोस् · फेर्न मिल्दैन',
+    rateRule: 'एउटा Google खाता, एक पटक · फेर्न मिल्दैन',
     photos: 'तस्बिर',
     already: 'तपाईंले पहिल्यै मत दिनुभएको छ।',
     alreadyRated: 'तपाईंले पहिल्यै रेटिङ दिनुभएको छ।',
@@ -109,7 +115,10 @@ const COPY = {
     tiedLine: 'It’s a tie',
     yourVote: 'Your vote',
     send: 'Send',
-    rateAll: (done: number, all: number) => `Rate all to send · ${done}/${all}`,
+    rateSome: 'Rate at least one',
+    sendSome: (done: number, all: number) => `Send · ${done} of ${all}`,
+    pickHint: 'Pick one, then vote',
+    rateHint: 'Give 1–5 stars to the ones you know; skip the rest',
     you: (n: number) => `you ${n} ★`,
     people: (n: number) => `${n} ${n === 1 ? 'person' : 'people'} rated`,
     overall: (avg: string, n: number) => `Overall ${avg} ★ · from ${n} ${n === 1 ? 'person' : 'people'}`,
@@ -120,7 +129,7 @@ const COPY = {
     ratings: (n: number) => `${n} ${n === 1 ? 'rating' : 'ratings'}`,
     fresh: 'New',
     voteRule: 'One vote per Google account · final',
-    rateRule: 'Rate each, then send · final',
+    rateRule: 'One Google account, one send · final',
     photos: 'Photos',
     already: 'You have already voted.',
     alreadyRated: 'You have already rated this.',
@@ -258,6 +267,89 @@ function VoteTile({
   );
 }
 
+/* ── one name of a vote without photos ─────────────────────────────────────── */
+
+interface RowProps {
+  option: InteractionCardData['options'][number];
+  theme: Theme;
+  fontFamily: string | undefined;
+  selected: boolean;
+  percent: number | null;
+  mine: boolean;
+  leader: boolean;
+  t: (typeof COPY)['ne' | 'en'];
+  onPress: (() => void) | null;
+}
+
+/**
+ * As X draws a poll: a row per name, a radio at its end. Once results may be
+ * seen the row fills from the left to its share — accent for the reader's pick
+ * and the leader — with the percentage counting up at the end.
+ */
+function VoteRow({ option, theme, fontFamily, selected, percent, mine, leader, t, onPress }: RowProps) {
+  const fill = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.timing(fill, { toValue: percent ?? 0, duration: 420, useNativeDriver: false }).start();
+  }, [percent, fill]);
+  const outlined = selected || mine;
+
+  return (
+    <Pressable
+      onPress={onPress ?? undefined}
+      disabled={onPress === null}
+      style={[
+        styles.vrow,
+        {
+          borderColor: outlined ? theme.accent : theme.divider,
+          borderWidth: outlined ? 2 : 1,
+          backgroundColor: selected ? `${theme.accent}14` : 'transparent',
+        },
+      ]}
+      accessibilityRole="radio"
+      accessibilityState={{ selected: outlined, disabled: onPress === null }}
+      accessibilityLabel={`${option.name}${percent !== null ? `, ${percent}%` : ''}${mine ? `, ${t.yourVote}` : ''}`}
+    >
+      {percent !== null && (
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.vrowFill,
+            {
+              backgroundColor: leader || mine ? `${theme.accent}2E` : theme.surfaceRaised,
+              width: fill.interpolate({ inputRange: [0, 100], outputRange: ['0%', '100%'] }),
+            },
+          ]}
+        />
+      )}
+      <View style={styles.vrowText}>
+        <Text
+          style={[styles.vrowName, { color: theme.textPrimary, fontFamily, fontWeight: leader ? '800' : '700' }]}
+          numberOfLines={1}
+        >
+          {option.name}
+        </Text>
+        {option.detail !== null && (
+          <Text style={[styles.vrowDetail, { color: theme.textSecondary, fontFamily }]} numberOfLines={1}>
+            {option.detail}
+          </Text>
+        )}
+      </View>
+      {percent !== null ? (
+        <View style={styles.vrowEnd}>
+          {mine && <MaterialCommunityIcons name="check-circle" size={16} color={theme.accent} />}
+          <CountUp value={percent} style={[styles.vrowPercent, { color: theme.textPrimary }]} />
+        </View>
+      ) : selected ? (
+        <View style={[styles.vrowCheck, { backgroundColor: theme.accent }]}>
+          <MaterialCommunityIcons name="check" size={14} color="#fff" />
+        </View>
+      ) : (
+        <View style={[styles.vrowRadio, { borderColor: theme.textSecondary }]} />
+      )}
+    </Pressable>
+  );
+}
+
 /* ── the card ──────────────────────────────────────────────────────────────── */
 
 interface Props {
@@ -372,10 +464,12 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
     });
   };
 
-  /** The whole form, once every option has stars. */
+  /** The options this reader gave stars, skipping the rest. */
   const sendRatings = () => {
-    if (ratedCount(chosen, card.options.map((o) => o.id)) < card.options.length) return;
-    const ratings = card.options.map((o) => ({ optionId: o.id, stars: chosen[o.id]! }));
+    const ratings = card.options
+      .filter((o) => (chosen[o.id] ?? 0) > 0)
+      .map((o) => ({ optionId: o.id, stars: chosen[o.id]! }));
+    if (ratings.length === 0) return;
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setPending('ratings');
     signedIn(async (tk) => {
@@ -426,12 +520,17 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
   const lead = voteResults ? leaderIndex(card.options.map((o) => result(o.id)?.votes ?? 0)) : -1;
   const answered = myVote !== null || closed;
   const selectedName = card.options.find((o) => o.id === selected)?.name ?? null;
+  /* All photos or all names (the editorial rules see to it); names are a list. */
+  const photoVote = card.options.some((o) => o.image !== null);
 
   /* ── the rating ── */
   const myRatings = state?.myRatings ?? [];
   const ratingResults = card.type === 'rating' && results !== null;
   const done = ratedCount(chosen, card.options.map((o) => o.id));
   const allRated = done === card.options.length;
+
+  /* What to do, under the question, until it has been done. */
+  const hint = card.type === 'vote' ? (answered ? null : t.pickHint) : ratingResults || closed ? null : t.rateHint;
 
   return (
     <View style={[styles.card, { height, backgroundColor: theme.surface, paddingHorizontal: pad }]}>
@@ -462,39 +561,73 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
       >
         {card.title}
       </Text>
+      {hint !== null && (
+        <Text style={[styles.hint, { color: theme.textSecondary, fontFamily }]} numberOfLines={2}>
+          {hint}
+        </Text>
+      )}
 
       {card.type === 'vote' ? (
         <>
-          <View style={[styles.grid, { gap }]}>
-            {card.options.map((o, i) => {
-              const r = voteResults ? result(o.id) : null;
-              return (
-                <VoteTile
-                  key={o.id}
-                  option={o}
-                  width={tile.width}
-                  height={tile.height}
-                  theme={theme}
-                  fontFamily={fontFamily}
-                  dataSaver={dataSaver}
-                  selected={!answered && selected === o.id}
-                  dimmed={!answered && selected !== null && selected !== o.id}
-                  percent={r === null ? null : r.percent}
-                  mine={myVote === o.id}
-                  leader={i === lead}
-                  t={t}
-                  onPress={
-                    answered || pending !== null
-                      ? null
-                      : () => {
-                          void Haptics.selectionAsync();
-                          setSelected((s) => (s === o.id ? null : o.id));
-                        }
-                  }
-                />
-              );
-            })}
-          </View>
+          {!photoVote ? (
+            <View style={styles.vlist}>
+              {card.options.map((o, i) => {
+                const r = voteResults ? result(o.id) : null;
+                return (
+                  <VoteRow
+                    key={o.id}
+                    option={o}
+                    theme={theme}
+                    fontFamily={fontFamily}
+                    selected={!answered && selected === o.id}
+                    percent={r === null ? null : r.percent}
+                    mine={myVote === o.id}
+                    leader={i === lead}
+                    t={t}
+                    onPress={
+                      answered || pending !== null
+                        ? null
+                        : () => {
+                            void Haptics.selectionAsync();
+                            setSelected((s) => (s === o.id ? null : o.id));
+                          }
+                    }
+                  />
+                );
+              })}
+            </View>
+          ) : (
+            <View style={[styles.grid, { gap }]}>
+              {card.options.map((o, i) => {
+                const r = voteResults ? result(o.id) : null;
+                return (
+                  <VoteTile
+                    key={o.id}
+                    option={o}
+                    width={tile.width}
+                    height={tile.height}
+                    theme={theme}
+                    fontFamily={fontFamily}
+                    dataSaver={dataSaver}
+                    selected={!answered && selected === o.id}
+                    dimmed={!answered && selected !== null && selected !== o.id}
+                    percent={r === null ? null : r.percent}
+                    mine={myVote === o.id}
+                    leader={i === lead}
+                    t={t}
+                    onPress={
+                      answered || pending !== null
+                        ? null
+                        : () => {
+                            void Haptics.selectionAsync();
+                            setSelected((s) => (s === o.id ? null : o.id));
+                          }
+                    }
+                  />
+                );
+              })}
+            </View>
+          )}
 
           <View style={styles.bottomBar}>
             {voteResults ? (
@@ -595,24 +728,24 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
             ) : closed ? null : (
               <Pressable
                 onPress={sendRatings}
-                disabled={!allRated || pending !== null}
+                disabled={done === 0 || pending !== null}
                 style={({ pressed }) => [
                   styles.confirm,
-                  allRated
+                  done > 0
                     ? { backgroundColor: theme.accent, opacity: pressed ? 0.85 : 1 }
                     : { backgroundColor: 'transparent', borderColor: theme.divider, borderWidth: 1 },
                 ]}
                 accessibilityRole="button"
-                accessibilityState={{ disabled: !allRated }}
+                accessibilityState={{ disabled: done === 0 }}
               >
                 {pending !== null ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
                   <Text
-                    style={[styles.confirmText, { color: allRated ? '#fff' : theme.textSecondary, fontFamily }]}
+                    style={[styles.confirmText, { color: done > 0 ? '#fff' : theme.textSecondary, fontFamily }]}
                     numberOfLines={1}
                   >
-                    {allRated ? t.send : t.rateAll(done, card.options.length)}
+                    {done === 0 ? t.rateSome : allRated ? t.send : t.sendSome(done, card.options.length)}
                   </Text>
                 )}
               </Pressable>
@@ -656,6 +789,26 @@ const styles = StyleSheet.create({
   pillText: { fontSize: textSize(12), fontWeight: '700', letterSpacing: 0.3 },
   meta: { flexShrink: 1, fontSize: textSize(12.5) },
   title: { fontWeight: '700', marginBottom: 14 },
+  hint: { fontSize: textSize(13), marginTop: -9, marginBottom: 12 },
+  vlist: { flex: 1, justifyContent: 'center', gap: 10 },
+  vrow: {
+    minHeight: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 14,
+    overflow: 'hidden',
+  },
+  vrowFill: { position: 'absolute', left: 0, top: 0, bottom: 0 },
+  vrowText: { flex: 1, minWidth: 0 },
+  vrowName: { fontSize: textSize(15.5) },
+  vrowDetail: { fontSize: textSize(12) },
+  vrowEnd: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  vrowPercent: { fontSize: textSize(16), fontWeight: '800' },
+  vrowRadio: { width: 20, height: 20, borderRadius: 10, borderWidth: 1.5 },
+  vrowCheck: { width: 22, height: 22, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' },
   tile: { borderRadius: 14, overflow: 'hidden', justifyContent: 'flex-end' },
   wash: { alignItems: 'center', justifyContent: 'center' },

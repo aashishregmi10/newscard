@@ -29,6 +29,8 @@ export interface RatingDoc {
   optionId: string;
   readerId: ObjectId;
   stars: number;
+  /** On the first rating of each Send: what makes a second Send collide. */
+  first?: true;
   createdAt: Date;
 }
 

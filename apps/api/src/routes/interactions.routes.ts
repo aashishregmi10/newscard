@@ -19,15 +19,17 @@ import { requireReader, signInWithGoogle, signOut } from '../services/readers.se
  *   GET    /v1/interactions/:id/me        this reader's answers, and the results they may see
  *   GET    /v1/interactions/:id/results   what anyone may see
  *   POST   /v1/interactions/:id/vote      one vote, final
- *   POST   /v1/interactions/:id/ratings   stars for every option, sent together, final
+ *   POST   /v1/interactions/:id/ratings   stars for the options this reader knows, sent once, final
  *
- * "One" is the database's rule — unique indexes on (interaction, reader) and
- * (interaction, option, reader) — so two taps arriving together cannot both
- * count. The second is told it was already recorded, not that it failed.
+ * "One" is the database's rule — unique indexes on (interaction, reader) for
+ * a vote; for a rating, (interaction, option, reader) and one on each Send's
+ * first rating — so two taps arriving together cannot both count. The second
+ * is told it was already recorded, not that it failed.
  *
- * A rating is answered whole, as a form is: stars for every option in one
- * request, so every reader counted has rated everything and the options'
- * averages are over the same people.
+ * A rating is answered once, as a form is: stars for any of its options — a
+ * reader skips the ones they do not know rather than guessing — in one
+ * request. Each option's average is over the readers who rated it, and says
+ * how many that was.
  */
 
 export const interactionRoutes = Router();
@@ -184,26 +186,29 @@ interactionRoutes.post(
   requireReader,
   asyncRoute(async (req, res) => {
     const parsed = RatingsBody.safeParse(req.body);
-    if (!parsed.success) throw new AppError('BAD_REQUEST', 'Give each option one to five stars.');
+    if (!parsed.success) throw new AppError('BAD_REQUEST', 'Give at least one option one to five stars.');
     const doc = await interactionOr404(req.params.id);
     if (doc.type !== 'rating') throw new AppError('BAD_REQUEST', 'This is a vote, not a rating.');
     assertOpen(doc);
     const given = parsed.data.ratings;
     const ids = new Set(given.map((r) => r.optionId));
-    if (ids.size !== given.length || ids.size !== doc.options.length || doc.options.some((o) => !ids.has(o.id))) {
-      throw new AppError('BAD_REQUEST', 'Give every option stars, once each.');
+    if (ids.size !== given.length || given.some((r) => !doc.options.some((o) => o.id === r.optionId))) {
+      throw new AppError('BAD_REQUEST', 'Rate each option at most once, and only the options on the card.');
     }
 
-    /* In the options' order, and stopping at the first that is already there:
-     * a second copy of the same request then adds nothing. */
+    /* In the options' order, the first marked `first`, stopping at the first
+     * that collides: a second Send — the same request again, or one for the
+     * options skipped — then adds nothing. */
     const at = new Date();
+    const rated = doc.options.filter((o) => ids.has(o.id));
     try {
       await interactionCollections(getDb()).ratings.insertMany(
-        doc.options.map((o) => ({
+        rated.map((o, k) => ({
           interactionId: doc._id,
           optionId: o.id,
           readerId: req.readerId!,
           stars: given.find((r) => r.optionId === o.id)!.stars,
+          ...(k === 0 ? { first: true as const } : {}),
           createdAt: at,
         })) as never,
         { ordered: true },

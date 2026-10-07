@@ -239,9 +239,9 @@ export function RatingResults({
 
 /**
  * The card as a reader meets it in the app: a vote's photo tiles with their
- * names, the confirm bar, the results washed over the photos; a rating's
- * question with each option's name over five stars and one Send — or, once
- * rated, each option's average and the overall score. Drawn from the same
+ * names — or, without photos, a list of names — the confirm bar, the results
+ * over them; a rating's question with each option's name over five stars and
+ * one Send — or, once rated, each option's average and the overall score. Drawn from the same
  * fields the app receives, so what the editor sees is what readers get.
  */
 export function PhonePreview({
@@ -260,6 +260,17 @@ export function PhonePreview({
   const ne = language === 'ne';
   const voteShown = type === 'vote' && results?.type === 'vote';
   const rated = type === 'rating' && results?.type === 'rating';
+  const photos = options.some((o) => o.image !== null);
+  const hint =
+    voteShown || rated
+      ? null
+      : type === 'vote'
+        ? ne
+          ? 'एउटा छान्नुहोस्, अनि मत दिनुहोस्'
+          : 'Pick one, then vote'
+        : ne
+          ? 'जानेकालाई १–५ तारा दिनुहोस्, नजानेकालाई छोड्नुहोस्'
+          : 'Give 1–5 stars to the ones you know; skip the rest';
   return (
     <div className="ix-phone" lang={language}>
       <div className="ix-phone-head">
@@ -269,8 +280,25 @@ export function PhonePreview({
         </span>
       </div>
       <p className="ix-phone-title">{title.trim() || (ne ? 'प्रश्न' : 'Your question')}</p>
+      {hint !== null && <p className="ix-phone-hint">{hint}</p>}
 
-      {type === 'vote' ? (
+      {type === 'vote' && !photos ? (
+        <>
+          <div className="ix-phone-vlist">
+            {options.map((o, i) => {
+              const r = voteShown ? (results.options[i] ?? null) : null;
+              return (
+                <div key={o.id ?? i} className="ix-phone-vrow">
+                  {r !== null && <span className="ix-phone-vfill" style={{ width: `${r.percent}%` }} />}
+                  <span className="ix-phone-row-name">{o.name.trim() || `${ne ? 'विकल्प' : 'Option'} ${i + 1}`}</span>
+                  {r !== null ? <strong>{r.percent}%</strong> : <span className="ix-phone-radio" />}
+                </div>
+              );
+            })}
+          </div>
+          <div className="ix-phone-confirm">{ne ? 'मत दिनुहोस्' : 'Vote'}</div>
+        </>
+      ) : type === 'vote' ? (
         <>
           <div className={`ix-phone-grid ix-phone-grid-${Math.min(4, Math.max(2, options.length))}`}>
             {options.map((o, i) => {
@@ -338,8 +366,8 @@ export function PhonePreview({
             ? 'एउटा Google खाता, एउटा मत · फेर्न मिल्दैन'
             : 'One vote per Google account · final'
           : ne
-            ? 'हरेकलाई तारा दिनुहोस्, अनि पठाउनुहोस् · फेर्न मिल्दैन'
-            : 'Rate each, then send · final'}
+            ? 'एउटा Google खाता, एक पटक · फेर्न मिल्दैन'
+            : 'One Google account, one send · final'}
       </p>
     </div>
   );
@@ -454,8 +482,9 @@ export function Interactions({ tab, page }: { tab: InteractionTab; page: number 
               </Button>
             }
           >
-            A vote asks readers to pick one of up to four photos. A rating asks a question and lets readers
-            give each of up to six options one to five stars. Both appear as cards in the app’s feed.
+            A vote asks readers to pick one — of up to four photos, or six names. A rating asks a question
+            and lets readers give the options they know, up to six, one to five stars. Both appear as cards
+            in the app’s feed.
           </EmptyState>
         ) : (
           <>

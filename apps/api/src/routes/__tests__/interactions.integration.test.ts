@@ -184,7 +184,7 @@ describe('rating', () => {
       .set(as(token))
       .send({ ratings: [{ optionId: 'bbbbbb01', stars: a }, { optionId: 'bbbbbb02', stars: b }] });
 
-  it('takes every option at once, and moves the averages', async () => {
+  it('takes the options in one Send, and moves the averages', async () => {
     const id = await rating();
     const a = await signIn('acct-1');
     const b = await signIn('acct-2');
@@ -212,11 +212,36 @@ describe('rating', () => {
     expect(await interactionCollections(getDb()).ratings.countDocuments()).toBe(2);
   });
 
-  it('refuses a form with an option left out, or one twice', async () => {
+  it('lets a reader skip options, and counts each option over those who rated it', async () => {
+    const id = await rating();
+    const a = await signIn('acct-1');
+    const b = await signIn('acct-2');
+    const only = (token: string, optionId: string, stars: number) =>
+      request(app).post(`/v1/interactions/${id}/ratings`).set(as(token)).send({ ratings: [{ optionId, stars }] });
+
+    expect((await only(a, 'bbbbbb02', 4)).status).toBe(201);
+    const r = await rate(id, b, 2, 2);
+    expect(r.body.results).toMatchObject({ total: 3, respondents: 2 });
+    expect(r.body.results.options[0]).toMatchObject({ ratings: 1, average: 2 });
+    expect(r.body.results.options[1]).toMatchObject({ ratings: 2, average: 3 });
+  });
+
+  it('takes one Send per reader: the options skipped cannot be sent later', async () => {
     const id = await rating();
     const a = await signIn('acct-1');
     const send = (ratings: unknown) => request(app).post(`/v1/interactions/${id}/ratings`).set(as(a)).send({ ratings });
-    expect((await send([{ optionId: 'bbbbbb01', stars: 4 }])).status).toBe(400);
+    expect((await send([{ optionId: 'bbbbbb01', stars: 4 }])).status).toBe(201);
+    const later = await send([{ optionId: 'bbbbbb02', stars: 1 }]);
+    expect(later.status).toBe(409);
+    expect(later.body.error.details.state.myRatings).toEqual([{ optionId: 'bbbbbb01', stars: 4 }]);
+    expect(await interactionCollections(getDb()).ratings.countDocuments()).toBe(1);
+  });
+
+  it('refuses an empty form, an option twice, or one not on the card', async () => {
+    const id = await rating();
+    const a = await signIn('acct-1');
+    const send = (ratings: unknown) => request(app).post(`/v1/interactions/${id}/ratings`).set(as(a)).send({ ratings });
+    expect((await send([])).status).toBe(400);
     expect(
       (await send([{ optionId: 'bbbbbb01', stars: 4 }, { optionId: 'bbbbbb01', stars: 2 }])).status,
     ).toBe(400);

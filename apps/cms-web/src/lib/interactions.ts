@@ -17,13 +17,24 @@ export const INTERACTION_LIMITS = {
   detail: { max: 60 },
   credit: { min: 2, max: 120 },
   /**
-   * How many options or candidates. A vote is a 2×2 grid, so four at most.
-   * A rating is a list of rows, each a name over five stars, and six is what
-   * fits on one card at the reader's normal text size without the card having
-   * to scroll inside a feed that scrolls.
+   * How many options or candidates. A rating is a list of rows, each a name
+   * over five stars, and a vote of names is a list too; six is what fits on one
+   * card at the reader's normal text size without the card having to scroll
+   * inside a feed that scrolls. A vote of photos is a 2×2 grid, so four
+   * (`photoVote`).
    */
-  options: { rating: { min: 2, max: 6 }, vote: { min: 2, max: 4 } },
+  options: { rating: { min: 2, max: 6 }, vote: { min: 2, max: 6 } },
+  photoVote: { max: 4 },
 } as const;
+
+/**
+ * How many options an Interaction may have. A vote is all photos or all
+ * names: with photos it is a 2×2 grid, so four; as names, a list of six.
+ */
+export function optionRange(type: InteractionType, withPhotos: boolean): { min: number; max: number } {
+  const r = INTERACTION_LIMITS.options[type];
+  return type === 'vote' && withPhotos ? { min: r.min, max: INTERACTION_LIMITS.photoVote.max } : r;
+}
 
 export interface InteractionShape {
   type: InteractionType;
@@ -70,13 +81,17 @@ export function interactionProblems(v: InteractionShape): InteractionProblem[] {
     out.push({ field: 'title', message: `At most ${L.title.max} characters (now ${title.length}).` });
   }
 
-  const range = L.options[v.type];
+  /* A vote with any photo is a vote of photos: every candidate needs one. */
+  const photos = v.type === 'vote' && v.options.some((o) => o.image !== null);
+  const range = optionRange(v.type, photos);
   if (v.options.length < range.min) {
     out.push({ field: 'options', message: `Add at least ${range.min} ${noun}s.` });
   } else if (v.options.length > range.max) {
     out.push({
       field: 'options',
-      message: `At most ${range.max} ${noun}s${v.type === 'vote' ? ' — the card is a 2×2 grid' : ''}.`,
+      message: photos
+        ? `At most ${range.max} candidates with photos — the card is a 2×2 grid. Without photos, up to ${L.options.vote.max}.`
+        : `At most ${range.max} ${noun}s.`,
     });
   }
 
@@ -105,8 +120,11 @@ export function interactionProblems(v: InteractionShape): InteractionProblem[] {
     }
 
     if (o.image === null) {
-      if (v.type === 'vote') {
-        out.push({ field: `options.${i}.image`, message: 'Every candidate needs a photo.' });
+      if (photos) {
+        out.push({
+          field: `options.${i}.image`,
+          message: 'Give every candidate a photo, or none: a vote shows all photos or all names.',
+        });
       }
     } else {
       const credit = o.image.credit.trim();

@@ -2816,6 +2816,54 @@
   line-height: 1.35;
 }
 
+.ix-phone-hint {
+  margin: -6px 0 0;
+  color: var(--ink-soft);
+  font-size: 11px;
+}
+
+/* A vote of names: a list, each row filling to its share once voted. */
+.ix-phone-vlist {
+  flex: 1;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+}
+
+.ix-phone-vrow {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 12px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.ix-phone-vrow > :not(.ix-phone-vfill) {
+  position: relative;
+}
+
+.ix-phone-vrow .ix-phone-row-name {
+  flex: 1;
+}
+
+.ix-phone-vfill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--accent-soft);
+}
+
+.ix-phone-radio {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid var(--ink-faint);
+  border-radius: 50%;
+}
+
 .ix-phone-grid {
   flex: 1;
   display: grid;

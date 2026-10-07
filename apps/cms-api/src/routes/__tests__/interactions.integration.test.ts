@@ -93,10 +93,17 @@ describe('making an Interaction', () => {
     expect(list.body.counts).toEqual({ live: 0, drafts: 1, closed: 0 });
   });
 
-  it('saves a rating whose businesses need no photo', async () => {
+  it('saves a rating whose options need no photo', async () => {
     const r = await send('post', '/api/cms/interactions').send(rating());
     expect(r.status).toBe(201);
     expect(r.body.interaction.options[0].detail).toBe('Baneshwor');
+  });
+
+  it('saves a vote of six names, without photos', async () => {
+    const names = ['क', 'ख', 'ग', 'घ', 'ङ', 'च'].map((n) => ({ name: `नमुना खेल ${n}`, detail: null, image: null }));
+    const r = await send('post', '/api/cms/interactions').send(vote({ options: names }));
+    expect(r.status).toBe(201);
+    expect(r.body.interaction.options).toHaveLength(6);
   });
 
   it('refuses a fifth candidate, a repeated name and a candidate without a photo', async () => {
@@ -125,7 +132,7 @@ describe('making an Interaction', () => {
     });
     const r3 = await send('post', '/api/cms/interactions').send(noPhoto);
     expect(r3.status).toBe(422);
-    expect(r3.body.error.message).toBe('Every candidate needs a photo.');
+    expect(r3.body.error.message).toBe('Give every candidate a photo, or none: a vote shows all photos or all names.');
   });
 
   it('refuses a vote without a closing date, and a closing date before the opening', async () => {

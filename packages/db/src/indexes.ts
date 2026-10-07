@@ -331,7 +331,17 @@ const RATINGS: IndexSpec[] = [
     key: { interactionId: 1, optionId: 1, readerId: 1 },
     name: 'rating_one_per_reader',
     unique: true,
-    serves: 'POST /v1/interactions/:id/rating — one rating per reader per business',
+    serves: 'POST /v1/interactions/:id/ratings — one rating per reader per option',
+  },
+  {
+    /* One Send per reader, who may skip options and so could otherwise send
+       again for the ones skipped. A Send's first rating is marked `first`; a
+       second Send's first rating collides here, and nothing of it is kept. */
+    key: { interactionId: 1, readerId: 1, first: 1 },
+    name: 'rating_one_send_per_reader',
+    unique: true,
+    partialFilterExpression: { first: true },
+    serves: 'POST /v1/interactions/:id/ratings — one Send per reader',
   },
   {
     key: { interactionId: 1, readerId: 1 },
