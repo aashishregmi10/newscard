@@ -84,6 +84,11 @@ const bad = (msg, how) => {
   console.log(`  ${c.red('FAIL')}  ${msg}`);
   if (how) console.log(`        ${c.dim(how)}`);
 };
+/** Worth knowing, not worth stopping for. */
+const note = (msg, how) => {
+  console.log(`  ${c.yellow('note')}  ${msg}`);
+  if (how) console.log(`        ${c.dim(how)}`);
+};
 
 /* ── helpers ────────────────────────────────────────────────────────────── */
 
@@ -264,6 +269,14 @@ function checkReactPairing() {
  * installed SDK expects. A mismatch here is the difference between an app that
  * bundles and an app that crashes on the device — and `npm install` is how it
  * happens, because npm does not know about SDK compatibility.
+ *
+ * Except when the only difference is a newer PATCH release of the same SDK
+ * (installed 57.0.26, Expo now publishing 57.0.27). Expo ships those every few
+ * days, so the check goes red overnight with nothing changed here. The
+ * versions installed are the ones the development build on the phone was made
+ * with; "fixing" them updates the JavaScript without the native half, which is
+ * exactly the mismatch that broke react-native-worklets (apps/mobile/AGENTS.md).
+ * So patch drift is a note, and the patches go in together with the next APK.
  */
 function checkNativeVersions() {
   const res = spawnSync(process.execPath, [EXPO_CLI, 'install', '--check'], {
@@ -273,6 +286,20 @@ function checkNativeVersions() {
   const out = `${res.stdout ?? ''}${res.stderr ?? ''}`;
 
   if (res.status === 0) return ok('native module versions match the Expo SDK');
+
+  const drift = [
+    ...out.matchAll(/^\s*(@?[\w/.-]+)@(\d+)\.(\d+)\.(\d+)\S*\s+-\s+expected version:\s*[~^]?(\d+)\.(\d+)\.(\d+)/gm),
+  ].map((m) => ({
+    name: m[1],
+    patchOnly: m[2] === m[5] && m[3] === m[6] && Number(m[4]) < Number(m[7]),
+  }));
+  if (drift.length > 0 && drift.every((d) => d.patchOnly)) {
+    return note(
+      `newer Expo patch releases are out: ${drift.map((d) => d.name).join(', ')}`,
+      'Kept as installed, to match the APK on the phone. Take them with the next APK build:\n' +
+        '        npx expo install --fix (from apps/mobile), then rebuild the APK.',
+    );
+  }
 
   const offenders = [...out.matchAll(/^\s*([@\w][\w@/.-]*)@\S+\s+-\s+expected/gm)].map((m) => m[1]);
   bad(
