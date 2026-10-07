@@ -1,5 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { endReaderSession, fetchReaderConfig, startReaderSession } from '../api/client';
+import {
+  AnswerError,
+  deleteReaderAccount,
+  endReaderSession,
+  fetchReaderConfig,
+  startReaderSession,
+} from '../api/client';
 import {
   googleSignIn,
   googleSignOut,
@@ -13,10 +19,16 @@ import {
  * The signed-in reader, if any — for voting and rating, and nothing else.
  *
  * Reading never asks. A reader meets sign-in only by pressing Vote or Submit
- * on an Interaction card, and the vote then goes through on its own once they
- * are in (see InteractionCard). The session survives restarts in the phone's
- * keystore until it expires or they sign out in Settings.
+ * on an Interaction card, or on the sign-in screen offered once after the
+ * first run, and the vote then goes through on its own once they are in (see
+ * InteractionCard). The session survives restarts in the phone's keystore
+ * until it expires or they sign out in Settings — where they can also delete
+ * the account and everything it holds (Google Play's rule).
  */
+
+/** ok: gone. signIn: the session had already ended, so the server cannot tell
+ *  whose account to delete — sign in again, then delete. */
+export type DeleteOutcome = 'ok' | 'signIn' | 'failed';
 
 export type SignInOutcome =
   | { ok: true; token: string }
@@ -30,6 +42,8 @@ interface ReaderState {
   session: StoredSession | null;
   signIn: () => Promise<SignInOutcome>;
   signOut: () => Promise<void>;
+  /** Delete the account on the server — votes, ratings, every session — then sign out here. */
+  deleteAccount: () => Promise<DeleteOutcome>;
   /** The server said the session has ended (401): forget it, so the next tap asks again. */
   forget: () => void;
 }
@@ -92,9 +106,26 @@ export function ReaderProvider({ children }: { children: ReactNode }) {
     if (token) await endReaderSession(token).catch(() => undefined);
   }, [session, forget]);
 
+  const deleteAccount = useCallback(async (): Promise<DeleteOutcome> => {
+    const token = session?.token;
+    if (!token) return 'signIn';
+    try {
+      await deleteReaderAccount(token);
+    } catch (e) {
+      if (e instanceof AnswerError && e.status === 401) {
+        forget();
+        return 'signIn';
+      }
+      return 'failed';
+    }
+    forget();
+    await googleSignOut();
+    return 'ok';
+  }, [session, forget]);
+
   const value = useMemo(
-    () => ({ available, ready, session, signIn, signOut, forget }),
-    [available, ready, session, signIn, signOut, forget],
+    () => ({ available, ready, session, signIn, signOut, deleteAccount, forget }),
+    [available, ready, session, signIn, signOut, deleteAccount, forget],
   );
   return <ReaderContext.Provider value={value}>{children}</ReaderContext.Provider>;
 }

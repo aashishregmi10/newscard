@@ -277,6 +277,66 @@ describe('rating', () => {
   });
 });
 
+describe('deleting an account', () => {
+  const answerBoth = async (token: string) => {
+    const vote = await interaction();
+    const rating = await interaction({
+      type: 'rating',
+      title: 'Sample: how was it?',
+      options: [OPTION('cccccc01', 'Sample One'), OPTION('cccccc02', 'नमुना दुई')],
+      closesAt: null,
+    });
+    await request(app).post(`/v1/interactions/${vote}/vote`).set(as(token)).send({ optionId: 'aaaaaa01' });
+    await request(app)
+      .post(`/v1/interactions/${rating}/ratings`)
+      .set(as(token))
+      .send({ ratings: [{ optionId: 'cccccc01', stars: 5 }] });
+    return { vote, rating };
+  };
+
+  it('removes the reader, every session, and every vote and rating — from the app', async () => {
+    const phone = await signIn('acct-1');
+    const tablet = await signIn('acct-1');
+    const other = await signIn('acct-2');
+    const { vote } = await answerBoth(phone);
+    await request(app).post(`/v1/interactions/${vote}/vote`).set(as(other)).send({ optionId: 'aaaaaa02' });
+
+    const r = await request(app).delete('/v1/readers/me').set(as(phone));
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ deleted: true, votes: 1, ratings: 1, sessions: 2 });
+
+    const c = interactionCollections(getDb());
+    expect(await c.readers.countDocuments()).toBe(1);
+    expect(await c.votes.countDocuments()).toBe(1);
+    expect(await c.ratings.countDocuments()).toBe(0);
+    /* Both of that account's sessions end; the other reader's does not. */
+    expect((await request(app).get(`/v1/interactions/${vote}/me`).set(as(tablet))).status).toBe(401);
+    const left = await request(app).get(`/v1/interactions/${vote}/me`).set(as(other));
+    expect(left.body.results).toMatchObject({ total: 1 });
+  });
+
+  it('needs a signed-in reader', async () => {
+    expect((await request(app).delete('/v1/readers/me')).status).toBe(401);
+  });
+
+  it('deletes from the web with a Google sign-in, and creates nothing for an unknown account', async () => {
+    const phone = await signIn('acct-1');
+    await answerBoth(phone);
+
+    const r = await request(app).post('/v1/readers/delete').send({ idToken: 'good-token-acct-1-padding' });
+    expect(r.status).toBe(200);
+    expect(r.body).toMatchObject({ deleted: true, votes: 1, ratings: 1 });
+    expect(await interactionCollections(getDb()).readers.countDocuments()).toBe(0);
+
+    const again = await request(app).post('/v1/readers/delete').send({ idToken: 'good-token-acct-1-padding' });
+    expect(again.body).toMatchObject({ deleted: false });
+    expect(await interactionCollections(getDb()).readers.countDocuments()).toBe(0);
+
+    const forged = await request(app).post('/v1/readers/delete').send({ idToken: 'forged-token-0123456789' });
+    expect(forged.status).toBe(401);
+  });
+});
+
 describe('Interaction cards in the feed', () => {
   const story = (i: number) => ({ id: `s${i}`, kind: 'article' as const });
   const card = (id: string) => ({

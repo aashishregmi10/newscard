@@ -17,8 +17,20 @@ function subscribe(onChange: () => void): () => void {
   return () => window.removeEventListener('hashchange', onChange);
 }
 
+/**
+ * The public legal pages also answer at plain paths. Google Play's forms and
+ * the app link to them, and an address with "#/" in it is the kind that gets
+ * mangled on its way through a form or a message. The hash still wins when
+ * there is one, so links inside the site work as everywhere else.
+ */
+const PATH_ROUTES: Readonly<Record<string, string>> = {
+  '/privacy': '#/privacy',
+  '/terms': '#/terms',
+  '/delete-account': '#/delete-account',
+};
+
 function getSnapshot(): string {
-  return window.location.hash;
+  return window.location.hash || PATH_ROUTES[window.location.pathname.replace(/\/+$/, '')] || '';
 }
 
 /**
@@ -69,7 +81,7 @@ export function useRoute(): Route {
    * would return to and be corrected away from again.
    */
   useEffect(() => {
-    if (window.location.hash !== canonical) {
+    if (getSnapshot() !== canonical) {
       window.history.replaceState(null, '', canonical);
     }
   }, [canonical]);

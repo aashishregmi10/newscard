@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import { Routes, routeToHash, type Route } from '../nav';
+import { SITE } from '../siteInfo';
 import { Icon } from '../ui';
+import { DeleteAccount, Privacy, Terms } from './LegalPages';
 
 /**
  * The public site.
@@ -78,15 +80,30 @@ export function PublicSite({ route }: PublicSiteProps) {
       </header>
 
       <main className="site-wrap site-main">
-        {route.name === 'about' ? <About /> : route.name === 'contact' ? <Contact /> : <Home />}
+        {route.name === 'about' ? (
+          <About />
+        ) : route.name === 'contact' ? (
+          <Contact />
+        ) : route.name === 'privacy' ? (
+          <Privacy />
+        ) : route.name === 'terms' ? (
+          <Terms />
+        ) : route.name === 'deleteAccount' ? (
+          <DeleteAccount />
+        ) : (
+          <Home />
+        )}
       </main>
 
       <footer className="site-foot">
         <div className="site-wrap">
           <p>
             SAAR — bilingual short-form news for Nepal.{' '}
-            <a href="/report/">Advertiser report</a> ·{' '}
-            <a href={routeToHash(Routes.contact())}>Contact</a>
+            <a href={routeToHash(Routes.privacy())}>Privacy</a> ·{' '}
+            <a href={routeToHash(Routes.terms())}>Terms</a> ·{' '}
+            <a href={routeToHash(Routes.deleteAccount())}>Delete account</a> ·{' '}
+            <a href={routeToHash(Routes.contact())}>Contact</a> ·{' '}
+            <a href="/report/">Advertiser report</a>
           </p>
         </div>
       </footer>
@@ -135,10 +152,10 @@ function Home() {
         <h2>For advertisers</h2>
         <p>
           Two formats, sold by time. A <strong>full-card ad</strong> puts your poster on a card of
-          its own between stories: at most one card in ten, never before the fourth card of a
-          session, and twelve a day. A <strong>small ad</strong> sits on stories themselves,
-          beside the share button, always labelled as an ad. Those limits are enforced on our
-          servers, so no future release can quietly raise them.
+          its own between stories, marked as sponsored: at most one card in ten, never before the
+          fourth card of a session, and twelve a day. A <strong>small ad</strong> sits on stories
+          themselves, beside the share button, with your name in the ad colour. Those limits are
+          enforced on our servers, so no future release can quietly raise them.
         </p>
         <p>
           How often your ad is shown follows what you pay per day: twice the price per day means
@@ -203,16 +220,21 @@ function About() {
         <li>
           No advertising identifier, no location, and no profile. Measurement is an install-scoped
           random id, how long a card was on screen, and whether the publisher&rsquo;s article was
-          opened.
+          opened. Signing in, only to vote or rate, keeps a one-way code — never a name or email.
+          The <a href={routeToHash(Routes.privacy())}>Privacy Policy</a> lists everything.
         </li>
-        <li>Summaries are written by people. There is no model in the pipeline.</li>
+        <li>
+          No summary is published unread. An AI model (Google&rsquo;s Gemini) drafts each one from the
+          publisher&rsquo;s article; an editor checks it against the original, and the publish step
+          refuses a summary that is mostly the publisher&rsquo;s own sentences.
+        </li>
       </ul>
 
       <h2>Where it runs</h2>
       <p>
-        Android first, built for entry-level handsets and metered data. Short video is capped at 90
-        seconds, stored at three sizes, and never plays by itself on a mobile connection — the
-        player shows what a clip will cost before it spends it.
+        Android first, built for entry-level handsets and metered data. Short videos play as they
+        come on screen, as on any video app; Data Saver stops them until tapped, and a video we host
+        ourselves is capped at 90 seconds and stored at three sizes.
       </p>
     </>
   );
@@ -230,23 +252,27 @@ function Contact() {
 
       <div className="site-contacts">
         <Contacted title="Publishers" note="Licensing, syndication, and how your work is credited.">
-          publishers@example.invalid
+          {SITE.emails.publishers}
         </Contacted>
         <Contacted title="Advertising" note="Campaigns, rates, and reporting.">
-          advertising@example.invalid
+          {SITE.emails.advertising}
         </Contacted>
         <Contacted
           title="Corrections and takedowns"
           note="Answered within 24 hours. Tell us the story and what is wrong with it."
         >
-          legal@example.invalid
+          {SITE.emails.legal}
+        </Contacted>
+        <Contacted title="Privacy" note="Your data, and deleting it.">
+          {SITE.emails.privacy}
         </Contacted>
       </div>
 
       <h2>Post</h2>
       <p className="site-address">
-        {/* TODO: the registered business name and address. */}
-        Kathmandu, Nepal
+        {SITE.operator}
+        {'\n'}
+        {SITE.address}
       </p>
     </>
   );

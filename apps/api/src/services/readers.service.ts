@@ -78,12 +78,8 @@ function readerKey(): string {
 
 const sha256 = (s: string) => createHash('sha256').update(s).digest('hex');
 
-/** Verify a Google ID token and start a session. */
-export async function signInWithGoogle(
-  idToken: string,
-  db: Db = getDb(),
-  now = new Date(),
-): Promise<{ token: string; expiresAt: Date }> {
+/** The stored form of the account a Google ID token names, once Google has confirmed it. */
+async function verifiedSubHash(idToken: string): Promise<string> {
   const audiences = loadEnv()
     .GOOGLE_WEB_CLIENT_ID.split(',')
     .map((s) => s.trim())
@@ -99,8 +95,16 @@ export async function signInWithGoogle(
     log.info('google sign-in refused', { reason: e instanceof Error ? e.message : String(e) });
     throw new AppError('UNAUTHENTICATED', 'Google did not confirm that sign-in. Please try again.');
   }
+  return createHmac('sha256', readerKey()).update(`google:${sub}`).digest('hex');
+}
 
-  const subHash = createHmac('sha256', readerKey()).update(`google:${sub}`).digest('hex');
+/** Verify a Google ID token and start a session. */
+export async function signInWithGoogle(
+  idToken: string,
+  db: Db = getDb(),
+  now = new Date(),
+): Promise<{ token: string; expiresAt: Date }> {
+  const subHash = await verifiedSubHash(idToken);
   const c = interactionCollections(db);
   const reader = await c.readers.findOneAndUpdate(
     { subHash },
@@ -148,4 +152,50 @@ export async function signOut(req: Request): Promise<void> {
   const token = tokenFrom(req);
   if (token === null) return;
   await interactionCollections(getDb()).readerSessions.deleteOne({ tokenHash: sha256(token) });
+}
+
+/* ── deleting an account ─────────────────────────────────────────────────────
+ *
+ * Google Play requires a reader who made an account to be able to delete it —
+ * and what it holds — from the app and from the web. Everything goes: the
+ * reader, every session on every phone, and every vote and rating. A deleted
+ * reader's answers come out of the results too, closed ones included: the
+ * results are counted from the answers, so there is nothing else to adjust.
+ */
+
+export interface DeletedReader {
+  deleted: boolean;
+  votes: number;
+  ratings: number;
+  sessions: number;
+}
+
+export async function deleteReader(readerId: ObjectId, db: Db = getDb()): Promise<DeletedReader> {
+  const c = interactionCollections(db);
+  const [votes, ratings, sessions] = await Promise.all([
+    c.votes.deleteMany({ readerId }),
+    c.ratings.deleteMany({ readerId }),
+    c.readerSessions.deleteMany({ readerId }),
+  ]);
+  const reader = await c.readers.deleteOne({ _id: readerId });
+  log.info('reader deleted', { votes: votes.deletedCount, ratings: ratings.deletedCount });
+  return {
+    deleted: reader.deletedCount > 0,
+    votes: votes.deletedCount,
+    ratings: ratings.deletedCount,
+    sessions: sessions.deletedCount,
+  };
+}
+
+/**
+ * From the web, where there is no session: the person signs in with Google on
+ * the deletion page, and that token names the account. Nothing else could —
+ * the server keeps no email to look anyone up by. An account that was never
+ * here is not created, only reported as not found.
+ */
+export async function deleteReaderByGoogle(idToken: string, db: Db = getDb()): Promise<DeletedReader> {
+  const subHash = await verifiedSubHash(idToken);
+  const reader = await interactionCollections(db).readers.findOne({ subHash }, { projection: { _id: 1 } });
+  if (!reader) return { deleted: false, votes: 0, ratings: 0, sessions: 0 };
+  return deleteReader(reader._id, db);
 }

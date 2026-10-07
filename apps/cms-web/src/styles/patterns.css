@@ -3048,3 +3048,48 @@
   font-size: 11px;
   text-align: center;
 }
+
+/* ── Privacy, Terms, Delete account ─────────────────────────────────────── */
+
+/* A reading measure: these are read line by line, sometimes by a lawyer. */
+.site-legal {
+  max-width: 70ch;
+}
+
+.site-legal-date {
+  margin-top: var(--s2) !important;
+  font-size: var(--text-sm) !important;
+}
+
+.site-delete {
+  margin-top: var(--s4);
+  padding: var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+}
+
+.site-delete > p:first-child {
+  margin-top: 0;
+}
+
+.site-delete-google {
+  margin-top: var(--s4);
+  min-height: 44px;
+}
+
+.site-danger {
+  margin-top: var(--s4);
+  padding: 10px 22px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--bad);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.site-danger:hover {
+  filter: brightness(1.08);
+}

@@ -133,6 +133,37 @@ export default function SettingsScreen() {
   const t = s.theme;
   const ne = s.languages.includes('ne');
 
+  const confirmDelete = () =>
+    Alert.alert(
+      ne ? 'खाता मेटाउने?' : 'Delete your account?',
+      ne
+        ? 'तपाईंका सबै मत र रेटिङ SAAR बाट हटाइन्छ र तपाईं साइन आउट हुनुहुन्छ। यो फिर्ता गर्न मिल्दैन।'
+        : 'All your votes and ratings are removed from SAAR and you are signed out. This cannot be undone.',
+      [
+        { text: ne ? 'रद्द' : 'Cancel', style: 'cancel' },
+        {
+          text: ne ? 'मेटाउनुहोस्' : 'Delete',
+          style: 'destructive',
+          onPress: () =>
+            void reader.deleteAccount().then((r) =>
+              r === 'ok'
+                ? Alert.alert(ne ? 'खाता मेटाइयो' : 'Account deleted')
+                : r === 'signIn'
+                  ? Alert.alert(
+                      ne ? 'फेरि साइन इन गर्नुहोस्' : 'Please sign in again',
+                      ne
+                        ? 'तपाईंको साइन इन सकिएको थियो। फेरि साइन इन गरेर मेटाउनुहोस्।'
+                        : 'Your sign-in had ended. Sign in again, then delete.',
+                    )
+                  : Alert.alert(
+                      ne ? 'मेटाउन सकिएन' : 'Could not delete',
+                      ne ? 'इन्टरनेट जाँचेर फेरि प्रयास गर्नुहोस्।' : 'Check your connection and try again.',
+                    ),
+            ),
+        },
+      ],
+    );
+
   return (
     <View style={[styles.root, { backgroundColor: t.surface, paddingTop: insets.top }]}>
       <View style={[styles.header, { borderBottomColor: t.divider }]}>
@@ -376,7 +407,6 @@ export default function SettingsScreen() {
                   : 'For votes and ratings only. We do not have your name or email.'
               }
               theme={t}
-              last
               right={
                 <Pressable
                   onPress={() =>
@@ -388,6 +418,25 @@ export default function SettingsScreen() {
                   accessibilityRole="button"
                 >
                   <Text style={{ color: t.accent, fontWeight: '600' }}>{ne ? 'साइन आउट' : 'Sign out'}</Text>
+                </Pressable>
+              }
+            />
+            {/* Google Play's rule for any app where readers make an account: they
+                can delete it, and what it holds, from inside the app. */}
+            <Row
+              label={ne ? 'खाता र डेटा मेटाउनुहोस्' : 'Delete account and data'}
+              hint={
+                ne
+                  ? 'तपाईंका मत, रेटिङ र साइन इन SAAR बाट सधैंका लागि हटाइन्छ।'
+                  : 'Removes your votes, ratings and sign-in from SAAR for good.'
+              }
+              theme={t}
+              last
+              right={
+                <Pressable onPress={confirmDelete} accessibilityRole="button">
+                  <Text style={{ color: s.isDark ? '#F2B8B5' : '#B3261E', fontWeight: '600' }}>
+                    {ne ? 'मेटाउनुहोस्' : 'Delete'}
+                  </Text>
                 </Pressable>
               }
             />

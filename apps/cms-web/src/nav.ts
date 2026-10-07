@@ -171,13 +171,16 @@ const MAX_QUERY_LENGTH = 120;
  * all. It is a static page in `public/report`, kept that way deliberately
  * — the header links to it like any other address.
  */
-export const PUBLIC_ROUTES = ['home', 'about', 'contact'] as const;
+export const PUBLIC_ROUTES = ['home', 'about', 'contact', 'privacy', 'terms', 'deleteAccount'] as const;
 export type PublicRouteName = (typeof PUBLIC_ROUTES)[number];
 
 export type Route =
   | { name: 'home' }
   | { name: 'about' }
   | { name: 'contact' }
+  | { name: 'privacy' }
+  | { name: 'terms' }
+  | { name: 'deleteAccount' }
   | { name: 'queue'; page: number; perPage: PerPage; q: string }
   | { name: 'new' }
   | { name: 'article'; id: string; tab: ArticleTab }
@@ -222,6 +225,9 @@ export const Routes = {
   home: (): Route => ({ name: 'home' }),
   about: (): Route => ({ name: 'about' }),
   contact: (): Route => ({ name: 'contact' }),
+  privacy: (): Route => ({ name: 'privacy' }),
+  terms: (): Route => ({ name: 'terms' }),
+  deleteAccount: (): Route => ({ name: 'deleteAccount' }),
   queue: (params: { page?: number; perPage?: PerPage; q?: string } = {}): Route => ({
     name: 'queue',
     page: params.page ?? 1,
@@ -304,6 +310,9 @@ export function parseRoute(hash: string): Route {
   if (section === 'home') return Routes.home();
   if (section === 'about') return Routes.about();
   if (section === 'contact') return Routes.contact();
+  if (section === 'privacy') return Routes.privacy();
+  if (section === 'terms') return Routes.terms();
+  if (section === 'delete-account') return Routes.deleteAccount();
 
   if (section === 'queue') {
     return Routes.queue({
@@ -449,6 +458,12 @@ export function routeToHash(route: Route): string {
       return '#/about';
     case 'contact':
       return '#/contact';
+    case 'privacy':
+      return '#/privacy';
+    case 'terms':
+      return '#/terms';
+    case 'deleteAccount':
+      return '#/delete-account';
     case 'queue':
       return withQuery('#/queue', {
         q: route.q === '' ? null : route.q,
@@ -532,6 +547,9 @@ export function sectionOf(route: Route): Section {
     case 'home':
     case 'about':
     case 'contact':
+    case 'privacy':
+    case 'terms':
+    case 'deleteAccount':
       return 'queue';
     case 'queue':
     case 'new':
@@ -577,6 +595,9 @@ export function screenKeyOf(route: Route): string {
     case 'home':
     case 'about':
     case 'contact':
+    case 'privacy':
+    case 'terms':
+    case 'deleteAccount':
       return route.name;
     case 'queue':
       return 'queue';

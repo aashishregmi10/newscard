@@ -442,6 +442,11 @@ export function endReaderSession(token: string): Promise<void> {
   return readerCall('/v1/readers/session', { method: 'DELETE', token });
 }
 
+/** Delete this reader's account and all it holds: every session, vote and rating. */
+export function deleteReaderAccount(token: string): Promise<{ deleted: boolean }> {
+  return readerCall('/v1/readers/me', { method: 'DELETE', token });
+}
+
 /** Where this reader stands; without a session, what anyone may see. */
 export function fetchInteractionState(id: string, token: string | null): Promise<InteractionState> {
   const path = `/v1/interactions/${encodeURIComponent(id)}/${token ? 'me' : 'results'}`;

@@ -8,7 +8,13 @@ import { asyncRoute } from '../middleware/index.js';
 import { loadEnv } from '../config/index.js';
 import { interactionAnswerLimit, readerSessionLimit } from '../middleware/rateLimit.js';
 import { forgetInteractionCaches, resultsOf, toResultsDto } from '../services/interactions.service.js';
-import { requireReader, signInWithGoogle, signOut } from '../services/readers.service.js';
+import {
+  deleteReader,
+  deleteReaderByGoogle,
+  requireReader,
+  signInWithGoogle,
+  signOut,
+} from '../services/readers.service.js';
 
 /**
  * Reader sign-in, and answering Interactions.
@@ -16,6 +22,8 @@ import { requireReader, signInWithGoogle, signOut } from '../services/readers.se
  *   GET    /v1/readers/config             the Google client ID the app signs in with
  *   POST   /v1/readers/session            Google ID token in, our session out
  *   DELETE /v1/readers/session            sign out
+ *   DELETE /v1/readers/me                 delete this reader: account, sessions, votes, ratings
+ *   POST   /v1/readers/delete             the same, from the web, with a Google ID token
  *   GET    /v1/interactions/:id/me        this reader's answers, and the results they may see
  *   GET    /v1/interactions/:id/results   what anyone may see
  *   POST   /v1/interactions/:id/vote      one vote, final
@@ -124,6 +132,32 @@ interactionRoutes.delete(
   asyncRoute(async (req, res) => {
     await signOut(req);
     res.status(204).end();
+  }),
+);
+
+/* Deleting the account — Google Play's rule for any app where readers make one. */
+interactionRoutes.delete(
+  '/readers/me',
+  readerSessionLimit,
+  requireReader,
+  asyncRoute(async (req, res) => {
+    const gone = await deleteReader(req.readerId!);
+    forgetInteractionCaches();
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(gone);
+  }),
+);
+
+interactionRoutes.post(
+  '/readers/delete',
+  readerSessionLimit,
+  asyncRoute(async (req, res) => {
+    const parsed = SessionBody.safeParse(req.body);
+    if (!parsed.success) throw new AppError('BAD_REQUEST', 'A Google ID token is required.');
+    const gone = await deleteReaderByGoogle(parsed.data.idToken);
+    if (gone.deleted) forgetInteractionCaches();
+    res.setHeader('Cache-Control', 'no-store');
+    res.json(gone);
   }),
 );
 
