@@ -1,36 +1,57 @@
 import { memo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
-import { type Theme, textSize } from '../theme/tokens';
+import { Image, StyleSheet } from 'react-native';
 
 /**
- * SAAR's mark, on every story card beside the publisher's name.
+ * SAAR's logo, from the founders' artwork of 7 Oct 2026.
  *
- * Drawn, not an image: the project has no logo file yet, and the app icon is
- * still Expo's placeholder. This is the wordmark the first-run screen sets in
- * type, in a filled badge so it reads as our mark rather than as part of the
- * publisher's credit. When a real logo exists, it replaces this one component.
- *
- * It is a logo, so it barely grows with the reader's text size: the publisher's
- * name beside it is what must stay readable.
+ * The images are made by scripts/gen-brand.mjs from brand/saar-logo-source.jpg
+ * — transparent, and the full logo in two versions, because its wordmark is
+ * dark navy and would vanish on the dark theme. To change the logo, replace
+ * the source and run the script; nothing here changes.
  */
-function SaarMarkInner({ theme }: { theme: Theme }) {
+
+const MARK = require('../../assets/brand/saar-mark.png') as number;
+const LOGO = require('../../assets/brand/saar-logo.png') as number;
+const LOGO_ON_DARK = require('../../assets/brand/saar-logo-dark.png') as number;
+
+/** Width over height of the mark, and of the full logo, as the images are cut. */
+const MARK_RATIO = 195 / 192;
+const LOGO_RATIO = 506 / 540;
+
+/**
+ * The mark alone, on every story card beside the publisher's name. It is a
+ * logo, so it does not grow with the reader's text size: the name beside it is
+ * what must stay readable.
+ */
+function SaarMarkInner({ size = 18 }: { size?: number }) {
   return (
-    <View style={[styles.badge, { backgroundColor: theme.accent }]} accessible accessibilityLabel="SAAR">
-      <Text style={[styles.word, { color: theme.surface }]} maxFontSizeMultiplier={1.2}>
-        SAAR
-      </Text>
-    </View>
+    <Image
+      source={MARK}
+      style={[styles.mark, { width: Math.round(size * MARK_RATIO), height: size }]}
+      resizeMode="contain"
+      accessible
+      accessibilityLabel="SAAR"
+    />
   );
 }
 
 export const SaarMark = memo(SaarMarkInner);
 
+/** The mark, the wordmark and "SUMMARY · SHORT · SMART", for the theme. */
+function SaarLogoInner({ height, onDark }: { height: number; onDark: boolean }) {
+  return (
+    <Image
+      source={onDark ? LOGO_ON_DARK : LOGO}
+      style={{ width: Math.round(height * LOGO_RATIO), height }}
+      resizeMode="contain"
+      accessible
+      accessibilityLabel="SAAR — Summary · Short · Smart"
+    />
+  );
+}
+
+export const SaarLogo = memo(SaarLogoInner);
+
 const styles = StyleSheet.create({
-  badge: {
-    flexShrink: 0,
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  word: { fontSize: textSize(10), fontWeight: '800', letterSpacing: 1.2 },
+  mark: { flexShrink: 0 },
 });

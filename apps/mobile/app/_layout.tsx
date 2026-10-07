@@ -8,17 +8,20 @@ import { SettingsProvider, useSettings } from '../src/state/SettingsContext';
 import { BookmarksProvider } from '../src/state/BookmarksContext';
 import { FiltersProvider } from '../src/state/FiltersContext';
 import { NetworkProvider } from '../src/state/NetworkContext';
-import { ReaderProvider } from '../src/state/ReaderContext';
+import { ReaderProvider, useReader } from '../src/state/ReaderContext';
 import { DeviceProvider } from '../src/state/DeviceContext';
 import { useNotificationRouting } from '../src/hooks/useNotificationRouting';
 import { useRetractionPurge } from '../src/hooks/useRetractionPurge';
 import { loadAdBudget, flushAdEvents } from '../src/lib/adTracker';
 import { useAppFonts } from '../src/lib/fonts';
 import { FirstRun } from '../src/components/FirstRun';
+import { SignInScreen } from '../src/components/SignInScreen';
 import { installGlobalErrorHandlers, flushEvents } from '../src/lib/telemetry';
 
 function Root() {
-  const { isDark, theme, ready, languageChosen, chooseLanguages } = useSettings();
+  const { isDark, theme, ready, languageChosen, chooseLanguages, languages, signInOffered, markSignInOffered } =
+    useSettings();
+  const reader = useReader();
   // The card layout is tuned to one Devanagari metric. Painting with the system
   // face first and swapping when the bundled one arrives reflows every card in
   // view, so the first paint waits — see src/lib/fonts.ts for the bound on it.
@@ -64,7 +67,26 @@ function Root() {
     return (
       <>
         <StatusBar style={isDark ? 'light' : 'dark'} />
-        <FirstRun theme={theme} onChoose={chooseLanguages} />
+        <FirstRun theme={theme} isDark={isDark} onChoose={chooseLanguages} />
+      </>
+    );
+  }
+
+  // Then, once, the sign-in screen — skipped by "Not now" as readily as it is
+  // answered, and never shown to a build that cannot sign in, or to a reader
+  // already signed in. It waits for the stored session to be read, so a
+  // signed-in reader never sees it flash past.
+  if (!signInOffered && reader.available && reader.session === null) {
+    if (!reader.ready) return <View style={{ flex: 1, backgroundColor: theme.surface }} />;
+    return (
+      <>
+        <StatusBar style={isDark ? 'light' : 'dark'} />
+        <SignInScreen
+          theme={theme}
+          isDark={isDark}
+          lang={languages.includes('ne') ? 'ne' : 'en'}
+          onDone={markSignInOffered}
+        />
       </>
     );
   }

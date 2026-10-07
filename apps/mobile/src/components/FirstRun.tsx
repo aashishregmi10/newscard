@@ -2,6 +2,7 @@ import { View, Text, Pressable, StyleSheet, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { FONT_DEVANAGARI, type Theme, textSize } from '../theme/tokens';
+import { SaarLogo } from './SaarMark';
 
 /**
  * The first launch.
@@ -25,6 +26,7 @@ import { FONT_DEVANAGARI, type Theme, textSize } from '../theme/tokens';
 
 interface Props {
   theme: Theme;
+  isDark: boolean;
   onChoose: (languages: Array<'ne' | 'en'>) => void;
 }
 
@@ -34,7 +36,7 @@ const CHOICES: Array<{ key: string; label: string; sub: string; langs: Array<'ne
   { key: 'en', label: 'English', sub: 'English only', langs: ['en'] },
 ];
 
-export function FirstRun({ theme, onChoose }: Props) {
+export function FirstRun({ theme, isDark, onChoose }: Props) {
   const insets = useSafeAreaInsets();
 
   // Scrolls only if it must: on a short phone at a large text size the three
@@ -50,7 +52,7 @@ export function FirstRun({ theme, onChoose }: Props) {
       bounces={false}
     >
       <View style={styles.top}>
-        <Text style={[styles.brand, { color: theme.accent }]}>SAAR</Text>
+        <SaarLogo height={112} onDark={isDark} />
         <Text style={[styles.tag, { color: theme.textSecondary }]}>
           समाचार, ६० शब्दमा{'\n'}
           <Text style={styles.tagEn}>The news, in sixty words</Text>
@@ -111,7 +113,6 @@ export function FirstRun({ theme, onChoose }: Props) {
 const styles = StyleSheet.create({
   root: { flexGrow: 1, paddingHorizontal: 28, justifyContent: 'space-between' },
   top: { paddingBottom: 24 },
-  brand: { fontSize: textSize(15), fontWeight: '800', letterSpacing: 3.5 },
   tag: {
     fontFamily: FONT_DEVANAGARI,
     fontSize: textSize(26),

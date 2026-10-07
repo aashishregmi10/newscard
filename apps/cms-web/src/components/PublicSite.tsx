@@ -47,6 +47,7 @@ export function PublicSite({ route }: PublicSiteProps) {
       <header className="site-top">
         <div className="site-wrap site-bar">
           <a className="site-brand" href={routeToHash(Routes.home())}>
+            <img className="site-logo" src="/brand/saar-mark.png" alt="" width={30} height={30} />
             <span className="site-mark">SAAR</span>
           </a>
 
@@ -99,6 +100,10 @@ function Home() {
   return (
     <>
       <section className="site-hero">
+        <picture className="site-hero-logo">
+          <source srcSet="/brand/saar-logo-dark.png" media="(prefers-color-scheme: dark)" />
+          <img src="/brand/saar-logo.png" alt="SAAR — Summary · Short · Smart" width={169} height={180} />
+        </picture>
         <h1>The day&rsquo;s news, in sixty words a story.</h1>
         <p className="site-lead">
           Nepali and English in one feed, every card credited to the publisher who reported it,

@@ -131,8 +131,11 @@ export function AppShell({
     <div className="app">
       <nav className="rail" aria-label="Sections">
         <div className="rail-brand">
-          <span className="rail-mark">SAAR</span>
-          <span className="rail-sub">Editorial</span>
+          <img className="rail-logo" src="/brand/saar-mark.png" alt="" width={30} height={30} />
+          <span className="rail-words">
+            <span className="rail-mark">SAAR</span>
+            <span className="rail-sub">Editorial</span>
+          </span>
         </div>
 
         <ul className="rail-nav">

@@ -60,9 +60,8 @@
  */
 .rail-brand {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 1px;
+  align-items: center;
+  gap: var(--s2);
   flex: none;
   height: var(--topbar-h);
   padding: 0 var(--s4);
@@ -70,11 +69,27 @@
   min-width: 0;
 }
 
+.rail-logo {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.rail-words {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* The logo's wordmark is set in navy; in type it follows the ink, so it
+   reads on the dark theme too. */
 .rail-mark {
   font-size: var(--text-md);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.08em;
-  color: var(--accent);
+  color: var(--ink);
   line-height: 1.2;
 }
 
@@ -383,10 +398,11 @@
   }
 
   .rail-brand {
-    align-items: center;
+    justify-content: center;
     padding: 0;
   }
 
+  .rail-words,
   .rail-sub,
   .rail-label,
   .rail-identity {

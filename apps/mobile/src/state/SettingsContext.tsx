@@ -33,6 +33,12 @@ interface Settings {
    * (decided 6 Oct 2026).
    */
   shortsMuted: boolean;
+  /**
+   * Whether the sign-in screen has been shown once, after the language choice.
+   * Signing in is never required — reading needs no account — so it is offered
+   * once and then lives in Settings (decided 7 Oct 2026).
+   */
+  signInOffered: boolean;
 }
 
 const DEFAULTS: Settings = {
@@ -42,6 +48,7 @@ const DEFAULTS: Settings = {
   themeMode: 'system',
   languageChosen: false,
   shortsMuted: false,
+  signInOffered: false,
 };
 
 const KEY = 'saar.settings.v1';
@@ -58,6 +65,8 @@ interface Ctx extends Settings {
   setDataSaver: (v: boolean) => void;
   setThemeMode: (m: ThemeMode) => void;
   setShortsMuted: (muted: boolean) => void;
+  /** The first-run sign-in screen was answered: signed in, or "not now". */
+  markSignInOffered: () => void;
 }
 
 const SettingsCtx = createContext<Ctx | null>(null);
@@ -110,6 +119,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setDataSaver: (dataSaver) => update({ dataSaver }),
       setThemeMode: (themeMode) => update({ themeMode }),
       setShortsMuted: (shortsMuted) => update({ shortsMuted }),
+      markSignInOffered: () => update({ signInOffered: true }),
     }),
      
     [settings, ready, isDark],

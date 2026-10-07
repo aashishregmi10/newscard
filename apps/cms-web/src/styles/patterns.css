@@ -1305,14 +1305,30 @@
 }
 
 .site-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
   text-decoration: none;
+}
+
+.site-logo {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
 }
 
 .site-mark {
   font-size: var(--text-md);
-  font-weight: 700;
+  font-weight: 800;
   letter-spacing: 0.08em;
-  color: var(--accent);
+  color: var(--ink);
+}
+
+.site-hero-logo img {
+  display: block;
+  width: auto;
+  height: 150px;
+  margin-bottom: var(--s5);
 }
 
 .site-nav {
@@ -1566,11 +1582,33 @@
   max-width: 34ch;
 }
 
-.signin-mark {
-  font-size: var(--text-lg);
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  opacity: 0.85;
+/* The logo on a white tile: its blue would sink into the blue panel. */
+.signin-logo {
+  display: inline-block;
+  padding: var(--s4) var(--s5);
+  border-radius: 20px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+.signin-logo img {
+  display: block;
+  width: auto;
+  height: 132px;
+}
+
+.signin-form-mark {
+  display: none;
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--s3);
+}
+
+/* Where the panel goes (900px and narrower), the mark heads the form instead. */
+@media (max-width: 900px) {
+  .signin-form-mark {
+    display: block;
+  }
 }
 
 .signin-pitch {

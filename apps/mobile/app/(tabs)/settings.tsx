@@ -1,6 +1,7 @@
 import { View, Text, ScrollView, StyleSheet, Switch, Pressable, Linking, Alert } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
 import { useSettings, type ThemeMode } from '../../src/state/SettingsContext';
 import { useBookmarks } from '../../src/state/BookmarksContext';
 import { useFilters } from '../../src/state/FiltersContext';
@@ -338,8 +339,27 @@ export default function SettingsScreen() {
           />
         </Section>
 
-        {/* Only once someone has signed in, from a vote or rating card — the
-            app never asks anyone to sign in from here. */}
+        {/* Signed in: who, and Sign out. Not signed in: the way to the sign-in
+            screen — offered once after the first run, and here after that. */}
+        {reader.session === null && reader.available && (
+          <Section title={ne ? 'खाता' : 'ACCOUNT'} theme={t}>
+            <Row
+              label={ne ? 'Google बाट साइन इन' : 'Sign in with Google'}
+              hint={
+                ne
+                  ? 'मत र रेटिङका लागि। हामी तपाईंको नाम वा इमेल राख्दैनौं।'
+                  : 'For votes and ratings. We never keep your name or email.'
+              }
+              theme={t}
+              last
+              right={
+                <Pressable onPress={() => router.push('/sign-in')} accessibilityRole="button">
+                  <Text style={{ color: t.accent, fontWeight: '600' }}>{ne ? 'साइन इन' : 'Sign in'}</Text>
+                </Pressable>
+              }
+            />
+          </Section>
+        )}
         {reader.session !== null && (
           <Section title={ne ? 'खाता' : 'ACCOUNT'} theme={t}>
             <Row

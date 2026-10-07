@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useReader } from '../state/ReaderContext';
+import { useSettings } from '../state/SettingsContext';
 import { textSize, type Theme } from '../theme/tokens';
+import { GoogleButton } from './GoogleButton';
 
 /**
  * "Sign in with Google to vote" — the only place the app asks anyone to sign in.
@@ -49,6 +50,7 @@ export function SignInSheet({
   onSignedIn: (token: string) => void;
 }) {
   const reader = useReader();
+  const { isDark } = useSettings();
   const insets = useSafeAreaInsets();
   const [busy, setBusy] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
@@ -79,21 +81,7 @@ export function SignInSheet({
         <Text style={[styles.body, { color: theme.textSecondary }]}>{t.body}</Text>
         {problem !== null && <Text style={[styles.problem, { color: theme.adMark }]}>{problem}</Text>}
 
-        <Pressable
-          style={({ pressed }) => [styles.google, { opacity: pressed || busy ? 0.75 : 1 }]}
-          disabled={busy}
-          onPress={() => void go()}
-          accessibilityRole="button"
-        >
-          {busy ? (
-            <ActivityIndicator color="#1F1F1F" />
-          ) : (
-            <>
-              <MaterialCommunityIcons name="google" size={20} color="#1F1F1F" />
-              <Text style={styles.googleText}>{t.google}</Text>
-            </>
-          )}
-        </Pressable>
+        <GoogleButton label={t.google} busy={busy} onDark={isDark} onPress={() => void go()} />
         <Pressable style={styles.later} disabled={busy} onPress={onClose} accessibilityRole="button">
           <Text style={[styles.laterText, { color: theme.textSecondary }]}>{t.later}</Text>
         </Pressable>
@@ -114,19 +102,6 @@ const styles = StyleSheet.create({
   title: { fontSize: textSize(18), fontWeight: '700', marginBottom: 8 },
   body: { fontSize: textSize(14), lineHeight: textSize(14) * 1.55, marginBottom: 18 },
   problem: { fontSize: textSize(13), marginBottom: 12 },
-  /* Google's own button colours, as their branding guidelines ask. */
-  google: {
-    height: 50,
-    borderRadius: 25,
-    borderWidth: 1,
-    borderColor: '#747775',
-    backgroundColor: '#FFFFFF',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-  },
-  googleText: { color: '#1F1F1F', fontSize: textSize(15), fontWeight: '600' },
   later: { alignSelf: 'center', paddingVertical: 14, paddingHorizontal: 24 },
   laterText: { fontSize: textSize(14) },
 });

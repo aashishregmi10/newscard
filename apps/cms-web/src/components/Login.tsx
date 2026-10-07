@@ -65,7 +65,9 @@ export function Login({ onSignedIn, problem = null }: LoginProps) {
     <div className="signin">
       <aside className="signin-side">
         <div className="signin-side-inner">
-          <p className="signin-mark">SAAR</p>
+          <span className="signin-logo">
+            <img src="/brand/saar-logo.png" alt="SAAR — Summary · Short · Smart" width={150} height={160} />
+          </span>
           <p className="signin-pitch">The day’s news, in sixty words a story.</p>
           <p className="signin-note">
             Nepali and English in one feed, every card credited to the publisher who reported it.
@@ -82,6 +84,8 @@ export function Login({ onSignedIn, problem = null }: LoginProps) {
             <Icon name="arrowLeft" /> Back to the site
           </a>
 
+          {/* The panel with the logo is hidden on a narrow screen; the mark stays. */}
+          <img className="signin-form-mark" src="/brand/saar-mark.png" alt="" width={44} height={44} />
           <h1 className="signin-title">Editorial</h1>
           <p className="signin-sub">Sign in to the newsroom.</p>
 

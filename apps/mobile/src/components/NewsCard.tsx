@@ -158,7 +158,7 @@ function NewsCardInner({
           * Without one, they have the row as before.
           */}
         <View style={inlineAd ? styles.creditWithAd : styles.credit}>
-          <SaarMark theme={theme} />
+          <SaarMark />
           <Text style={[styles.sourceChip, { color: theme.accent }]} numberOfLines={1}>
             {card.source.name}
           </Text>
