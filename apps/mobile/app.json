@@ -22,7 +22,15 @@
       "_comment_package": "Must match the Android package name registered in Firebase EXACTLY. A mismatch produces a build that installs and then silently receives no push.",
       "package": "com.saar.news",
       "_comment_googleServicesFile": "Firebase project saar-8a829. expo-notifications reads this at prebuild and injects the google-services Gradle plugin itself — the Gradle snippets the Firebase console shows must NOT be applied by hand, because android/ is generated and regenerated on every build.",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "blockedPermissions": [
+        "android.permission.SYSTEM_ALERT_WINDOW",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "com.google.android.gms.permission.AD_ID"
+      ],
+      "_comment_blockedPermissions": "Removed from the final manifest. The first three come from the Expo template and nothing here uses them; boot-completed is only for re-scheduling local notifications, which SAAR does not schedule; AD_ID can be merged in by Firebase, and SAAR answers No to Play's advertising-ID question (launch review, 7 Oct 2026)."
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -33,7 +41,13 @@
       "expo-font",
       "expo-video",
       "expo-sqlite",
-      "expo-notifications",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#1F4E79"
+        }
+      ],
       "expo-web-browser",
       "react-native-nitro-google-signin",
       "expo-secure-store"

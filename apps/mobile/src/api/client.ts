@@ -49,6 +49,30 @@ const API_PORT = 3000;
 export const API_BASE = resolveApiBase();
 
 /**
+ * The public website — privacy policy, terms, contact, account deletion.
+ * EXPO_PUBLIC_SITE_URL in a release build (eas.json); in development, the
+ * editorial site on the machine Metro runs on, as for the API.
+ */
+function resolveSiteBase(): string {
+  const explicit = process.env.EXPO_PUBLIC_SITE_URL;
+  if (explicit) return explicit.replace(/\/$/, '');
+  const hostUri =
+    Constants.expoConfig?.hostUri ??
+    (Constants.expoGoConfig as { debuggerHost?: string } | undefined)?.debuggerHost;
+  return `http://${hostUri?.split(':')[0] ?? 'localhost'}:5173`;
+}
+
+export const SITE_BASE = resolveSiteBase();
+
+/** The site's pages the app links to. Google Play's News policy wants the contact one reachable in-app. */
+export const SITE_LINKS = {
+  privacy: `${SITE_BASE}/privacy`,
+  terms: `${SITE_BASE}/terms`,
+  contact: `${SITE_BASE}/#/contact`,
+  deleteAccount: `${SITE_BASE}/delete-account`,
+} as const;
+
+/**
  * Image URLs are stored relative in development ("/media/…") so they survive an
  * IP change, and absolute in production where they point at a real CDN.
  */

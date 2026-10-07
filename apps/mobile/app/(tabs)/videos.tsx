@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  AppState,
   View,
   Text,
   FlatList,
@@ -137,6 +138,21 @@ export default function VideosScreen() {
     }, []),
   );
 
+  /*
+   * Nor once the app is in the background — Home, the lock button, another
+   * app. YouTube's terms forbid background playback, and Google Play holds
+   * apps to them. Going inactive takes the player off the page entirely
+   * rather than asking it to pause: a WebView in a backgrounded app may never
+   * run the pause, and a player that is gone is certainly silent. On return
+   * it loads again where the reader was.
+   */
+  const [foreground, setForeground] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => setForeground(state === 'active'));
+    return () => sub.remove();
+  }, []);
+  const live = focused && foreground;
+
   const loadMore = useCallback(async () => {
     if (loadingMore.current || !hasMore.current || !cursor.current) return;
     loadingMore.current = true;
@@ -182,13 +198,13 @@ export default function VideosScreen() {
         textScale={textScale}
         dataSaver={dataSaver}
         unmetered={unmetered}
-        active={focused && item.id === activeId}
-        preload={focused && activeIndex >= 0 && index === activeIndex + 1}
+        active={live && item.id === activeId}
+        preload={live && activeIndex >= 0 && index === activeIndex + 1}
         muted={muted}
         onToggleMute={toggleMute}
       />
     ),
-    [theme, pageHeight, textScale, dataSaver, unmetered, focused, activeId, activeIndex, muted, toggleMute],
+    [theme, pageHeight, textScale, dataSaver, unmetered, live, activeId, activeIndex, muted, toggleMute],
   );
 
   const getItemLayout = useCallback(

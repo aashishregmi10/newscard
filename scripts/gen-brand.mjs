@@ -273,3 +273,8 @@ const GOOGLE_G = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
 </svg>`;
 await sharp(Buffer.from(GOOGLE_G), { density: 600 }).resize(96, 96).png().toFile(join(MOBILE, 'brand', 'google-g.png'));
 console.log('  apps/mobile/assets/brand/google-g.png  96×96');
+
+/* The notification icon: Android draws the status-bar icon as a white shape
+ * from its alpha alone, so it is the mark's silhouette — the white lines cut
+ * out — on transparent, with Android's padding (96 px, the mark inside 72). */
+await onSquare(mono, markBox, 96, 72, TRANSPARENT, join(MOBILE, 'notification-icon.png'));

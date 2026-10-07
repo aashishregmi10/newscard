@@ -1,7 +1,10 @@
+import { useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Switch, Pressable, Linking, Alert } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import Constants from 'expo-constants';
+import { SITE_LINKS } from '../../src/api/client';
 import { useSettings, type ThemeMode } from '../../src/state/SettingsContext';
 import { useBookmarks } from '../../src/state/BookmarksContext';
 import { useFilters } from '../../src/state/FiltersContext';
@@ -132,6 +135,11 @@ export default function SettingsScreen() {
   const insets = useSafeAreaInsets();
   const t = s.theme;
   const ne = s.languages.includes('ne');
+  const [diagnostics, setDiagnostics] = useState(false);
+  const openLink = (url: string) =>
+    void Linking.openURL(url).catch(() =>
+      Alert.alert(ne ? 'खोल्न सकिएन' : 'Could not open the page', url),
+    );
 
   const confirmDelete = () =>
     Alert.alert(
@@ -520,58 +528,70 @@ export default function SettingsScreen() {
           <Row
             label={ne ? 'गोपनीयता नीति' : 'Privacy policy'}
             theme={t}
-            onPress={() => void Linking.openURL('https://example.invalid/privacy')}
+            onPress={() => openLink(SITE_LINKS.privacy)}
           />
           <Row
             label={ne ? 'सर्तहरू' : 'Terms of use'}
             theme={t}
-            onPress={() => void Linking.openURL('https://example.invalid/terms')}
+            onPress={() => openLink(SITE_LINKS.terms)}
+          />
+          {/* Who publishes SAAR and how to reach them — corrections, takedowns,
+              publishers, advertisers. Google Play's News policy wants it
+              reachable from inside the app. */}
+          <Row
+            label={ne ? 'सम्पर्क र सुधार' : 'Contact and corrections'}
+            theme={t}
+            onPress={() => openLink(SITE_LINKS.contact)}
           />
           {/*
-            * The device id and push status, in the reader-facing settings
-            * screen rather than a hidden debug menu.
-            *
-            * Both are needed to answer "why did my phone not buzz", and that
-            * question gets asked by whoever is holding the phone — support, an
-            * editor testing copy, a reader. A diagnostic nobody can reach is a
-            * diagnostic that gets replaced by a guess. Neither value is
-            * sensitive: the id is a random UUID this install generated and is
-            * not derived from any hardware identifier.
+            * The device id and push status: needed to answer "why did my phone
+            * not buzz", but noise to a reader — and the full id is what links
+            * this phone's reading on the server. So they wait behind a long
+            * press on the version, which support can talk anyone through.
             */}
+          {diagnostics && (
+            <>
+              <Row
+                label={ne ? 'डिभाइस आइडी' : 'Device id'}
+                hint={ne ? 'थिच्दा प्रतिलिपि हुन्छ' : 'Tap to copy'}
+                theme={t}
+                onPress={() => {
+                  if (!device.deviceId) return;
+                  void Clipboard.setStringAsync(device.deviceId);
+                  Alert.alert(ne ? 'प्रतिलिपि भयो' : 'Copied', device.deviceId);
+                }}
+                right={
+                  <Text style={{ color: t.textSecondary }}>
+                    {device.deviceId ? `${device.deviceId.slice(0, 8)}…` : '—'}
+                  </Text>
+                }
+              />
+              <Row
+                label={ne ? 'पुश दर्ता' : 'Push registration'}
+                hint={device.pushRegistered ? undefined : (device.pushUnavailable ?? undefined)}
+                theme={t}
+                right={
+                  <Text style={{ color: t.textSecondary }}>
+                    {device.pushRegistered ? (ne ? 'दर्ता भयो' : 'Registered') : ne ? 'छैन' : 'None'}
+                  </Text>
+                }
+              />
+            </>
+          )}
           <Row
-            label={ne ? 'डिभाइस आइडी' : 'Device id'}
-            hint={ne ? 'थिच्दा प्रतिलिपि हुन्छ' : 'Tap to copy'}
+            label={ne ? 'संस्करण' : 'Version'}
             theme={t}
-            onPress={() => {
-              if (!device.deviceId) return;
-              void Clipboard.setStringAsync(device.deviceId);
-              Alert.alert(ne ? 'प्रतिलिपि भयो' : 'Copied', device.deviceId);
-            }}
+            last
             right={
-              <Text style={{ color: t.textSecondary }}>
-                {device.deviceId ? `${device.deviceId.slice(0, 8)}…` : '—'}
-              </Text>
+              <Pressable
+                onLongPress={() => setDiagnostics((d) => !d)}
+                delayLongPress={700}
+                accessibilityHint={ne ? 'लामो थिच्दा प्राविधिक विवरण' : 'Long press for technical details'}
+              >
+                <Text style={{ color: t.textSecondary }}>{Constants.expoConfig?.version ?? '—'}</Text>
+              </Pressable>
             }
           />
-          <Row
-            label={ne ? 'पुश दर्ता' : 'Push registration'}
-            hint={device.pushRegistered ? undefined : (device.pushUnavailable ?? undefined)}
-            theme={t}
-            right={
-              <Text style={{ color: t.textSecondary }}>
-                {device.pushRegistered
-                  ? ne
-                    ? 'दर्ता भयो'
-                    : 'Registered'
-                  : ne
-                    ? 'छैन'
-                    : 'None'}
-              </Text>
-            }
-          />
-          <Row label={ne ? 'संस्करण' : 'Version'} theme={t} last right={
-            <Text style={{ color: t.textSecondary }}>0.1.0</Text>
-          } />
         </Section>
 
         <Text style={[styles.note, { color: t.textSecondary, marginTop: 4 }]}>
