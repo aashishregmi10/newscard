@@ -2945,13 +2945,17 @@
 .ix-phone-rates {
   flex: 1;
   display: grid;
-  align-content: center;
-  gap: 12px;
+  align-content: start;
+  gap: 8px;
 }
 
+/* As the app draws it: a soft tile per option, its stars spread across. */
 .ix-phone-rate {
   display: grid;
-  gap: 3px;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: var(--surface-sunk);
 }
 
 .ix-phone-rate-head {
@@ -2978,9 +2982,10 @@
 }
 
 .ix-phone-rate-stars {
-  color: var(--ink-faint);
-  font-size: 22px;
-  letter-spacing: 4px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--line-strong);
+  font-size: 24px;
   line-height: 1;
 }
 

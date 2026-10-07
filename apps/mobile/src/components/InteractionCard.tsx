@@ -22,7 +22,15 @@ import {
   type InteractionCard as InteractionCardData,
   type InteractionState,
 } from '../api/client';
-import { leaderIndex, ratedCount, ratingTone, voteTileSize, type RatingTone } from '../lib/interactionLayout';
+import {
+  leaderIndex,
+  ratedCount,
+  ratingLayout,
+  ratingTone,
+  voteChromeHeight,
+  voteTileSize,
+  type RatingTone,
+} from '../lib/interactionLayout';
 import { useReader } from '../state/ReaderContext';
 import { useSettings } from '../state/SettingsContext';
 import { fontFor, textSize, type Theme } from '../theme/tokens';
@@ -48,7 +56,11 @@ import { StarAverage, StarRating } from './StarRating';
  *           share, or each name fills to it, the reader's own pick marked,
  *           the leader badged.
  *   Rating  A feedback form (redrawn 7 Oct 2026 from the newsroom's example):
- *           the question, then each option's name over a row of large stars.
+ *           the question, then a soft tile per option: its name over five
+ *           large stars spread across it (name beside smaller stars when
+ *           five or six must fit), sized to the space the card has. A star
+ *           pops when tapped, the tile turns gold, and a word says what the
+ *           stars mean ("Very good"); tapping the same star again clears it.
  *           The reader rates the ones they know and skips the rest — a guess
  *           about a player they have never seen would only blur the average —
  *           then one Send, also final. Then each option shows its average, in part-filled stars
@@ -83,6 +95,7 @@ const COPY = {
     yourVote: 'तपाईंको मत',
     send: 'पठाउनुहोस्',
     rateSome: 'कम्तीमा एउटालाई तारा दिनुहोस्',
+    scoreWords: ['नराम्रो', 'ठिकै', 'राम्रो', 'धेरै राम्रो', 'उत्कृष्ट'],
     sendSome: (done: number, all: number) => `पठाउनुहोस् · ${done}/${all}`,
     pickHint: 'एउटा छान्नुहोस्, अनि मत दिनुहोस्',
     rateHint: 'जानेकालाई १–५ तारा दिनुहोस्, नजानेकालाई छोड्नुहोस्',
@@ -116,6 +129,7 @@ const COPY = {
     yourVote: 'Your vote',
     send: 'Send',
     rateSome: 'Rate at least one',
+    scoreWords: ['Poor', 'Fair', 'Good', 'Very good', 'Excellent'],
     sendSome: (done: number, all: number) => `Send · ${done} of ${all}`,
     pickHint: 'Pick one, then vote',
     rateHint: 'Give 1–5 stars to the ones you know; skip the rest',
@@ -163,6 +177,14 @@ function CountUp({ value, style }: { value: number; style: object }) {
   }, [value]);
   return <Text style={style}>{shown}%</Text>;
 }
+
+/** A tile the reader has given stars: the stars' gold, faintly. */
+const GOLD = {
+  light: { tint: '#FFF8E6', edge: '#F0D59A', text: '#8A5A00' },
+  dark: { tint: '#2A2415', edge: '#5C4A1E', text: '#F5C451' },
+};
+/** An empty star: a soft solid grey, readable on the tile in either theme. */
+const STAR_EMPTY = { light: '#D5DDE5', dark: '#3A424C' };
 
 /* ── one photo tile of a vote ──────────────────────────────────────────────── */
 
@@ -378,6 +400,8 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
   const [chosen, setChosen] = useState<Record<string, number>>({});
   const [note, setNote] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
+  /** The rating list's own box, once laid out: what its tiles are sized to. */
+  const [rowsBox, setRowsBox] = useState<{ w: number; h: number } | null>(null);
   const afterSignIn = useRef<((token: string) => void) | null>(null);
 
   const load = useCallback(async () => {
@@ -506,8 +530,28 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
   const pad = 18;
   const gap = 10;
   const tile = voteTileSize(width, height, card.options.length, textScale, pad, gap);
-  /* Five or six options: smaller stars, so all fit the card. */
-  const compact = card.type === 'rating' && card.options.length > 4;
+  /* Until the list has been measured, an estimate from the card's size. */
+  const layout = ratingLayout(
+    rowsBox?.w ?? width - 2 * pad,
+    rowsBox?.h ?? height - voteChromeHeight(textScale) - 40,
+    card.options.length,
+    textScale,
+  );
+  const onRowsLayout = (e: { nativeEvent: { layout: { width: number; height: number } } }) => {
+    const { width: w, height: h } = e.nativeEvent.layout;
+    setRowsBox((b) => (b !== null && Math.abs(b.w - w) < 1 && Math.abs(b.h - h) < 1 ? b : { w, h }));
+  };
+  const gold = GOLD[isDark ? 'dark' : 'light'];
+  const starEmpty = STAR_EMPTY[isDark ? 'dark' : 'light'];
+  /* The accent is light in the dark theme; white on it would not read. */
+  const onAccent = isDark ? '#0E1620' : '#FFFFFF';
+  /** Stars for one option; the same star again takes them away. */
+  const pick = (optionId: string, n: number) =>
+    setChosen((c) => {
+      if (c[optionId] !== n) return { ...c, [optionId]: n };
+      const { [optionId]: _cleared, ...rest } = c;
+      return rest;
+    });
 
   const footnote =
     note ??
@@ -643,17 +687,17 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
                 style={({ pressed }) => [
                   styles.confirm,
                   selected === null
-                    ? { backgroundColor: 'transparent', borderColor: theme.divider, borderWidth: 1 }
+                    ? { backgroundColor: theme.surfaceRaised }
                     : { backgroundColor: theme.accent, opacity: pressed ? 0.85 : 1 },
                 ]}
                 accessibilityRole="button"
                 accessibilityState={{ disabled: selected === null }}
               >
                 {pending !== null ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={onAccent} />
                 ) : (
                   <Text
-                    style={[styles.confirmText, { color: selected === null ? theme.textSecondary : '#fff', fontFamily }]}
+                    style={[styles.confirmText, { color: selected === null ? theme.textSecondary : onAccent, fontFamily }]}
                     numberOfLines={1}
                   >
                     {selectedName === null ? t.choose : t.voteFor(selectedName)}
@@ -665,55 +709,93 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
         </>
       ) : (
         <>
-          <View style={styles.rows}>
+          <View style={[styles.rows, { gap: layout.gap }]} onLayout={onRowsLayout}>
             {card.options.map((o) => {
               const r = ratingResults ? result(o.id) : null;
               const mine = myRatings.find((m) => m.optionId === o.id)?.stars ?? null;
+              const picked = r === null ? (chosen[o.id] ?? 0) : 0;
               const src = dataSaver ? null : resolveMediaUrl(o.image?.urls.sm ?? o.image?.urls.md ?? null);
-              const tone = ratingTone(r?.average ?? null);
-              const [pillBg, pillFg] = TONES[tone][isDark ? 'dark' : 'light'];
-              return (
-                <View key={o.id} style={[styles.rateRow, compact && styles.rateRowCompact]}>
+              const [pillBg, pillFg] = TONES[ratingTone(r?.average ?? null)][isDark ? 'dark' : 'light'];
+              const pill = r !== null && (
+                <View style={[styles.avg, { backgroundColor: pillBg }]}>
+                  <Text style={[styles.avgText, { color: pillFg }]}>
+                    {r.average !== null ? `${r.average.toFixed(1)} ★` : t.fresh}
+                  </Text>
+                </View>
+              );
+              const name = (
+                <Text style={[styles.rateName, { color: theme.textPrimary, fontFamily }]} numberOfLines={1}>
+                  {o.name}
+                  {o.detail !== null && (
+                    <Text style={[styles.rateDetail, { color: theme.textSecondary }]}>{`  ${o.detail}`}</Text>
+                  )}
+                </Text>
+              );
+              const stars =
+                r !== null ? (
+                  <StarAverage
+                    value={r.average ?? 0}
+                    size={layout.mode === 'stacked' ? 22 : 16}
+                    emptyColor={starEmpty}
+                    label={o.name}
+                  />
+                ) : (
+                  <StarRating
+                    value={picked}
+                    size={layout.starSize}
+                    spread={layout.mode === 'stacked'}
+                    onChange={(n) => pick(o.id, n)}
+                    disabled={pending !== null || closed}
+                    emptyColor={starEmpty}
+                    label={`${t.rateKicker}: ${o.name}`}
+                  />
+                );
+              const count = r !== null && (
+                <Text style={[styles.rateCount, { color: theme.textSecondary, fontFamily }]} numberOfLines={1}>
+                  {mine !== null ? `${t.ratings(r.ratings)} · ${t.you(mine)}` : t.ratings(r.ratings)}
+                </Text>
+              );
+              const tile = [
+                styles.rateTile,
+                { minHeight: layout.tileHeight },
+                picked > 0
+                  ? { backgroundColor: gold.tint, borderColor: gold.edge }
+                  : { backgroundColor: theme.surfaceRaised, borderColor: 'transparent' },
+              ];
+
+              return layout.mode === 'stacked' ? (
+                <View key={o.id} style={[tile, styles.rateTileStacked]}>
                   <View style={styles.rateHead}>
                     {src !== null && <Image source={{ uri: src }} style={styles.rateThumb} resizeMode="cover" />}
-                    <Text style={[styles.rateName, { color: theme.textPrimary, fontFamily }]} numberOfLines={1}>
-                      {o.name}
-                      {o.detail !== null && (
-                        <Text style={[styles.rateDetail, { color: theme.textSecondary }]}>{`  ${o.detail}`}</Text>
-                      )}
-                    </Text>
-                    {r !== null && (
-                      <View style={[styles.avg, { backgroundColor: pillBg }]}>
-                        <Text style={[styles.avgText, { color: pillFg }]}>
-                          {r.average !== null ? `${r.average.toFixed(1)} ★` : t.fresh}
-                        </Text>
-                      </View>
+                    {name}
+                    {pill}
+                    {picked > 0 && (
+                      <Text style={[styles.scoreWord, { color: gold.text, fontFamily }]}>{t.scoreWords[picked - 1]}</Text>
                     )}
                   </View>
-
                   {r !== null ? (
                     <View style={styles.rateResult}>
-                      <StarAverage
-                        value={r.average ?? 0}
-                        size={compact ? 20 : 24}
-                        emptyColor={theme.divider}
-                        label={o.name}
-                      />
-                      <Text style={[styles.rateCount, { color: theme.textSecondary, fontFamily }]} numberOfLines={1}>
-                        {mine !== null ? `${t.ratings(r.ratings)} · ${t.you(mine)}` : t.ratings(r.ratings)}
-                      </Text>
+                      {stars}
+                      {count}
                     </View>
                   ) : (
-                    <View style={styles.rateStars}>
-                      <StarRating
-                        value={chosen[o.id] ?? 0}
-                        size={compact ? 28 : 34}
-                        onChange={(n) => setChosen((c) => ({ ...c, [o.id]: n }))}
-                        disabled={pending !== null || closed}
-                        emptyColor={theme.textSecondary}
-                        label={`${t.rateKicker}: ${o.name}`}
-                      />
+                    stars
+                  )}
+                </View>
+              ) : (
+                <View key={o.id} style={[tile, styles.rateTileInline]}>
+                  {src !== null && <Image source={{ uri: src }} style={styles.rateThumb} resizeMode="cover" />}
+                  <View style={styles.rateInlineText}>
+                    {name}
+                    {count}
+                  </View>
+                  {r !== null ? (
+                    <View style={styles.rateInlineEnd}>
+                      {pill}
+                      {stars}
                     </View>
+                  ) : (
+                    stars
                   )}
                 </View>
               );
@@ -733,16 +815,16 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
                   styles.confirm,
                   done > 0
                     ? { backgroundColor: theme.accent, opacity: pressed ? 0.85 : 1 }
-                    : { backgroundColor: 'transparent', borderColor: theme.divider, borderWidth: 1 },
+                    : { backgroundColor: theme.surfaceRaised },
                 ]}
                 accessibilityRole="button"
                 accessibilityState={{ disabled: done === 0 }}
               >
                 {pending !== null ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={onAccent} />
                 ) : (
                   <Text
-                    style={[styles.confirmText, { color: done > 0 ? '#fff' : theme.textSecondary, fontFamily }]}
+                    style={[styles.confirmText, { color: done > 0 ? onAccent : theme.textSecondary, fontFamily }]}
                     numberOfLines={1}
                   >
                     {done === 0 ? t.rateSome : allRated ? t.send : t.sendSome(done, card.options.length)}
@@ -845,17 +927,20 @@ const styles = StyleSheet.create({
   confirm: { height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
   confirmText: { fontSize: textSize(15), fontWeight: '700' },
   summary: { textAlign: 'center', fontSize: textSize(15), fontWeight: '700' },
-  rows: { flex: 1, justifyContent: 'center' },
-  rateRow: { paddingVertical: 9 },
-  rateRowCompact: { paddingVertical: 5 },
+  /* From the top, under the question: a short form reads as one, and what
+   * room is left sits above the Send, not in a band between. */
+  rows: { flex: 1, paddingTop: 2 },
+  rateTile: { borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, justifyContent: 'center' },
+  rateTileStacked: { paddingVertical: 10, gap: 4 },
+  rateTileInline: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6 },
+  rateInlineText: { flex: 1, minWidth: 0 },
+  rateInlineEnd: { alignItems: 'flex-end', gap: 4 },
+  scoreWord: { fontSize: textSize(13), fontWeight: '700' },
   rateHead: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 28 },
   rateThumb: { width: 28, height: 28, borderRadius: 8 },
   rateName: { flex: 1, minWidth: 0, fontSize: textSize(15.5), fontWeight: '700' },
   rateDetail: { fontSize: textSize(12.5), fontWeight: '400' },
-  /* The stars' targets are wider than the stars; this lines the first star's
-   * edge up with the name above it. */
-  rateStars: { marginLeft: -6, marginTop: 2 },
-  rateResult: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
+  rateResult: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
   rateCount: { flexShrink: 1, fontSize: textSize(12.5) },
   avg: { minWidth: 54, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, alignItems: 'center' },
   avgText: { fontSize: textSize(14), fontWeight: '800' },

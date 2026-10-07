@@ -87,3 +87,50 @@ export function starFills(average: number): number[] {
 export function ratedCount(chosen: Readonly<Record<string, number>>, optionIds: readonly string[]): number {
   return optionIds.filter((id) => (chosen[id] ?? 0) > 0).length;
 }
+
+export interface RatingLayout {
+  /** stacked: the name over five stars spread across the tile. inline: the
+   *  name beside the stars, for five or six options on a shorter card. */
+  mode: 'stacked' | 'inline';
+  starSize: number;
+  gap: number;
+  /** Each option's tile. */
+  tileHeight: number;
+}
+
+/**
+ * A rating's options, laid out in the space they actually have (the list's
+ * measured width and height). Stars as large as fit — up to 40 points, five
+ * across the tile — with the name above them while that leaves stars of 28 or
+ * more; otherwise name and stars share a line, so six options still fit
+ * without the card scrolling inside a feed that scrolls.
+ */
+export function ratingLayout(width: number, height: number, options: number, textScale: number): RatingLayout {
+  const s = Math.min(Math.max(textScale, 0.85), 1.4);
+  const n = Math.max(1, options);
+  const nameLine = 22 * s;
+  /* Stacked tile: 12 above and below, the name, 4 between, the star's target. */
+  const gap = 10;
+  const perRow = (height - gap * (n - 1)) / n;
+  const fromWidth = (width - 28) / 5 - 14;
+  const star = Math.min(40, fromWidth, perRow - 38 - nameLine);
+  if (star >= 28) {
+    const natural = 38 + nameLine + star;
+    return {
+      mode: 'stacked',
+      starSize: Math.floor(star),
+      gap,
+      /* Roomy when there is room — 132 at least — but never past its share. */
+      tileHeight: Math.floor(Math.min(perRow, Math.max(natural * 1.15, 132))),
+    };
+  }
+  const tight = 8;
+  const perInline = (height - tight * (n - 1)) / n;
+  const small = Math.floor(Math.max(18, Math.min(26, perInline - 26)));
+  return {
+    mode: 'inline',
+    starSize: small,
+    gap: tight,
+    tileHeight: Math.floor(Math.max(small + 26, Math.min(perInline, small + 34))),
+  };
+}

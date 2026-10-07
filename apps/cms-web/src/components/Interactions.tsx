@@ -338,7 +338,9 @@ export function PhonePreview({
                     </span>
                   ) : (
                     <span className="ix-phone-rate-stars" aria-hidden="true">
-                      ☆☆☆☆☆
+                      {[1, 2, 3, 4, 5].map((n) => (
+                        <span key={n}>★</span>
+                      ))}
                     </span>
                   )}
                 </div>
