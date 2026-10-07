@@ -1,0 +1,14 @@
+# Only source goes into the image. Never secrets, readers' data, or the app.
+.git
+.claude
+**/node_modules
+**/dist
+.env
+.env.*
+!.env.example
+media
+backups
+docs
+brand
+apps/mobile
+*.log

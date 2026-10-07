@@ -1,0 +1,62 @@
+# Production: the two servers and Caddy on one machine. See docs/deploy.md.
+#
+#   docker compose -f infra/docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# Uploaded photos and videos live in the `media` volume, shared by both servers
+# and kept across deploys. MongoDB is not here: it is Atlas (MONGO_URI).
+
+name: saar
+
+services:
+  api:
+    build:
+      context: ..
+      target: server
+      args:
+        GIT_SHA: ${GIT_SHA:-unknown}
+    image: saar-server
+    command: ['node', 'apps/api/dist/server.js']
+    env_file: ../.env.production
+    environment:
+      NODE_ENV: production
+      API_PORT: '3000'
+      MEDIA_ROOT: /data/media
+    volumes:
+      - media:/data/media
+    restart: unless-stopped
+
+  cms-api:
+    image: saar-server
+    depends_on:
+      - api
+    command: ['node', 'apps/cms-api/dist/server.js']
+    env_file: ../.env.production
+    environment:
+      NODE_ENV: production
+      CMS_PORT: '3001'
+      MEDIA_ROOT: /data/media
+    volumes:
+      - media:/data/media
+    restart: unless-stopped
+
+  caddy:
+    build:
+      context: ..
+      target: site
+    environment:
+      SAAR_DOMAIN: ${SAAR_DOMAIN:?set SAAR_DOMAIN in .env.production}
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - api
+      - cms-api
+    restart: unless-stopped
+
+volumes:
+  media:
+  caddy-data:
+  caddy-config:

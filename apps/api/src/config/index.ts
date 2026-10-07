@@ -33,6 +33,22 @@ const EnvSchema = z.object({
     .string()
     .default('false')
     .transform((v) => v === 'true'),
+  /** Where uploaded photos and videos live. In production, a persistent disk
+   *  shared with the CMS — never the container's own, which a deploy wipes. */
+  MEDIA_ROOT: z.string().optional(),
+}).superRefine((env, ctx) => {
+  /*
+   * In production, the settings whose absence would otherwise surface later —
+   * as a 500 at the first reader's sign-in, or photos that vanish on the next
+   * deploy — stop the server starting instead (launch review, 7 Oct 2026).
+   */
+  if (env.NODE_ENV !== 'production') return;
+  const need = (key: string, ok: boolean, why: string) => {
+    if (!ok) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [key], message: `required in production — ${why}` });
+  };
+  need('READER_ID_SECRET', Boolean(env.READER_ID_SECRET), 'it turns Google accounts into reader ids; never change it once set');
+  need('GOOGLE_WEB_CLIENT_ID', env.GOOGLE_WEB_CLIENT_ID.trim() !== '', 'readers sign in with it');
+  need('MEDIA_ROOT', Boolean(env.MEDIA_ROOT), 'a persistent folder for photos and videos');
 });
 
 export type Env = z.infer<typeof EnvSchema>;

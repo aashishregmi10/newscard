@@ -27,10 +27,15 @@ export const ensureRateLimitIndexes = ensureRateCounterIndexes;
 export type { RateRule } from '@saar/http';
 export { rateLimit } from '@saar/http';
 
-/** Generous: one IP may be a whole CGNAT cell (see header note). */
+/**
+ * Generous: one IP may be a whole CGNAT cell (see header note). 120 a minute
+ * was one reader's worth — a feed page, Shorts, a vote card refreshing every
+ * ten seconds — shared by everyone behind a carrier's address (launch review,
+ * 7 Oct 2026). Twenty a second still stops a crude flood from one machine.
+ */
 export const publicReadLimit = rateLimit({
   name: 'read',
-  limit: 120,
+  limit: 1200,
   windowMs: 60_000,
   key: byIp,
 });
@@ -74,26 +79,32 @@ export const adEventsLimit = rateLimit({
  */
 export const clientErrorLimit = rateLimit({
   name: 'cerr',
-  limit: 60,
+  limit: 300,
   windowMs: 60_000,
   key: byIp,
 });
 
+/**
+ * Every app launch registers, so behind one carrier address ten an hour turned
+ * away most of a neighbourhood on launch day — and a device that fails to
+ * register gets no push token. A per-IP ceiling for scripted floods only.
+ */
 export const deviceRegisterLimit = rateLimit({
   name: 'devreg',
-  limit: 10,
+  limit: 600,
   windowMs: 60 * 60_000,
   key: byIp,
 });
 
 /**
  * Signing in. Each one is a check against Google and a new session, so a
- * client hammering it is either broken or forging tokens; twenty an hour from
- * one address is far beyond a family sharing a connection.
+ * client hammering it is either broken or forging tokens. Two hundred an hour
+ * from one address allows for a carrier's shared address on launch day while
+ * still refusing a forger's loop. Deleting an account counts here too.
  */
 export const readerSessionLimit = rateLimit({
   name: 'rsess',
-  limit: 20,
+  limit: 200,
   windowMs: 60 * 60_000,
   key: byIp,
 });

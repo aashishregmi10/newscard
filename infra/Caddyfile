@@ -1,0 +1,36 @@
+# One address for everything readers and staff open, over HTTPS.
+# Caddy obtains and renews the certificate itself for SAAR_DOMAIN.
+#
+#   /v1/*, /media/*   the reader API (the app; photos and videos)
+#   /api/*            the editorial API (the editorial site's calls)
+#   everything else   the website and editorial site; /privacy, /terms and
+#                     /delete-account are real paths that load the same page
+
+{$SAAR_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		-Server
+	}
+
+	handle /v1/* {
+		reverse_proxy api:3000
+	}
+
+	handle /media/* {
+		reverse_proxy api:3000
+	}
+
+	handle /api/* {
+		reverse_proxy cms-api:3001
+	}
+
+	handle {
+		root * /srv/site
+		try_files {path} {path}/index.html /index.html
+		file_server
+	}
+}

@@ -37,6 +37,18 @@ const EnvSchema = z.object({
    */
   CMS_ORIGIN: z.string().url().default('http://localhost:5173'),
   LOG_LEVEL: z.enum(LOG_LEVELS).default('info'),
+  /** Where uploads are written; the reader API serves the same folder. */
+  MEDIA_ROOT: z.string().optional(),
+}).superRefine((env, ctx) => {
+  /* In production: a persistent media folder, and a site served over HTTPS —
+     the session cookie is Secure there, and a browser drops it over http. */
+  if (env.NODE_ENV !== 'production') return;
+  if (!env.MEDIA_ROOT) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['MEDIA_ROOT'], message: 'required in production — a persistent folder for uploads' });
+  }
+  if (!env.CMS_ORIGIN.startsWith('https://')) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['CMS_ORIGIN'], message: 'must be the https:// address of the site in production' });
+  }
 });
 
 export type CmsEnv = z.infer<typeof EnvSchema>;

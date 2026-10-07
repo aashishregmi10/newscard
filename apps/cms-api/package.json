@@ -37,6 +37,7 @@
   "//optionalDependencies": "The argon2 native binaries, listed so the lockfile carries them. npm records an optional dependency only for the platform it installed on (npm/cli#4828), and this lockfile was generated on Windows — so `npm ci` on the Linux runner installed no binding at all and every test that hashes a password failed with \"Cannot find native binding\". Naming them here puts all three in the lockfile whoever regenerates it. Add a platform when someone develops on one.",
   "optionalDependencies": {
     "@node-rs/argon2-darwin-arm64": "^2.2.0",
+    "@node-rs/argon2-linux-arm64-gnu": "^2.2.0",
     "@node-rs/argon2-linux-x64-gnu": "^2.2.0",
     "@node-rs/argon2-win32-x64-msvc": "^2.2.0"
   }

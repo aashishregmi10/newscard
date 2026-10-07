@@ -50,7 +50,12 @@ import { sweepInterruptedSummaryDrafts } from './services/summaryDraft.service.j
 export function createCmsApp(ORIGIN = 'http://localhost:5173') {
   const app = express();
   app.disable('x-powered-by');
-  app.set('trust proxy', 1);
+  /*
+   * How many proxies sit in front: Caddy alone is 1; a CDN in front of Caddy
+   * makes 2. Too few and every reader shares the proxy's address — and so one
+   * rate limit for everyone.
+   */
+  app.set('trust proxy', Number(process.env.TRUST_PROXY_HOPS ?? 1));
 
   app.use(requestId);
   app.use(helmet());
