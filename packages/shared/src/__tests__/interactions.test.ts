@@ -41,13 +41,13 @@ describe('interactionProblems', () => {
     ).toEqual([]);
   });
 
-  it('holds a vote to 2–4 candidates and a rating to 2–6 businesses', () => {
+  it('holds a vote to 2–4 candidates and a rating to 2–6 options', () => {
     const one = vote({ options: [{ name: 'नमुना एक', detail: null, image: photo }] });
     expect(interactionProblems(one)[0]?.field).toBe('options');
     const names = ['एक', 'दुई', 'तीन', 'चार', 'पाँच'].map((n) => ({ name: `नमुना ${n}`, detail: null, image: photo }));
     expect(interactionProblems(vote({ options: names }))[0]?.message).toMatch(/At most 4 candidates/);
     const seven = Array.from({ length: 7 }, (_, i) => ({ name: `Sample ${i + 1}`, detail: null, image: null }));
-    expect(interactionProblems({ ...vote({ options: seven }), type: 'rating' })[0]?.message).toMatch(/At most 6 businesses/);
+    expect(interactionProblems({ ...vote({ options: seven }), type: 'rating' })[0]?.message).toMatch(/At most 6 options/);
   });
 
   it('treats names that differ only in case, spacing or Unicode form as the same', () => {

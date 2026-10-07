@@ -647,10 +647,22 @@ export interface InteractionOptionData {
   image: OptionImageData | null;
 }
 
-/** `today` is answers since midnight in Nepal. */
+/**
+ * `today` is answers since midnight in Nepal: votes, or readers who rated.
+ * A rating's `total` is every star given (a reader rates every option), its
+ * `respondents` the readers, and `average` every star averaged; `breakdown`
+ * is how many gave 1, 2, 3, 4 and 5 stars, in that order.
+ */
 export type InteractionResultsData =
   | { type: 'vote'; total: number; today: number; options: Array<{ id: string; votes: number; percent: number }> }
-  | { type: 'rating'; total: number; today: number; options: Array<{ id: string; ratings: number; average: number | null }> };
+  | {
+      type: 'rating';
+      total: number;
+      respondents: number;
+      today: number;
+      average: number | null;
+      options: Array<{ id: string; ratings: number; average: number | null; breakdown: number[] }>;
+    };
 
 export interface InteractionRow {
   id: string;

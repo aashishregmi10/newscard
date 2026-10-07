@@ -174,43 +174,81 @@ describe('rating', () => {
   const rating = () =>
     interaction({
       type: 'rating',
-      title: 'Sample cafes',
-      options: [OPTION('bbbbbb01', 'Sample Cafe'), OPTION('bbbbbb02', 'नमुना क्याफे')],
+      title: 'Sample: how was the service?',
+      options: [OPTION('bbbbbb01', 'Sample Speed'), OPTION('bbbbbb02', 'नमुना व्यवहार')],
       closesAt: null,
     });
+  const rate = (id: string, token: string, a: number, b: number) =>
+    request(app)
+      .post(`/v1/interactions/${id}/ratings`)
+      .set(as(token))
+      .send({ ratings: [{ optionId: 'bbbbbb01', stars: a }, { optionId: 'bbbbbb02', stars: b }] });
 
-  it('takes one rating per business per reader, and moves the average', async () => {
+  it('takes every option at once, and moves the averages', async () => {
     const id = await rating();
     const a = await signIn('acct-1');
     const b = await signIn('acct-2');
 
-    const r1 = await request(app).post(`/v1/interactions/${id}/rating`).set(as(a)).send({ optionId: 'bbbbbb01', stars: 5 });
+    const r1 = await rate(id, a, 5, 3);
     expect(r1.status).toBe(201);
-    expect(r1.body.myRatings).toEqual([{ optionId: 'bbbbbb01', stars: 5 }]);
+    expect(r1.body.myRatings).toEqual([
+      { optionId: 'bbbbbb01', stars: 5 },
+      { optionId: 'bbbbbb02', stars: 3 },
+    ]);
 
-    const r2 = await request(app).post(`/v1/interactions/${id}/rating`).set(as(b)).send({ optionId: 'bbbbbb01', stars: 2 });
+    const r2 = await rate(id, b, 2, 4);
+    expect(r2.body.results).toMatchObject({ total: 4, respondents: 2, average: 3.5 });
     expect(r2.body.results.options[0]).toMatchObject({ ratings: 2, average: 3.5 });
-
-    const again = await request(app).post(`/v1/interactions/${id}/rating`).set(as(a)).send({ optionId: 'bbbbbb01', stars: 1 });
-    expect(again.status).toBe(409);
-    /* A different business is a different rating. */
-    const other = await request(app).post(`/v1/interactions/${id}/rating`).set(as(a)).send({ optionId: 'bbbbbb02', stars: 4 });
-    expect(other.status).toBe(201);
+    expect(r2.body.results.options[1]).toMatchObject({ ratings: 2, average: 3.5 });
   });
 
-  it('shows averages to anyone, from the first rating', async () => {
+  it('counts one rating per account, and says so to a second try', async () => {
     const id = await rating();
     const a = await signIn('acct-1');
-    await request(app).post(`/v1/interactions/${id}/rating`).set(as(a)).send({ optionId: 'bbbbbb02', stars: 4 });
+    await rate(id, a, 5, 5);
+    const again = await rate(id, a, 1, 1);
+    expect(again.status).toBe(409);
+    expect(again.body.error.message).toMatch(/already rated/);
+    expect(await interactionCollections(getDb()).ratings.countDocuments()).toBe(2);
+  });
+
+  it('refuses a form with an option left out, or one twice', async () => {
+    const id = await rating();
+    const a = await signIn('acct-1');
+    const send = (ratings: unknown) => request(app).post(`/v1/interactions/${id}/ratings`).set(as(a)).send({ ratings });
+    expect((await send([{ optionId: 'bbbbbb01', stars: 4 }])).status).toBe(400);
+    expect(
+      (await send([{ optionId: 'bbbbbb01', stars: 4 }, { optionId: 'bbbbbb01', stars: 2 }])).status,
+    ).toBe(400);
+    expect(
+      (await send([{ optionId: 'bbbbbb01', stars: 4 }, { optionId: 'zzzzzz99', stars: 2 }])).status,
+    ).toBe(400);
+    expect(await interactionCollections(getDb()).ratings.countDocuments()).toBe(0);
+  });
+
+  it('shows the averages only to a reader who has rated, until it closes', async () => {
+    const id = await rating();
+    const a = await signIn('acct-1');
+    const b = await signIn('acct-2');
+    await rate(id, a, 4, 2);
+
+    const other = await request(app).get(`/v1/interactions/${id}/me`).set(as(b));
+    expect(other.body).toMatchObject({ myRatings: [], results: null });
+    expect((await request(app).get(`/v1/interactions/${id}/results`)).body.results).toBeNull();
+
+    await interactionCollections(getDb()).interactions.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: { status: 'closed', closedAt: new Date() } },
+    );
+    forgetInteractionCaches();
     const pub = await request(app).get(`/v1/interactions/${id}/results`);
-    expect(pub.body.results.options[1]).toMatchObject({ ratings: 1, average: 4 });
+    expect(pub.body.results).toMatchObject({ respondents: 1, average: 3 });
   });
 
   it('refuses a sixth star', async () => {
     const id = await rating();
     const a = await signIn('acct-1');
-    const r = await request(app).post(`/v1/interactions/${id}/rating`).set(as(a)).send({ optionId: 'bbbbbb01', stars: 6 });
-    expect(r.status).toBe(400);
+    expect((await rate(id, a, 6, 1)).status).toBe(400);
   });
 });
 

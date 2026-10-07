@@ -456,10 +456,15 @@ export function answerVote(id: string, optionId: string, token: string): Promise
   });
 }
 
-export function answerRating(id: string, optionId: string, stars: number, token: string): Promise<InteractionState> {
-  return readerCall(`/v1/interactions/${encodeURIComponent(id)}/rating`, {
+/** Stars for every option of a rating, sent together, as a form is. */
+export function answerRatings(
+  id: string,
+  ratings: ReadonlyArray<{ optionId: string; stars: number }>,
+  token: string,
+): Promise<InteractionState> {
+  return readerCall(`/v1/interactions/${encodeURIComponent(id)}/ratings`, {
     method: 'POST',
     token,
-    body: JSON.stringify({ optionId, stars }),
+    body: JSON.stringify({ ratings }),
   });
 }

@@ -23,7 +23,7 @@ import { writeAudit } from '../audit/writeAudit.js';
  * ── The life of one ─────────────────────────────────────────────────────────
  *
  *   draft   everything can change. It can be deleted.
- *   live    published. Its businesses or candidates, their names and photos are
+ *   live    published. Its options or candidates, their names and photos are
  *           LOCKED: a vote's result must mean what readers voted on, so
  *           changing a candidate after the first vote would make the result a
  *           lie. Only the closing date can move, or it can be closed now.

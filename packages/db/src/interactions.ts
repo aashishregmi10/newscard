@@ -95,11 +95,21 @@ export interface VoteResults {
 
 export interface RatingResults {
   type: 'rating';
-  /** Ratings in all, across every business. */
+  /** Star ratings in all: a reader who rated four options gave four. */
   total: number;
-  /** Ratings since midnight in Nepal. */
+  /** Readers who rated. Each rates every option, once, in one go. */
+  respondents: number;
+  /** Readers who rated since midnight in Nepal. */
   today: number;
-  options: Array<{ id: string; ratings: number; average: number | null }>;
+  /** Every star given, averaged: the question's overall score. Null before the first. */
+  average: number | null;
+  options: Array<{
+    id: string;
+    ratings: number;
+    average: number | null;
+    /** How many gave 1, 2, 3, 4 and 5 stars, in that order. */
+    breakdown: number[];
+  }>;
 }
 
 /** Nepal is UTC+5:45 all year (no daylight saving). */
@@ -143,18 +153,33 @@ export async function countInteractionResults(
     };
   }
 
-  const [rows, today] = await Promise.all([
+  const [rows, respondents, today] = await Promise.all([
     c.ratings
-      .aggregate<{ _id: string; n: number; sum: number }>([
+      .aggregate<{ _id: { o: string; s: number }; n: number }>([
         { $match: { interactionId: i._id } },
-        { $group: { _id: '$optionId', n: { $sum: 1 }, sum: { $sum: '$stars' } } },
+        { $group: { _id: { o: '$optionId', s: '$stars' }, n: { $sum: 1 } } },
       ])
       .toArray(),
-    c.ratings.countDocuments(sinceToday),
+    readersWho(c.ratings, { interactionId: i._id }),
+    readersWho(c.ratings, sinceToday),
   ]);
+  let allSum = 0;
+  let allN = 0;
   const options = ids.map((id) => {
-    const r = rows.find((x) => x._id === id);
-    return { id, ratings: r?.n ?? 0, average: averageStars(r?.sum ?? 0, r?.n ?? 0) };
+    const breakdown = [1, 2, 3, 4, 5].map((stars) => rows.find((x) => x._id.o === id && x._id.s === stars)?.n ?? 0);
+    const n = breakdown.reduce((a, b) => a + b, 0);
+    const sum = breakdown.reduce((a, b, k) => a + b * (k + 1), 0);
+    allSum += sum;
+    allN += n;
+    return { id, ratings: n, average: averageStars(sum, n), breakdown };
   });
-  return { type: 'rating', total: options.reduce((a, o) => a + o.ratings, 0), today, options };
+  return { type: 'rating', total: allN, respondents, today, average: averageStars(allSum, allN), options };
+}
+
+/** How many different readers gave the answers that match. */
+async function readersWho(answers: Collection<RatingDoc>, match: Record<string, unknown>): Promise<number> {
+  const [row] = await answers
+    .aggregate<{ n: number }>([{ $match: match }, { $group: { _id: '$readerId' } }, { $count: 'n' }])
+    .toArray();
+  return row?.n ?? 0;
 }

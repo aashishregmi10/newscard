@@ -14,7 +14,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import {
   AnswerError,
-  answerRating,
+  answerRatings,
   answerVote,
   blurHashAverageColor,
   fetchInteractionState,
@@ -22,12 +22,12 @@ import {
   type InteractionCard as InteractionCardData,
   type InteractionState,
 } from '../api/client';
-import { leaderIndex, ratingTone, voteTileSize, type RatingTone } from '../lib/interactionLayout';
+import { leaderIndex, ratedCount, ratingTone, voteTileSize, type RatingTone } from '../lib/interactionLayout';
 import { useReader } from '../state/ReaderContext';
 import { useSettings } from '../state/SettingsContext';
 import { fontFor, textSize, type Theme } from '../theme/tokens';
 import { SignInSheet } from './SignInSheet';
-import { StarRating } from './StarRating';
+import { StarAverage, StarRating } from './StarRating';
 
 /**
  * A rating or a vote, as a card between stories.
@@ -45,12 +45,16 @@ import { StarRating } from './StarRating';
  *           because a vote is final and a stray tap while scrolling must not
  *           cast one. Then each photo shows its share, the reader's own pick
  *           marked, the leader badged.
- *   Rating  Google Play's large average beside its stars, and the coloured
- *           average pill of food apps (green from 4, amber from 3, red below).
- *           Large stars to pick, then Send — also final.
+ *   Rating  A feedback form (redrawn 7 Oct 2026 from the newsroom's example):
+ *           the question, then each option's name over a row of large stars.
+ *           One Send for the whole form, once every option has stars — also
+ *           final. Then each option shows its average, in part-filled stars
+ *           and the coloured pill of food apps (green from 4, amber from 3,
+ *           red below), with the reader's own stars beside; the bar beneath
+ *           gives the overall score and how many rated.
  *
- * Totals stay hidden until this reader has voted, or the vote has closed, so
- * the first votes do not steer the rest; a rating's averages always show.
+ * Results stay hidden until this reader has answered, or it has closed, so
+ * the first answers do not steer the rest.
  *
  * ── Feel ────────────────────────────────────────────────────────────────────
  *
@@ -74,18 +78,22 @@ const COPY = {
     leadingLine: (name: string, p: number) => `अगाडि: ${name} · ${p}%`,
     tiedLine: 'बराबरी छ',
     yourVote: 'तपाईंको मत',
-    yourRating: 'तपाईंको रेटिङ',
     send: 'पठाउनुहोस्',
+    rateAll: (done: number, all: number) => `सबैलाई तारा दिनुहोस् · ${done}/${all}`,
+    you: (n: number) => `तपाईं ${n} ★`,
+    people: (n: number) => `${n} जनाले रेटिङ दिए`,
+    overall: (avg: string, n: number) => `समग्र ${avg} ★ · ${n} जनाको औसत`,
+    noRatings: 'कसैले रेटिङ दिएनन्',
     closed: 'मतदान सकियो',
     ratingClosed: 'रेटिङ सकियो',
     votes: (n: number) => `${n} मत`,
     ratings: (n: number) => `${n} रेटिङ`,
     fresh: 'नयाँ',
     voteRule: 'एउटा Google खाता, एउटा मत · फेर्न मिल्दैन',
-    rateRule: 'ताराहरू छुनुहोस्, अनि पठाउनुहोस् · फेर्न मिल्दैन',
+    rateRule: 'हरेकलाई तारा दिनुहोस्, अनि पठाउनुहोस् · फेर्न मिल्दैन',
     photos: 'तस्बिर',
     already: 'तपाईंले पहिल्यै मत दिनुभएको छ।',
-    alreadyRated: 'यसलाई तपाईंले पहिल्यै रेटिङ दिनुभएको छ।',
+    alreadyRated: 'तपाईंले पहिल्यै रेटिङ दिनुभएको छ।',
     failed: 'पठाउन सकिएन। फेरि प्रयास गर्नुहोस्।',
     signInAgain: 'फेरि साइन इन गर्नुहोस्।',
     update: 'मत दिन एपको नयाँ संस्करण चाहिन्छ।',
@@ -100,15 +108,19 @@ const COPY = {
     leadingLine: (name: string, p: number) => `Leading: ${name} · ${p}%`,
     tiedLine: 'It’s a tie',
     yourVote: 'Your vote',
-    yourRating: 'Your rating',
     send: 'Send',
+    rateAll: (done: number, all: number) => `Rate all to send · ${done}/${all}`,
+    you: (n: number) => `you ${n} ★`,
+    people: (n: number) => `${n} ${n === 1 ? 'person' : 'people'} rated`,
+    overall: (avg: string, n: number) => `Overall ${avg} ★ · from ${n} ${n === 1 ? 'person' : 'people'}`,
+    noRatings: 'Nobody rated',
     closed: 'Voting closed',
     ratingClosed: 'Rating closed',
     votes: (n: number) => `${n} ${n === 1 ? 'vote' : 'votes'}`,
     ratings: (n: number) => `${n} ${n === 1 ? 'rating' : 'ratings'}`,
     fresh: 'New',
     voteRule: 'One vote per Google account · final',
-    rateRule: 'Pick stars, then send · final',
+    rateRule: 'Rate each, then send · final',
     photos: 'Photos',
     already: 'You have already voted.',
     alreadyRated: 'You have already rated this.',
@@ -126,13 +138,6 @@ const TONES: Record<RatingTone, { light: [string, string]; dark: [string, string
   poor: { light: ['#FCEBEB', '#791F1F'], dark: ['#791F1F', '#F7C1C1'] },
   new: { light: ['#F1EFE8', '#444441'], dark: ['#444441', '#D3D1C7'] },
 };
-
-/** A steady colour per name, for a business without a photo. */
-function initialColour(name: string): string {
-  let h = 0;
-  for (const ch of name) h = (h * 31 + ch.codePointAt(0)!) % 360;
-  return `hsl(${h}, 42%, 42%)`;
-}
 
 /** A number that counts up to its value once, when it first appears. */
 function CountUp({ value, style }: { value: number; style: object }) {
@@ -277,7 +282,7 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
   const [selected, setSelected] = useState<string | null>(null);
   /** The vote or rating on its way to the server. */
   const [pending, setPending] = useState<string | null>(null);
-  /** Stars picked but not yet sent, per business. */
+  /** Stars picked but not yet sent, per option. */
   const [chosen, setChosen] = useState<Record<string, number>>({});
   const [note, setNote] = useState<string | null>(null);
   const [asking, setAsking] = useState(false);
@@ -367,19 +372,17 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
     });
   };
 
-  const sendRating = (optionId: string) => {
-    const stars = chosen[optionId];
-    if (!stars) return;
+  /** The whole form, once every option has stars. */
+  const sendRatings = () => {
+    if (ratedCount(chosen, card.options.map((o) => o.id)) < card.options.length) return;
+    const ratings = card.options.map((o) => ({ optionId: o.id, stars: chosen[o.id]! }));
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setPending(optionId);
+    setPending('ratings');
     signedIn(async (tk) => {
       try {
-        setState(await answerRating(card.id, optionId, stars, tk));
+        setState(await answerRatings(card.id, ratings, tk));
         void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setChosen((c) => {
-          const { [optionId]: _sent, ...rest } = c;
-          return rest;
-        });
+        setChosen({});
       } catch (e) {
         refused(e, t.alreadyRated);
       } finally {
@@ -400,15 +403,16 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
     if (ms > 0) left = t.left(Math.floor(ms / 86_400_000), Math.floor(ms / 3_600_000));
   }
   const status = closed ? (card.type === 'vote' ? t.closed : t.ratingClosed) : left;
-  const totalLabel =
-    results === null ? null : card.type === 'vote' ? t.votes(results.total) : t.ratings(results.total);
+  /* An older server sends no respondents; its total is then the closest figure. */
+  const respondents = results === null ? 0 : (results.respondents ?? results.total);
+  const totalLabel = results === null ? null : card.type === 'vote' ? t.votes(results.total) : t.people(respondents);
   const meta = [totalLabel, status].filter(Boolean).join(' · ');
 
   const titleSize = textSize(20) * Math.min(Math.max(textScale, 0.85), 1.4);
   const pad = 18;
   const gap = 10;
   const tile = voteTileSize(width, height, card.options.length, textScale, pad, gap);
-  /* Five or six businesses: smaller photos and stars, so all fit the card. */
+  /* Five or six options: smaller stars, so all fit the card. */
   const compact = card.type === 'rating' && card.options.length > 4;
 
   const footnote =
@@ -422,6 +426,12 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
   const lead = voteResults ? leaderIndex(card.options.map((o) => result(o.id)?.votes ?? 0)) : -1;
   const answered = myVote !== null || closed;
   const selectedName = card.options.find((o) => o.id === selected)?.name ?? null;
+
+  /* ── the rating ── */
+  const myRatings = state?.myRatings ?? [];
+  const ratingResults = card.type === 'rating' && results !== null;
+  const done = ratedCount(chosen, card.options.map((o) => o.id));
+  const allRated = done === card.options.length;
 
   return (
     <View style={[styles.card, { height, backgroundColor: theme.surface, paddingHorizontal: pad }]}>
@@ -521,94 +531,94 @@ function InteractionCardInner({ card, theme, height, textScale, dataSaver }: Pro
           </View>
         </>
       ) : (
-        <View style={styles.rows}>
-          {card.options.map((o, i) => {
-            const r = result(o.id);
-            const mine = state?.myRatings.find((m) => m.optionId === o.id)?.stars ?? null;
-            const picked = chosen[o.id] ?? 0;
-            const tone = ratingTone(r?.average ?? null);
-            const [pillBg, pillFg] = TONES[tone][isDark ? 'dark' : 'light'];
-            const src = dataSaver ? null : resolveMediaUrl(o.image?.urls.sm ?? o.image?.urls.md ?? null);
-            const sub = [o.detail, r !== null && r.ratings > 0 ? t.ratings(r.ratings) : null].filter(Boolean).join(' · ');
-            return (
-              <View
-                key={o.id}
-                style={[
-                  styles.row,
-                  { maxHeight: compact ? 96 : 124 },
-                  i < card.options.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.divider },
-                ]}
-              >
-                <View style={styles.rowTop}>
-                  <View
-                    style={[
-                      styles.thumb,
-                      compact && styles.thumbCompact,
-                      { backgroundColor: src !== null ? theme.surfaceRaised : initialColour(o.name) },
-                    ]}
-                  >
-                    {src !== null ? (
-                      <Image source={{ uri: src }} style={StyleSheet.absoluteFill} resizeMode="cover" />
-                    ) : (
-                      <Text style={styles.thumbInitial}>{[...o.name.trim()][0] ?? '·'}</Text>
-                    )}
-                  </View>
-                  <View style={styles.rowMiddle}>
-                    <Text style={[styles.rowName, { color: theme.textPrimary, fontFamily }]} numberOfLines={1}>
+        <>
+          <View style={styles.rows}>
+            {card.options.map((o) => {
+              const r = ratingResults ? result(o.id) : null;
+              const mine = myRatings.find((m) => m.optionId === o.id)?.stars ?? null;
+              const src = dataSaver ? null : resolveMediaUrl(o.image?.urls.sm ?? o.image?.urls.md ?? null);
+              const tone = ratingTone(r?.average ?? null);
+              const [pillBg, pillFg] = TONES[tone][isDark ? 'dark' : 'light'];
+              return (
+                <View key={o.id} style={[styles.rateRow, compact && styles.rateRowCompact]}>
+                  <View style={styles.rateHead}>
+                    {src !== null && <Image source={{ uri: src }} style={styles.rateThumb} resizeMode="cover" />}
+                    <Text style={[styles.rateName, { color: theme.textPrimary, fontFamily }]} numberOfLines={1}>
                       {o.name}
+                      {o.detail !== null && (
+                        <Text style={[styles.rateDetail, { color: theme.textSecondary }]}>{`  ${o.detail}`}</Text>
+                      )}
                     </Text>
-                    {sub !== '' && (
-                      <Text style={[styles.rowSub, { color: theme.textSecondary, fontFamily }]} numberOfLines={1}>
-                        {sub}
-                      </Text>
+                    {r !== null && (
+                      <View style={[styles.avg, { backgroundColor: pillBg }]}>
+                        <Text style={[styles.avgText, { color: pillFg }]}>
+                          {r.average !== null ? `${r.average.toFixed(1)} ★` : t.fresh}
+                        </Text>
+                      </View>
                     )}
                   </View>
-                  <View style={[styles.avg, { backgroundColor: pillBg }]}>
-                    <Text style={[styles.avgText, { color: pillFg }]}>
-                      {r?.average != null ? `${r.average.toFixed(1)} ★` : t.fresh}
-                    </Text>
-                  </View>
-                </View>
 
-                <View style={styles.starsLine}>
-                  {mine !== null ? (
-                    <>
-                      <StarRating value={mine} size={compact ? 18 : 20} emptyColor={theme.divider} label={o.name} />
-                      <MaterialCommunityIcons name="check-circle" size={16} color={pillFg} />
-                      <Text style={[styles.rowSub, { color: theme.textSecondary }]}>{t.yourRating}</Text>
-                    </>
-                  ) : closed ? null : (
-                    <>
+                  {r !== null ? (
+                    <View style={styles.rateResult}>
+                      <StarAverage
+                        value={r.average ?? 0}
+                        size={compact ? 20 : 24}
+                        emptyColor={theme.divider}
+                        label={o.name}
+                      />
+                      <Text style={[styles.rateCount, { color: theme.textSecondary, fontFamily }]} numberOfLines={1}>
+                        {mine !== null ? `${t.ratings(r.ratings)} · ${t.you(mine)}` : t.ratings(r.ratings)}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.rateStars}>
                       <StarRating
-                        value={picked}
-                        size={compact ? 24 : 28}
+                        value={chosen[o.id] ?? 0}
+                        size={compact ? 28 : 34}
                         onChange={(n) => setChosen((c) => ({ ...c, [o.id]: n }))}
-                        disabled={pending !== null}
+                        disabled={pending !== null || closed}
                         emptyColor={theme.textSecondary}
                         label={`${t.rateKicker}: ${o.name}`}
                       />
-                      {picked > 0 && (
-                        <Pressable
-                          onPress={() => sendRating(o.id)}
-                          disabled={pending !== null}
-                          style={({ pressed }) => [styles.send, { backgroundColor: theme.accent, opacity: pressed ? 0.85 : 1 }]}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${t.send}: ${o.name}, ${picked} / 5`}
-                        >
-                          {pending === o.id ? (
-                            <ActivityIndicator color="#fff" size="small" />
-                          ) : (
-                            <Text style={styles.sendText}>{t.send}</Text>
-                          )}
-                        </Pressable>
-                      )}
-                    </>
+                    </View>
                   )}
                 </View>
-              </View>
-            );
-          })}
-        </View>
+              );
+            })}
+          </View>
+
+          <View style={styles.bottomBar}>
+            {ratingResults ? (
+              <Text style={[styles.summary, { color: theme.textPrimary, fontFamily }]} numberOfLines={1}>
+                {results!.average !== null ? t.overall(results!.average.toFixed(1), respondents) : t.noRatings}
+              </Text>
+            ) : closed ? null : (
+              <Pressable
+                onPress={sendRatings}
+                disabled={!allRated || pending !== null}
+                style={({ pressed }) => [
+                  styles.confirm,
+                  allRated
+                    ? { backgroundColor: theme.accent, opacity: pressed ? 0.85 : 1 }
+                    : { backgroundColor: 'transparent', borderColor: theme.divider, borderWidth: 1 },
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ disabled: !allRated }}
+              >
+                {pending !== null ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text
+                    style={[styles.confirmText, { color: allRated ? '#fff' : theme.textSecondary, fontFamily }]}
+                    numberOfLines={1}
+                  >
+                    {allRated ? t.send : t.rateAll(done, card.options.length)}
+                  </Text>
+                )}
+              </Pressable>
+            )}
+          </View>
+        </>
       )}
 
       <Text
@@ -682,18 +692,18 @@ const styles = StyleSheet.create({
   confirm: { height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
   confirmText: { fontSize: textSize(15), fontWeight: '700' },
   summary: { textAlign: 'center', fontSize: textSize(15), fontWeight: '700' },
-  rows: { flex: 1 },
-  row: { flex: 1, justifyContent: 'center', paddingVertical: 6 },
-  rowTop: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  thumb: { width: 52, height: 52, borderRadius: 12, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  thumbCompact: { width: 40, height: 40, borderRadius: 10 },
-  thumbInitial: { color: '#fff', fontSize: textSize(20), fontWeight: '700' },
-  rowMiddle: { flex: 1, minWidth: 0 },
-  rowName: { fontSize: textSize(15), fontWeight: '700' },
-  rowSub: { fontSize: textSize(12) },
-  starsLine: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4, minHeight: 36 },
-  send: { height: 32, paddingHorizontal: 14, borderRadius: 16, alignItems: 'center', justifyContent: 'center' },
-  sendText: { color: '#fff', fontSize: textSize(13), fontWeight: '700' },
+  rows: { flex: 1, justifyContent: 'center' },
+  rateRow: { paddingVertical: 9 },
+  rateRowCompact: { paddingVertical: 5 },
+  rateHead: { flexDirection: 'row', alignItems: 'center', gap: 10, minHeight: 28 },
+  rateThumb: { width: 28, height: 28, borderRadius: 8 },
+  rateName: { flex: 1, minWidth: 0, fontSize: textSize(15.5), fontWeight: '700' },
+  rateDetail: { fontSize: textSize(12.5), fontWeight: '400' },
+  /* The stars' targets are wider than the stars; this lines the first star's
+   * edge up with the name above it. */
+  rateStars: { marginLeft: -6, marginTop: 2 },
+  rateResult: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 6 },
+  rateCount: { flexShrink: 1, fontSize: textSize(12.5) },
   avg: { minWidth: 54, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, alignItems: 'center' },
   avgText: { fontSize: textSize(14), fontWeight: '800' },
   footnote: { marginTop: 'auto', paddingTop: 10, fontSize: textSize(11.5), textAlign: 'center' },

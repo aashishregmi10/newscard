@@ -3,16 +3,16 @@ import { INTERACTION_LIMITS } from '@saar/shared';
 import { LanguageEnum } from './enums.js';
 
 /**
- * Interactions — a star rating of a few businesses, or a vote between a few
- * candidates — and the readers' answers to them.
+ * Interactions — a question whose few options readers rate with stars, or a
+ * vote between a few candidates — and the readers' answers to them.
  *
  * ── Collections ─────────────────────────────────────────────────────────────
  *
- *   interactions    what editors make. Its businesses or candidates are its
+ *   interactions    what editors make. Its options or candidates are its
  *                   `options`; once it is live they are locked, so a result
  *                   always means what it says.
  *   votes           one per reader per vote. Final.
- *   ratings         one per reader per business. Final.
+ *   ratings         one per reader per option, all sent together. Final.
  *   readers         a signed-in reader: an HMAC of Google's account number,
  *                   and nothing else — no name, no email.
  *   readerSessions  the app's sign-in, by the hash of its token.
@@ -33,7 +33,7 @@ export type InteractionStatus = z.infer<typeof InteractionStatusEnum>;
 
 const L = INTERACTION_LIMITS;
 
-/** A business's or candidate's photo: square renditions, and whose it is. */
+/** An option's or candidate's photo: square renditions, and whose it is. */
 export const OptionImage = z.object({
   credit: z.string().trim().min(L.credit.min).max(L.credit.max),
   blurHash: z.string().max(100).nullable(),
@@ -148,8 +148,12 @@ export type InteractionCardDto = z.infer<typeof InteractionCardDto>;
  */
 export const InteractionResultsDto = z.object({
   type: InteractionTypeEnum,
-  /** Votes in all, or ratings in all. */
+  /** Votes in all, or star ratings in all. */
   total: z.number(),
+  /** The readers who answered: voters, or readers who rated. */
+  respondents: z.number(),
+  /** A rating's every star averaged — its overall score. Null on a vote, and before the first. */
+  average: z.number().nullable(),
   options: z.array(
     z.object({
       id: z.string(),
@@ -169,11 +173,11 @@ export const InteractionStateDto = z.object({
   closed: z.boolean(),
   /** The candidate this reader voted for. */
   myVote: z.string().nullable(),
-  /** The businesses this reader has rated, and how. */
+  /** The options this reader has rated, and how. */
   myRatings: z.array(z.object({ optionId: z.string(), stars: z.number() })),
   /**
-   * A rating's averages are always shown. A vote's totals only once the reader
-   * has voted, or it has closed, so early votes do not steer later ones.
+   * Shown only once this reader has answered, or it has closed — for a vote
+   * and a rating alike — so early answers do not steer later ones.
    */
   results: InteractionResultsDto.nullable(),
 });

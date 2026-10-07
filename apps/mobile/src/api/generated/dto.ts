@@ -155,6 +155,8 @@ export interface InteractionCardDto {
 export interface InteractionResultsDto {
   type: "rating" | "vote";
   total: number;
+  respondents: number;
+  average: number | null;
   options: ({
     id: string;
     votes: number;

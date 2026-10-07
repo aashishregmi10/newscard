@@ -73,3 +73,17 @@ export function leaderIndex(votes: readonly number[]): number {
   });
   return tied ? -1 : best;
 }
+
+/**
+ * How full each of five stars is for an average: 3.4 is three whole stars and
+ * the fourth four-tenths full. Readers judge a 3.4 against a 3.9 by the last
+ * star, so it is drawn in part rather than rounded away.
+ */
+export function starFills(average: number): number[] {
+  return [0, 1, 2, 3, 4].map((k) => Math.round(Math.min(1, Math.max(0, average - k)) * 100) / 100);
+}
+
+/** "2 of 4 rated", for the Send button that waits for every option. */
+export function ratedCount(chosen: Readonly<Record<string, number>>, optionIds: readonly string[]): number {
+  return optionIds.filter((id) => (chosen[id] ?? 0) > 0).length;
+}

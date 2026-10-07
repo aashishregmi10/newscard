@@ -13,7 +13,7 @@ import {
 import { useAsyncAction } from '../hooks/useAsyncAction';
 import { useResource } from '../hooks/useResource';
 import { crumbs } from '../lib/crumbs';
-import { dateTime } from '../lib/format';
+import { countOf, dateTime } from '../lib/format';
 import { INTERACTION_LIMITS, interactionProblems } from '../lib/interactions';
 import { mediaUrl } from '../lib/media';
 import { Routes } from '../nav';
@@ -44,7 +44,7 @@ function swap<T>(list: readonly T[], a: number, b: number): T[] {
 /**
  * Making and running one Interaction.
  *
- * A draft is the whole form: rating or vote, the question, its businesses or
+ * A draft is the whole form: rating or vote, the question, its options or
  * candidates with their photos, the dates — with the card as a reader will see
  * it alongside, redrawn as the editor types. Each problem is shown on its own
  * field (lib/interactions, the same rules the server enforces), but only once
@@ -158,7 +158,7 @@ function toInput(d: Draft): InteractionInputData {
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 /**
- * One candidate or business as a compact card: its square photo on the left —
+ * One candidate or option as a compact card: its square photo on the left —
  * click or drop to add or replace it, the credit beneath — and its name and
  * detail on the right, with up, down and remove.
  */
@@ -189,8 +189,8 @@ function OptionEditor({
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const fileInput = useRef<HTMLInputElement | null>(null);
-  const noun = type === 'vote' ? 'candidate' : 'business';
-  const Noun = type === 'vote' ? 'Candidate' : 'Business';
+  const noun = type === 'vote' ? 'candidate' : 'option';
+  const Noun = type === 'vote' ? 'Candidate' : 'Option';
   const nameProblem = problem(`options.${index}.name`);
   const detailProblem = problem(`options.${index}.detail`);
   const imageProblem = problem(`options.${index}.image`);
@@ -358,7 +358,7 @@ function OptionEditor({
             label="Detail"
             optional="optional"
             invalid={detailProblem !== null}
-            note={detailProblem ?? (type === 'vote' ? 'A party, a place, a role.' : 'The area, such as “Patan”.')}
+            note={detailProblem ?? (type === 'vote' ? 'A party, a place, a role.' : 'Optional. A few words under the name.')}
             noteTone={detailProblem !== null ? 'bad' : 'default'}
           >
             {(f) => (
@@ -449,7 +449,7 @@ export function InteractionEditor({ id }: { id: string | null }) {
   const row = detail.data?.interaction ?? null;
   const isDraft = row === null || row.status === 'draft';
   const range = INTERACTION_LIMITS.options[d.type];
-  const noun = d.type === 'vote' ? 'candidate' : 'business';
+  const noun = d.type === 'vote' ? 'candidate' : 'option';
   const categories = options.data?.categories ?? [];
 
   if (id !== null && detail.error !== null && detail.data === null) {
@@ -583,7 +583,7 @@ export function InteractionEditor({ id }: { id: string | null }) {
         <div className="confirm-strip" role="alert">
           <p>
             {confirming === 'publish'
-              ? `Publish it to the app? Once readers can answer, its ${noun === 'business' ? 'businesses' : 'candidates'}, names and photos cannot change.`
+              ? `Publish it to the app? Once readers can answer, its ${noun}s, names and photos cannot change.`
               : confirming === 'close'
                 ? 'Close it now? Readers can no longer answer, and the results become final.'
                 : 'Delete this draft? This cannot be undone.'}
@@ -625,7 +625,7 @@ export function InteractionEditor({ id }: { id: string | null }) {
                     <span>
                       <span className="ix-kind-name">{TYPE_LABEL[k]}</span>
                       <span className="ix-kind-hint">
-                        {k === 'vote' ? '2–4 photos, readers pick one' : '2–6 places, 1–5 stars each'}
+                        {k === 'vote' ? '2–4 photos, readers pick one' : 'A question; 2–6 options, 1–5 stars each'}
                       </span>
                     </span>
                   </button>
@@ -653,11 +653,11 @@ export function InteractionEditor({ id }: { id: string | null }) {
 
                 <div className="col-12">
                   <Field
-                    label={d.type === 'vote' ? 'Question' : 'Title'}
+                    label="Question"
                     invalid={titleProblem !== null}
                     note={
                       titleProblem ??
-                      (d.type === 'vote' ? 'What readers are choosing between.' : 'For example, “Best coffee in Kathmandu”.')
+                      (d.type === 'vote' ? 'What readers are choosing between.' : 'For example, “How was the service at the new bus park?”')
                     }
                     noteTone={titleProblem !== null ? 'bad' : 'default'}
                     counter={count(d.title.trim().length, INTERACTION_LIMITS.title.max)}
@@ -758,7 +758,7 @@ export function InteractionEditor({ id }: { id: string | null }) {
                   {row.closedAt !== null && <span>Closed {dateTime(row.closedAt)}</span>}
                 </p>
                 <p className="field-note ix-locked-note">
-                  Readers have answered what they saw, so its {noun === 'business' ? 'businesses' : 'candidates'}{' '}
+                  Readers have answered what they saw, so its {noun}s{' '}
                   and photos are locked.
                 </p>
                 {row.phase !== 'closed' && (
@@ -799,21 +799,23 @@ export function InteractionEditor({ id }: { id: string | null }) {
           {!isDraft && row !== null && (
             <Panel
               title="Results"
-              note={`${row.results.total.toLocaleString()} ${row.type === 'vote' ? 'votes' : 'ratings'}${
-                row.results.today > 0 ? ` · ${row.results.today.toLocaleString()} today` : ''
-              }`}
+              note={`${
+                row.results.type === 'vote'
+                  ? countOf(row.results.total, 'vote')
+                  : `${countOf(row.results.respondents, 'person', 'people')} rated`
+              }${row.results.today > 0 ? ` · ${row.results.today.toLocaleString()} today` : ''}`}
             >
               {row.type === 'vote' ? (
                 <VoteResults options={row.options} results={row.results} />
               ) : (
-                <RatingResults options={row.options} results={row.results} />
+                <RatingResults options={row.options} results={row.results} detailed />
               )}
             </Panel>
           )}
 
           {isDraft && (
             <Panel
-              title={`3 · ${d.type === 'vote' ? 'Candidates' : 'Businesses'}`}
+              title={`3 · ${d.type === 'vote' ? 'Candidates' : 'Options'}`}
               note={`${d.options.length} of ${range.max}${d.type === 'vote' ? ' · each needs a photo' : ' · photos optional'}`}
             >
               {optionsProblem !== null && <Banner tone="error">{optionsProblem}</Banner>}

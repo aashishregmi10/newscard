@@ -42,7 +42,7 @@ const CASES: Array<[string, server.InteractionShape]> = [
   ['no closing date', { ...base, closesAt: null }],
   ['closing before opening', { ...base, opensAt: '2026-12-02T00:00:00Z' }],
   [
-    'a rating with seven businesses',
+    'a rating with seven options',
     {
       ...base,
       type: 'rating',

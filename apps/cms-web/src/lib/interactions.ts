@@ -17,10 +17,10 @@ export const INTERACTION_LIMITS = {
   detail: { max: 60 },
   credit: { min: 2, max: 120 },
   /**
-   * How many businesses or candidates. A vote is a 2×2 grid, so four at most.
-   * A rating is a list of rows, and six is what fits on one card at the
-   * reader's normal text size without the card having to scroll inside a feed
-   * that scrolls.
+   * How many options or candidates. A vote is a 2×2 grid, so four at most.
+   * A rating is a list of rows, each a name over five stars, and six is what
+   * fits on one card at the reader's normal text size without the card having
+   * to scroll inside a feed that scrolls.
    */
   options: { rating: { min: 2, max: 6 }, vote: { min: 2, max: 4 } },
 } as const;
@@ -53,7 +53,7 @@ function sameNameKey(name: string): string {
 export function interactionProblems(v: InteractionShape): InteractionProblem[] {
   const out: InteractionProblem[] = [];
   const L = INTERACTION_LIMITS;
-  const noun = v.type === 'vote' ? 'candidate' : 'business';
+  const noun = v.type === 'vote' ? 'candidate' : 'option';
 
   const title = v.title.trim();
   if (title.length < L.title.min) {
@@ -63,7 +63,7 @@ export function interactionProblems(v: InteractionShape): InteractionProblem[] {
         title.length === 0
           ? v.type === 'vote'
             ? 'Write the question readers are voting on.'
-            : 'Write a title, such as "Best coffee in Kathmandu".'
+            : 'Write the question readers are rating, such as "How was the service?"'
           : `At least ${L.title.min} characters.`,
     });
   } else if (title.length > L.title.max) {
@@ -72,11 +72,11 @@ export function interactionProblems(v: InteractionShape): InteractionProblem[] {
 
   const range = L.options[v.type];
   if (v.options.length < range.min) {
-    out.push({ field: 'options', message: `Add at least ${range.min} ${noun === 'business' ? 'businesses' : 'candidates'}.` });
+    out.push({ field: 'options', message: `Add at least ${range.min} ${noun}s.` });
   } else if (v.options.length > range.max) {
     out.push({
       field: 'options',
-      message: `At most ${range.max} ${noun === 'business' ? 'businesses' : 'candidates'}${v.type === 'vote' ? ' — the card is a 2×2 grid' : ''}.`,
+      message: `At most ${range.max} ${noun}s${v.type === 'vote' ? ' — the card is a 2×2 grid' : ''}.`,
     });
   }
 

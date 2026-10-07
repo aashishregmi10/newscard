@@ -19,18 +19,27 @@ import { requireReader, signInWithGoogle, signOut } from '../services/readers.se
  *   GET    /v1/interactions/:id/me        this reader's answers, and the results they may see
  *   GET    /v1/interactions/:id/results   what anyone may see
  *   POST   /v1/interactions/:id/vote      one vote, final
- *   POST   /v1/interactions/:id/rating    one rating per business, final
+ *   POST   /v1/interactions/:id/ratings   stars for every option, sent together, final
  *
  * "One" is the database's rule — unique indexes on (interaction, reader) and
- * (interaction, business, reader) — so two taps arriving together cannot both
+ * (interaction, option, reader) — so two taps arriving together cannot both
  * count. The second is told it was already recorded, not that it failed.
+ *
+ * A rating is answered whole, as a form is: stars for every option in one
+ * request, so every reader counted has rated everything and the options'
+ * averages are over the same people.
  */
 
 export const interactionRoutes = Router();
 
 const SessionBody = z.object({ idToken: z.string().min(20).max(4096) });
 const VoteBody = z.object({ optionId: z.string().min(1).max(40) });
-const RatingBody = z.object({ optionId: z.string().min(1).max(40), stars: Stars });
+const RatingsBody = z.object({
+  ratings: z
+    .array(z.object({ optionId: z.string().min(1).max(40), stars: Stars }))
+    .min(1)
+    .max(20),
+});
 
 async function interactionOr404(idParam: unknown): Promise<InteractionDoc> {
   const id = String(idParam ?? '');
@@ -60,7 +69,7 @@ async function stateFor(doc: InteractionDoc, readerId: ObjectId | null): Promise
     }
   }
 
-  const mayShow = doc.type === 'rating' || closed || myVote !== null;
+  const mayShow = closed || myVote !== null || myRatings.length > 0;
   return {
     id: String(doc._id),
     closed,
@@ -170,29 +179,38 @@ interactionRoutes.post(
 );
 
 interactionRoutes.post(
-  '/interactions/:id/rating',
+  '/interactions/:id/ratings',
   interactionAnswerLimit,
   requireReader,
   asyncRoute(async (req, res) => {
-    const parsed = RatingBody.safeParse(req.body);
-    if (!parsed.success) throw new AppError('BAD_REQUEST', 'Choose one to five stars.');
+    const parsed = RatingsBody.safeParse(req.body);
+    if (!parsed.success) throw new AppError('BAD_REQUEST', 'Give each option one to five stars.');
     const doc = await interactionOr404(req.params.id);
     if (doc.type !== 'rating') throw new AppError('BAD_REQUEST', 'This is a vote, not a rating.');
     assertOpen(doc);
-    const option = doc.options.find((o) => o.id === parsed.data.optionId);
-    if (!option) throw new AppError('BAD_REQUEST', 'No such business.');
+    const given = parsed.data.ratings;
+    const ids = new Set(given.map((r) => r.optionId));
+    if (ids.size !== given.length || ids.size !== doc.options.length || doc.options.some((o) => !ids.has(o.id))) {
+      throw new AppError('BAD_REQUEST', 'Give every option stars, once each.');
+    }
 
+    /* In the options' order, and stopping at the first that is already there:
+     * a second copy of the same request then adds nothing. */
+    const at = new Date();
     try {
-      await interactionCollections(getDb()).ratings.insertOne({
-        interactionId: doc._id,
-        optionId: option.id,
-        readerId: req.readerId!,
-        stars: parsed.data.stars,
-        createdAt: new Date(),
-      } as never);
+      await interactionCollections(getDb()).ratings.insertMany(
+        doc.options.map((o) => ({
+          interactionId: doc._id,
+          optionId: o.id,
+          readerId: req.readerId!,
+          stars: given.find((r) => r.optionId === o.id)!.stars,
+          createdAt: at,
+        })) as never,
+        { ordered: true },
+      );
     } catch (e) {
       if (isDuplicate(e)) {
-        throw new AppError('INVALID_TRANSITION', `You have already rated ${option.name}. A rating cannot be changed.`, {
+        throw new AppError('INVALID_TRANSITION', 'You have already rated this. A rating cannot be changed.', {
           state: await stateFor(doc, req.readerId!),
         });
       }

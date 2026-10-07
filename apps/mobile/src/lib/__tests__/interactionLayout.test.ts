@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { leaderIndex, ratingTone, voteChromeHeight, voteTileSize } from '../interactionLayout';
+import { leaderIndex, ratedCount, ratingTone, starFills, voteChromeHeight, voteTileSize } from '../interactionLayout';
 
 describe('voteTileSize', () => {
   it('makes two tall tiles in one row for two candidates', () => {
@@ -43,5 +43,21 @@ describe('leaderIndex', () => {
     expect(leaderIndex([3, 9, 1])).toBe(1);
     expect(leaderIndex([5, 5, 1])).toBe(-1);
     expect(leaderIndex([0, 0])).toBe(-1);
+  });
+});
+
+describe('starFills', () => {
+  it('fills whole stars, then part of the next, then none', () => {
+    expect(starFills(3.4)).toEqual([1, 1, 1, 0.4, 0]);
+    expect(starFills(5)).toEqual([1, 1, 1, 1, 1]);
+    expect(starFills(1)).toEqual([1, 0, 0, 0, 0]);
+    expect(starFills(0)).toEqual([0, 0, 0, 0, 0]);
+  });
+});
+
+describe('ratedCount', () => {
+  it('counts only the options given stars, and only this card’s', () => {
+    expect(ratedCount({ a: 4, b: 0, z: 5 }, ['a', 'b', 'c'])).toBe(1);
+    expect(ratedCount({}, ['a', 'b'])).toBe(0);
   });
 });

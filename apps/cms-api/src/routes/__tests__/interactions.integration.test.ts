@@ -250,4 +250,31 @@ describe('publishing, and what is locked after', () => {
     const percents = r.body.interaction.results.options.map((o: { percent: number }) => o.percent);
     expect(percents).toEqual([50, 25, 25, 0]);
   });
+
+  it('breaks a rating down by stars, and counts the people who rated', async () => {
+    const made = await send('post', '/api/cms/interactions').send(rating());
+    const id = made.body.interaction.id as string;
+    await send('post', `/api/cms/interactions/${id}/publish`);
+    const [a, b] = made.body.interaction.options.map((o: { id: string }) => o.id);
+    const twoDaysAgo = new Date(Date.now() - 2 * 86_400_000);
+    /* Three readers, each rating both: (5, 4), (4, 2) today, (1, 3) two days ago. */
+    const forms: Array<[number, number, Date]> = [
+      [5, 4, new Date()],
+      [4, 2, new Date()],
+      [1, 3, twoDaysAgo],
+    ];
+    await interactionCollections(getDb()).ratings.insertMany(
+      forms.flatMap(([x, y, at]) => {
+        const readerId = new ObjectId();
+        return [
+          { _id: new ObjectId(), interactionId: new ObjectId(id), optionId: a, readerId, stars: x, createdAt: at },
+          { _id: new ObjectId(), interactionId: new ObjectId(id), optionId: b, readerId, stars: y, createdAt: at },
+        ];
+      }),
+    );
+    const r = await send('get', `/api/cms/interactions/${id}`);
+    expect(r.body.interaction.results).toMatchObject({ total: 6, respondents: 3, today: 2, average: 3.2 });
+    expect(r.body.interaction.results.options[0]).toMatchObject({ ratings: 3, average: 3.3, breakdown: [1, 0, 0, 1, 1] });
+    expect(r.body.interaction.results.options[1]).toMatchObject({ ratings: 3, average: 3, breakdown: [0, 1, 1, 1, 0] });
+  });
 });

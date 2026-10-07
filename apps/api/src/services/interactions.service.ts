@@ -139,12 +139,16 @@ export function toResultsDto(r: InteractionResults): InteractionResultsDto {
     return {
       type: 'vote',
       total: r.total,
+      respondents: r.total,
+      average: null,
       options: r.options.map((o) => ({ id: o.id, votes: o.votes, percent: o.percent, ratings: 0, average: null })),
     };
   }
   return {
     type: 'rating',
     total: r.total,
+    respondents: r.respondents,
+    average: r.average,
     options: r.options.map((o) => ({ id: o.id, votes: 0, percent: 0, ratings: o.ratings, average: o.average })),
   };
 }
