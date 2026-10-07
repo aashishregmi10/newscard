@@ -69,6 +69,8 @@ interface Actions {
   /** Puts a removed story back where it was — the Saved screen's Undo. */
   restore: (card: Card, index: number) => void;
   clear: () => void;
+  /** The saved stories now, without subscribing to them. */
+  current: () => Card[];
 }
 
 interface Shared extends Actions {
@@ -107,6 +109,7 @@ export function BookmarksProvider({ children }: { children: ReactNode }) {
           s.has(card.id) ? s.getItems().filter((i) => i.id !== card.id) : [card, ...s.getItems()],
         ),
       remove: (id) => s.set(s.getItems().filter((i) => i.id !== id)),
+      current: () => s.getItems(),
       restore: (card, index) => {
         if (s.has(card.id)) return;
         const next = [...s.getItems()];
@@ -140,6 +143,7 @@ export function useBookmarks(): Actions & { ready: boolean; items: Card[]; has: 
       remove: shared.remove,
       restore: shared.restore,
       clear: shared.clear,
+      current: shared.current,
     }),
     [shared, items],
   );
@@ -153,6 +157,6 @@ export function useIsSaved(id: string): boolean {
 
 /** Save, remove and clear, without subscribing to the list. */
 export function useBookmarkActions(): Actions {
-  const { toggle, remove, restore, clear } = useShared();
-  return { toggle, remove, restore, clear };
+  const { toggle, remove, restore, clear, current } = useShared();
+  return { toggle, remove, restore, clear, current };
 }

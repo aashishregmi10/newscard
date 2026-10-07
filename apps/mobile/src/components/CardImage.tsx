@@ -45,6 +45,8 @@ interface Props {
   rendition?: 'sm' | 'md' | 'lg';
   /** Tapping the photograph — the card opens it full screen. */
   onPress?: () => void;
+  /** The card's language, for the "load image" and "unavailable" words. */
+  lang?: 'ne' | 'en';
   /** What a screen reader says that tap does. */
   pressLabel?: string;
 }
@@ -64,7 +66,9 @@ function CardImageInner({
   rendition = 'md',
   onPress,
   pressLabel,
+  lang = 'en',
 }: Props) {
+  const ne = lang === 'ne';
   const [loaded, setLoaded] = useState(false);
   /**
    * A spinner only for an image that is actually slow.
@@ -131,9 +135,9 @@ function CardImageInner({
             onPress={() => setManuallyRequested(true)}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="Load image"
+            accessibilityLabel={ne ? 'तस्बिर लोड गर्नुहोस्' : 'Load image'}
           >
-            <Text style={styles.loadBtnText}>Load image</Text>
+            <Text style={styles.loadBtnText}>{ne ? 'तस्बिर लोड गर्नुहोस्' : 'Load image'}</Text>
             <Text style={styles.loadBtnSize}>~{APPROX_KB.sm} KB</Text>
           </Pressable>
         </View>
@@ -141,7 +145,7 @@ function CardImageInner({
 
       {failed && (
         <View style={styles.centre}>
-          <Text style={styles.failText}>image unavailable</Text>
+          <Text style={styles.failText}>{ne ? 'तस्बिर उपलब्ध छैन' : 'image unavailable'}</Text>
         </View>
       )}
     </Region>

@@ -133,6 +133,7 @@ function NewsCardInner({
       )}
 
       <CardImage
+        lang={card.language}
         image={card.image}
         theme={theme}
         style={imageStyle}

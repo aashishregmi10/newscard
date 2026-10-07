@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { VideoCard } from '../../src/components/VideoCard';
-import { fetchVideos, FeedError, type VideoCard as VideoCardType } from '../../src/api/client';
+import { failureText, fetchVideos, FeedError, type VideoCard as VideoCardType } from '../../src/api/client';
 import { useSettings } from '../../src/state/SettingsContext';
 import { useNetwork } from '../../src/state/NetworkContext';
 import { textSize } from '../../src/theme/tokens';
@@ -77,7 +77,7 @@ export default function VideosScreen() {
       setActiveId(page.items[0]?.id ?? null);
     } catch (e) {
       const fe = e instanceof FeedError ? e : null;
-      setError(fe?.message ?? 'Something went wrong.');
+      setError(failureText(fe?.kind, languages.includes('ne') ? 'ne' : 'en'));
       setItems([]);
     }
   }, [languages]);

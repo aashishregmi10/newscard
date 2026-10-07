@@ -13,6 +13,7 @@ import {
   type ViewToken,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { CardBoundary } from './CardBoundary';
 import { NewsCard } from './NewsCard';
 import { CardSkeleton } from './CardSkeleton';
 import { SponsoredCard } from './SponsoredCard';
@@ -21,7 +22,16 @@ import { useFeed } from '../hooks/useFeed';
 import { useFilters } from '../state/FiltersContext';
 import { useDevice } from '../state/DeviceContext';
 import { useNetwork } from '../state/NetworkContext';
-import { isAd, isInteraction, isStory, type AdCard, type Card, type FeedEntry, type InlineAd } from '../api/client';
+import {
+  failureText,
+  isAd,
+  isInteraction,
+  isStory,
+  type AdCard,
+  type Card,
+  type FeedEntry,
+  type InlineAd,
+} from '../api/client';
 import {
   noteAdVisible,
   noteAdHidden,
@@ -236,37 +246,40 @@ function CategoryFeedInner({
   );
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<FeedEntry>) =>
-      isInteraction(item) ? (
-        <InteractionCard
-          card={item}
-          theme={theme}
-          height={height}
-          textScale={textScale}
-          dataSaver={dataSaver}
-        />
-      ) : isAd(item) ? (
-        <SponsoredCard
-          ad={item}
-          theme={theme}
-          height={height}
-          textScale={textScale}
-          dataSaver={dataSaver}
-          lang={item.language}
-          onClick={handleAdClick}
-        />
-      ) : (
-        <NewsCard
-          card={item}
-          theme={theme}
-          height={height}
-          textScale={textScale}
-          dataSaver={dataSaver}
-          onMenu={onMenu}
-          inlineAd={item.inlineAd}
-          onInlineAd={handleInlineAdClick}
-        />
-      ),
+    ({ item }: ListRenderItemInfo<FeedEntry>) => (
+      <CardBoundary theme={theme} height={height} lang={item.language === 'en' ? 'en' : 'ne'}>
+        {isInteraction(item) ? (
+          <InteractionCard
+            card={item}
+            theme={theme}
+            height={height}
+            textScale={textScale}
+            dataSaver={dataSaver}
+          />
+        ) : isAd(item) ? (
+          <SponsoredCard
+            ad={item}
+            theme={theme}
+            height={height}
+            textScale={textScale}
+            dataSaver={dataSaver}
+            lang={item.language}
+            onClick={handleAdClick}
+          />
+        ) : (
+          <NewsCard
+            card={item}
+            theme={theme}
+            height={height}
+            textScale={textScale}
+            dataSaver={dataSaver}
+            onMenu={onMenu}
+            inlineAd={item.inlineAd}
+            onInlineAd={handleInlineAdClick}
+          />
+        )}
+      </CardBoundary>
+    ),
     [theme, height, textScale, dataSaver, handleAdClick, handleInlineAdClick, onMenu],
   );
 
@@ -361,7 +374,7 @@ function CategoryFeedInner({
           ? 'सर्भरसँग जोड्न सकिएन। सुरक्षित समाचार देखाइँदै।'
           : 'Could not reach the server. Showing saved stories.'
         : error
-          ? error.message
+          ? failureText(error.kind, labelLang === 'ne' ? 'ne' : 'en')
           : fromCache
             ? labelLang === 'ne'
               ? 'सुरक्षित प्रतिलिपि देखाइँदै…'
@@ -386,7 +399,7 @@ function CategoryFeedInner({
               : 'Nothing here yet'}
         </Text>
         <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
-          {error?.message ??
+          {(error ? failureText(error.kind, labelLang === 'ne' ? 'ne' : 'en') : null) ??
             (labelLang === 'ne'
               ? 'यो श्रेणीमा अहिले कुनै समाचार छैन।'
               : 'This category has no stories right now.')}

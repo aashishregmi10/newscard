@@ -353,9 +353,9 @@ export default function SettingsScreen() {
                 value={s.themeMode}
                 onChange={s.setThemeMode}
                 options={[
-                  { key: 'system', label: 'Auto' },
-                  { key: 'light', label: 'Light' },
-                  { key: 'dark', label: 'Dark' },
+                  { key: 'system', label: ne ? 'स्वतः' : 'Auto' },
+                  { key: 'light', label: ne ? 'उज्यालो' : 'Light' },
+                  { key: 'dark', label: ne ? 'अँध्यारो' : 'Dark' },
                 ]}
               />
             }

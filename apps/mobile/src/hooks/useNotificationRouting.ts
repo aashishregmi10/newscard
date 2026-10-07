@@ -19,6 +19,12 @@ import { targetFrom, type NotificationData } from '../lib/notificationTarget';
  *          getLastNotificationResponseAsync. Handling only the warm case is
  *          the classic bug: it works in every casual test, because testers
  *          rarely force-stop the app first.
+ *
+ * And the cold tap arrives before there is anywhere to go: the root layout
+ * shows a blank surface, the language choice or the sign-in screen before it
+ * mounts the navigator, and expo-router throws on a push before then — the
+ * story was lost and the reader landed on the feed (launch review, 7 Oct
+ * 2026). So a target waits until the caller says the navigator is up.
  */
 
 /**
@@ -27,16 +33,31 @@ import { targetFrom, type NotificationData } from '../lib/notificationTarget';
  * remains here is the subscription, which cannot be.
  */
 
-export function useNotificationRouting(): void {
+export function useNotificationRouting(navigatorReady: boolean): void {
   /** Guards against navigating twice when a cold-start tap also fires the
    *  listener on some platforms. */
   const handled = useRef<string | null>(null);
+  /** A tap that arrived before the navigator; opened once it is up. */
+  const pending = useRef<string | null>(null);
+  const ready = useRef(navigatorReady);
+  ready.current = navigatorReady;
 
   const go = (path: string) => {
     if (handled.current === path) return;
+    if (!ready.current) {
+      pending.current = path;
+      return;
+    }
     handled.current = path;
     router.push(path);
   };
+
+  useEffect(() => {
+    if (!navigatorReady || pending.current === null) return;
+    const path = pending.current;
+    pending.current = null;
+    go(path);
+  }, [navigatorReady]);
 
   useEffect(() => {
     let alive = true;

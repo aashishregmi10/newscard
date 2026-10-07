@@ -46,8 +46,8 @@ export default function SavedScreen() {
           </Text>
           <Text style={[styles.emptyBody, { color: theme.textSecondary }]}>
             {lang === 'ne'
-              ? 'कार्डमा ♡ थिचेर समाचार सुरक्षित गर्नुहोस्। सुरक्षित समाचार इन्टरनेट नभए पनि पढ्न सकिन्छ।'
-              : 'Tap ♡ on a card to save it. Saved stories can be read without a connection.'}
+              ? 'कार्डको बुकमार्क चिन्ह थिचेर समाचार सुरक्षित गर्नुहोस्। सुरक्षित समाचार इन्टरनेट नभए पनि पढ्न सकिन्छ।'
+              : 'Tap the bookmark on a card to save it. Saved stories can be read without a connection.'}
           </Text>
         </View>
       ) : (

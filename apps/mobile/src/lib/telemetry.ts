@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
-import { API_BASE, type Card } from '../api/client';
+import { API_BASE, fetchWithTimeout, type Card } from '../api/client';
 
 /**
  * Two things the app was not doing, both of which left us blind.
@@ -108,11 +108,12 @@ export async function flushEvents(): Promise<void> {
   const batch = queue.slice(0, MAX_BATCH);
   queue = queue.slice(MAX_BATCH);
   try {
-    await fetch(`${API_BASE}/v1/events`, {
+    // fetchWithTimeout, not AbortSignal.timeout: React Native may not have the
+    // latter, and its absence threw here — dropping every batch unseen.
+    await fetchWithTimeout(`${API_BASE}/v1/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ deviceId, events: batch }),
-      signal: AbortSignal.timeout(8000),
     });
   } catch {
     // Dropped on purpose. See the note at the top of this file.
@@ -146,12 +147,11 @@ export function reportError(error: unknown, context?: string, fatal = false): vo
   // Sent immediately, not batched: the app may be about to die, and a fatal
   // error held in a queue for twenty-five seconds is a fatal error nobody
   // hears about.
-  void fetch(`${API_BASE}/v1/client-errors`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(6000),
-  }).catch(() => undefined);
+  void fetchWithTimeout(
+    `${API_BASE}/v1/client-errors`,
+    { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) },
+    6000,
+  ).catch(() => undefined);
 }
 
 /**

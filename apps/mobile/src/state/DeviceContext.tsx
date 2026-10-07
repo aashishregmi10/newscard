@@ -12,7 +12,7 @@ import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
-import { API_BASE } from '../api/client';
+import { API_BASE, fetchWithTimeout } from '../api/client';
 import { useSettings } from './SettingsContext';
 import {
   safeNotify,
@@ -45,6 +45,20 @@ const pushTokenOptions = EAS_PROJECT_ID ? { projectId: EAS_PROJECT_ID } : undefi
 const DEVICE_ID_KEY = 'saar.deviceId.v1';
 const DEVICE_TOKEN_KEY = 'saar.deviceToken.v1';
 const PROMPT_STATE_KEY = 'saar.notifPrompt.v1';
+/** The reader's notification settings, kept here too: a change made offline,
+ *  or before the device ever registered, is sent once a request gets through
+ *  rather than lost on the next launch. */
+const NOTIF_PREFS_KEY = 'saar.notifPrefs.v1';
+
+interface SavedPrefs {
+  prefs: NotifPrefs;
+  /** Changed here and not yet confirmed by the server. */
+  unsent: boolean;
+}
+
+function savePrefs(saved: SavedPrefs): void {
+  void AsyncStorage.setItem(NOTIF_PREFS_KEY, JSON.stringify(saved)).catch(() => undefined);
+}
 
 /**
  * Cards a reader must get through before we ask for notification permission.
@@ -130,7 +144,7 @@ async function uuid(): Promise<string> {
 }
 
 export function DeviceProvider({ children }: { children: ReactNode }) {
-  const { languages } = useSettings();
+  const { languages, ready: settingsReady } = useSettings();
   const [ready, setReady] = useState(false);
   const [deviceId, setDeviceId] = useState<string | null>(null);
   const [pushToken, setPushToken] = useState<string | null>(null);
@@ -147,11 +161,35 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
   }, []);
   const [promptDismissed, setPromptDismissed] = useState(false);
 
+  /** Send preferences (and languages) to the server; adopt what it stored. */
+  const sendPrefs = useCallback(
+    async (id: string, deviceToken: string, next: NotifPrefs | null, langs: Array<'ne' | 'en'>) => {
+      try {
+        const r = await fetchWithTimeout(`${API_BASE}/v1/devices/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${deviceToken}` },
+          body: JSON.stringify({ ...(next ? { notif: next } : {}), langPrefs: langs }),
+        });
+        if (!r.ok) return;
+        // The server clamps dailyCap; adopt what it actually stored so the UI
+        // cannot claim a value the server rejected.
+        const body = (await r.json()) as { notif?: NotifPrefs };
+        if (body.notif) {
+          setPrefsState(body.notif);
+          savePrefs({ prefs: body.notif, unsent: false });
+        }
+      } catch {
+        // Kept on the phone, marked unsent: the next launch tries again.
+      }
+    },
+    [],
+  );
+
   /** Register (or refresh) with the API. Idempotent on deviceId. */
   const register = useCallback(
     async (id: string, pushToken: string | null) => {
       try {
-        const res = await fetch(`${API_BASE}/v1/devices`, {
+        const res = await fetchWithTimeout(`${API_BASE}/v1/devices`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -167,14 +205,23 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
         const body = (await res.json()) as { deviceToken: string; notif: NotifPrefs };
         setToken(body.deviceToken);
         await AsyncStorage.setItem(DEVICE_TOKEN_KEY, body.deviceToken).catch(() => undefined);
-        // Trust the server's copy: it is authoritative and already clamped.
-        if (body.notif) setPrefsState(body.notif);
+        // A change the server never received goes now; otherwise the server's
+        // copy is authoritative and already clamped.
+        const saved = await AsyncStorage.getItem(NOTIF_PREFS_KEY)
+          .then((raw) => (raw ? (JSON.parse(raw) as SavedPrefs) : null))
+          .catch(() => null);
+        if (saved?.unsent) {
+          await sendPrefs(id, body.deviceToken, saved.prefs, languages);
+        } else if (body.notif) {
+          setPrefsState(body.notif);
+          savePrefs({ prefs: body.notif, unsent: false });
+        }
       } catch {
         // Registration is best-effort. Failing it must never block reading —
         // the entire app works without notifications.
       }
     },
-    [languages],
+    [languages, sendPrefs],
   );
 
   useEffect(() => {
@@ -182,18 +229,37 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
     // channel, a notification that arrives while the app is open is simply
     // never shown, and every layer above reports success.
     configurePushRuntime();
+  }, []);
+
+  /*
+   * Register once the reader's settings have been read — not before. It used
+   * to run at once, with the default languages (both), so a Nepali-only reader
+   * was registered for English pushes too (launch review, 7 Oct 2026).
+   */
+  const started = useRef(false);
+  useEffect(() => {
+    if (!settingsReady || started.current) return;
+    started.current = true;
 
     void (async () => {
       const id = await uuid();
       setDeviceId(id);
 
-      const [savedToken, promptState, perms] = await Promise.all([
+      const [savedToken, promptState, perms, savedPrefs] = await Promise.all([
         AsyncStorage.getItem(DEVICE_TOKEN_KEY).catch(() => null),
         AsyncStorage.getItem(PROMPT_STATE_KEY).catch(() => null),
         safeNotify((n) => n.getPermissionsAsync(), null),
+        AsyncStorage.getItem(NOTIF_PREFS_KEY).catch(() => null),
       ]);
 
       if (savedToken) setToken(savedToken);
+      if (savedPrefs) {
+        try {
+          setPrefsState((JSON.parse(savedPrefs) as SavedPrefs).prefs);
+        } catch {
+          // A corrupt copy is ignored; the server's arrives with registration.
+        }
+      }
       if (promptState === 'dismissed') setPromptDismissed(true);
       if (perms) setPermission(perms.granted ? 'granted' : perms.canAskAgain ? 'undetermined' : 'denied');
 
@@ -218,7 +284,22 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
       setReady(true);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [settingsReady]);
+
+  /* A language change reaches the server on its own, not only alongside a
+     notification change — it decides which pushes this phone is sent. */
+  const sentLanguages = useRef<string | null>(null);
+  useEffect(() => {
+    if (!ready || !deviceId || !token) return;
+    const key = languages.join(',');
+    if (sentLanguages.current === null) {
+      sentLanguages.current = key; // registration just sent these
+      return;
+    }
+    if (sentLanguages.current === key) return;
+    sentLanguages.current = key;
+    void sendPrefs(deviceId, token, null, languages);
+  }, [ready, deviceId, token, languages, sendPrefs]);
 
   const requestPermission = useCallback(async (): Promise<boolean> => {
     const res = await safeNotify((n) => n.requestPermissionsAsync(), null);
@@ -249,22 +330,11 @@ export function DeviceProvider({ children }: { children: ReactNode }) {
     (patch: Partial<NotifPrefs>) => {
       const next = { ...prefs, ...patch, channels: { ...prefs.channels, ...patch.channels } };
       setPrefsState(next); // optimistic: the control responds immediately
-      if (!deviceId || !token) return;
-      void fetch(`${API_BASE}/v1/devices/${deviceId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ notif: next, langPrefs: languages }),
-      })
-        .then(async (r) => {
-          if (!r.ok) return;
-          // The server clamps dailyCap; adopt what it actually stored so the UI
-          // cannot claim a value the server rejected.
-          const body = (await r.json()) as { notif?: NotifPrefs };
-          if (body.notif) setPrefsState(body.notif);
-        })
-        .catch(() => undefined);
+      savePrefs({ prefs: next, unsent: true });
+      if (!deviceId || !token) return; // sent with the next registration
+      void sendPrefs(deviceId, token, next, languages);
     },
-    [prefs, deviceId, token, languages],
+    [prefs, deviceId, token, languages, sendPrefs],
   );
 
   const dismissPrompt = useCallback(() => {

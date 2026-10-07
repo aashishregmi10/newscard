@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
-import { API_BASE } from '../api/client';
-import { getCards, purge } from '../db/cache';
-import { useBookmarks } from '../state/BookmarksContext';
+import type { Card } from '../api/client';
+import { API_BASE, fetchWithTimeout } from '../api/client';
+import { purge, recentIds } from '../db/cache';
+import { useBookmarkActions } from '../state/BookmarksContext';
 
 /**
  * Purge withdrawn stories from the local cache.  Spec Ch. 9.7.
@@ -21,21 +22,17 @@ import { useBookmarks } from '../state/BookmarksContext';
  *  feed anyway, and checking it wastes the reader's data. */
 const CHECK_WINDOW_HOURS = 72;
 
-async function runPurge(removeBookmark: (id: string) => void): Promise<number> {
-  // Categories are checked together; the cache is keyed by category, and `top`
-  // plus `nepal` covers the overwhelming majority of what a reader holds.
-  const cached = await getCards('top', ['ne', 'en'], 200).catch(() => []);
-  if (cached.length === 0) return 0;
-
+async function runPurge(saved: Card[], removeBookmark: (id: string) => void): Promise<number> {
+  // Every section's cache, not only `top`: a story withdrawn from Sport and
+  // cached there stayed readable offline (launch review, 7 Oct 2026). And every
+  // bookmark, whatever its age — a bookmark outlives the cache window, and a
+  // promise to keep a story is not a promise to keep one we withdrew.
   const cutoff = Date.now() - CHECK_WINDOW_HOURS * 60 * 60 * 1000;
-  const ids = cached
-    .filter((c) => Date.parse(c.publishedAt) >= cutoff)
-    .map((c) => c.id)
-    .slice(0, 500);
-
+  const cached = await recentIds(cutoff).catch(() => [] as string[]);
+  const ids = [...new Set([...saved.map((c) => c.id), ...cached])].slice(0, 500);
   if (ids.length === 0) return 0;
 
-  const res = await fetch(`${API_BASE}/v1/articles/validate`, {
+  const res = await fetchWithTimeout(`${API_BASE}/v1/articles/validate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ ids }),
@@ -55,7 +52,9 @@ async function runPurge(removeBookmark: (id: string) => void): Promise<number> {
 }
 
 export function useRetractionPurge(): void {
-  const { remove } = useBookmarks();
+  /* The actions, not the list: subscribing here re-rendered the whole app
+     (this runs in the root layout) on every save and unsave. */
+  const { remove, current } = useBookmarkActions();
   const running = useRef(false);
 
   useEffect(() => {
@@ -63,7 +62,7 @@ export function useRetractionPurge(): void {
       // Foreground events can arrive in bursts; one pass at a time is enough.
       if (running.current) return;
       running.current = true;
-      runPurge(remove)
+      runPurge(current(), remove)
         .then((n) => {
           if (n > 0) console.info(`[cache] removed ${n} withdrawn stor${n === 1 ? 'y' : 'ies'}`);
         })
@@ -82,5 +81,5 @@ export function useRetractionPurge(): void {
       if (state === 'active') run();
     });
     return () => sub.remove();
-  }, [remove]);
+  }, [remove, current]);
 }

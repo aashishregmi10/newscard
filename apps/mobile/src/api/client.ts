@@ -143,8 +143,48 @@ export class FeedError extends Error {
   }
 }
 
+/**
+ * What to tell a reader about a failure, in their language. The messages
+ * thrown above are for logs; these are for screens — a Nepali reader was being
+ * shown "The server returned 503." (launch review, 7 Oct 2026).
+ */
+export function failureText(kind: FailureKind | string | undefined, lang: 'ne' | 'en'): string {
+  const ne = lang === 'ne';
+  switch (kind) {
+    case 'offline':
+      return ne
+        ? 'सर्भरसँग जोड्न सकिएन। इन्टरनेट जाँचेर फेरि प्रयास गर्नुहोस्।'
+        : 'Could not reach the server. Check your connection and try again.';
+    case 'timeout':
+      return ne ? 'सर्भरले समयमै जवाफ दिएन। फेरि प्रयास गर्नुहोस्।' : 'The server took too long to answer. Try again.';
+    case 'server':
+      return ne
+        ? 'सर्भरमा समस्या आयो। केही बेरपछि फेरि प्रयास गर्नुहोस्।'
+        : 'The server had a problem. Try again in a moment.';
+    default:
+      return ne ? 'केही गडबड भयो। फेरि प्रयास गर्नुहोस्।' : 'Something went wrong. Try again.';
+  }
+}
+
 /** Spec Ch. 2.6: abort at 8s and fall back to cache rather than hanging. */
 const TIMEOUT_MS = 8000;
+
+/**
+ * fetch, with the feed's ceiling. Android's HTTP client in React Native never
+ * times out on its own (OkHttp's timeouts are set to 0), so a request into a
+ * dead connection waits forever: a notification's story stuck on its skeleton,
+ * a withdrawn-story check that never runs again that session (launch review,
+ * 7 Oct 2026). Every request goes through this or carries its own timer.
+ */
+export async function fetchWithTimeout(url: string, init: RequestInit = {}, ms = TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), ms);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export async function fetchFeed(opts: {
   languages: Array<'ne' | 'en'>;
@@ -237,7 +277,12 @@ export class ArticleGoneError extends Error {
 
 /** Resolve a deep link. Spec Ch. 6.6. */
 export async function fetchArticle(slug: string): Promise<Card> {
-  const res = await fetch(`${API_BASE}/v1/articles/${encodeURIComponent(slug)}`);
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(`${API_BASE}/v1/articles/${encodeURIComponent(slug)}`);
+  } catch {
+    throw new FeedError('offline', 'Could not reach the server.');
+  }
   if (res.status === 410) throw new ArticleGoneError();
   if (!res.ok) throw new FeedError('server', `The server returned ${res.status}.`);
   const body = (await res.json()) as { item?: Card };
@@ -253,7 +298,7 @@ export interface CategoryOption {
 /** Category list for the rail. Failure is non-fatal — the feed still works on
  *  `top`, so callers fall back rather than blocking the screen. */
 export async function fetchCategories(): Promise<CategoryOption[]> {
-  const res = await fetch(`${API_BASE}/v1/categories`);
+  const res = await fetchWithTimeout(`${API_BASE}/v1/categories`);
   if (!res.ok) throw new FeedError('server', `Categories returned ${res.status}.`);
   const body = (await res.json()) as { items?: CategoryOption[] };
   if (!Array.isArray(body.items)) throw new FeedError('bad-response', 'Unexpected response.');
@@ -307,7 +352,7 @@ export interface AdEventInput {
  */
 export async function postAdEvents(deviceId: string, events: AdEventInput[]): Promise<void> {
   if (events.length === 0) return;
-  const res = await fetch(`${API_BASE}/v1/ads/events`, {
+  const res = await fetchWithTimeout(`${API_BASE}/v1/ads/events`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ deviceId, events: events.slice(0, 50) }),

@@ -123,6 +123,18 @@ export async function getCards(
     .filter((c): c is Card => c !== null);
 }
 
+/** Ids of cached stories published since a moment, in every section — what
+ *  the withdrawn-story check asks the server about. */
+export async function recentIds(sinceMs: number, limit = 400): Promise<string[]> {
+  const db = await open();
+  const rows = await db.getAllAsync<{ id: string }>(
+    `SELECT id FROM articles WHERE published_at >= ? ORDER BY published_at DESC LIMIT ?`,
+    sinceMs,
+    limit,
+  );
+  return rows.map((r) => r.id);
+}
+
 /**
  * Evict by age, then by count.  Ch. 9.3.
  *

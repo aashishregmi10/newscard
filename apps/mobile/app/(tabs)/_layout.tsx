@@ -71,7 +71,8 @@ function TabIcon({
 }
 
 export default function TabsLayout() {
-  const { theme } = useSettings();
+  const { theme, languages } = useSettings();
+  const ne = languages.includes('ne');
   const insets = useSafeAreaInsets();
 
   return (
@@ -133,7 +134,7 @@ export default function TabsLayout() {
           },
         })}
         options={{
-          title: 'Feed',
+          title: ne ? 'समाचार' : 'Feed',
           tabBarIcon: ({ focused, color }) => (
             <TabIcon
               name="card-text-outline"
@@ -147,7 +148,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="videos"
         options={{
-          title: 'Shorts',
+          title: ne ? 'भिडियो' : 'Shorts',
           tabBarIcon: ({ focused, color }) => (
             <TabIcon
               name="play-circle-outline"
@@ -161,7 +162,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="saved"
         options={{
-          title: 'Saved',
+          title: ne ? 'सुरक्षित' : 'Saved',
           tabBarIcon: ({ focused, color }) => (
             <TabIcon
               name="bookmark-outline"
@@ -175,7 +176,7 @@ export default function TabsLayout() {
       <Tabs.Screen
         name="settings"
         options={{
-          title: 'Settings',
+          title: ne ? 'सेटिङ' : 'Settings',
           tabBarIcon: ({ focused, color }) => (
             <TabIcon name="cog-outline" nameFocused="cog" focused={focused} color={color} />
           ),

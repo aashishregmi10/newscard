@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { AppState, View } from 'react-native';
-import { Stack } from 'expo-router';
+import { Stack, useRootNavigationState } from 'expo-router';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { ErrorBoundary } from '../src/components/ErrorBoundary';
@@ -26,8 +26,10 @@ function Root() {
   // face first and swapping when the bundled one arrives reflows every card in
   // view, so the first paint waits — see src/lib/fonts.ts for the bound on it.
   const { ready: fontsReady } = useAppFonts();
-  // Routes a notification tap straight to its card, including from cold start.
-  useNotificationRouting();
+  // Routes a notification tap straight to its card, including from cold start —
+  // held until the navigator below has mounted (it has a key once it has).
+  const navigation = useRootNavigationState();
+  useNotificationRouting(navigation?.key != null);
   // Drops withdrawn stories from the cache on every foreground (Ch. 9.7).
   useRetractionPurge();
 
