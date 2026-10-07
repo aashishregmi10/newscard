@@ -278,3 +278,34 @@ console.log('  apps/mobile/assets/brand/google-g.png  96×96');
  * from its alpha alone, so it is the mark's silhouette — the white lines cut
  * out — on transparent, with Android's padding (96 px, the mark inside 72). */
 await onSquare(mono, markBox, 96, 72, TRANSPARENT, join(MOBILE, 'notification-icon.png'));
+
+/* ── Google Play's store listing (brand/store/) ──
+ * The icon: 512 × 512, 32-bit PNG; Play rounds the corners itself, so the
+ * square is filled edge to edge with white. The feature graphic: 1024 × 500,
+ * no transparency; the full logo on a soft light ground. */
+const STORE = join(ROOT, 'brand', 'store');
+await onSquare(full, markBox, 512, 340, WHITE, join(STORE, 'play-icon-512.png'));
+{
+  const logo = await full()
+    .extract(logoBox)
+    .resize({ height: 400 })
+    .png()
+    .toBuffer();
+  const ground = Buffer.from(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500">
+       <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+         <stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#E7F0FA"/>
+       </linearGradient></defs>
+       <rect width="1024" height="500" fill="url(#g)"/>
+     </svg>`,
+  );
+  mkdirSync(STORE, { recursive: true });
+  const out = join(STORE, 'play-feature-graphic-1024x500.png');
+  await sharp(ground)
+    .composite([{ input: logo, gravity: 'center' }])
+    .flatten({ background: '#ffffff' })
+    .removeAlpha()
+    .png()
+    .toFile(out);
+  console.log(`  ${out.slice(ROOT.length + 1)}  1024×500`);
+}
