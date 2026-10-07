@@ -59,9 +59,31 @@ export function isValidPushToken(token: string | null | undefined): token is str
  * and the chunk size is theirs to decide, so it is asked for rather than
  * assumed.
  */
+/**
+ * The kill switch. Nothing leaves for a phone unless the server is told it may:
+ * NOTIFICATIONS_ENABLED=true in its environment, which only production (or a
+ * developer deliberately testing on their own phone) sets.
+ *
+ * Here, at the one place every push passes through, rather than in the
+ * editorial screens: a development machine pointed at a shared database holds
+ * real devices' tokens, and a test send from it must not reach them. A refused
+ * send is reported as failed, with the reason, so the editorial site says why
+ * nothing went rather than looking as if it did.
+ */
+export function pushEnabled(): boolean {
+  return process.env.NOTIFICATIONS_ENABLED === 'true';
+}
+
+export const PUSH_DISABLED_MESSAGE =
+  'Not sent: notifications are switched off on this server (NOTIFICATIONS_ENABLED is not true).';
+
 export async function sendPush(targets: PushTarget[]): Promise<SendOutcome> {
   const outcome: SendOutcome = { accepted: [], unregistered: [], failed: [] };
   if (targets.length === 0) return outcome;
+  if (!pushEnabled()) {
+    for (const t of targets) outcome.failed.push({ deviceId: t.deviceId, message: PUSH_DISABLED_MESSAGE });
+    return outcome;
+  }
 
   const messages: ExpoPushMessage[] = targets.map((t) => ({
     to: t.token,

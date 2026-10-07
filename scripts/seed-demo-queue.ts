@@ -2,6 +2,7 @@ import 'dotenv/config';
 import { ObjectId } from 'mongodb';
 import { connect, close, collections } from '@saar/db';
 import { countGraphemes, countWords } from '@saar/shared';
+import { requireLocalDatabase } from './lib/localOnly.js';
 
 /**
  * Stories in the editorial queue, so the newsroom workflow can be demonstrated.
@@ -152,7 +153,7 @@ const STORIES: QueueStory[] = [
 ];
 
 async function main(): Promise<void> {
-  const db = await connect({ uri: process.env.MONGO_URI! });
+  const db = await connect({ uri: requireLocalDatabase('demo:seed') });
   const c = collections(db);
 
   // Idempotent: clear anything a previous run left, so rehearsing twice does

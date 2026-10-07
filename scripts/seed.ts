@@ -20,17 +20,15 @@ import { generateFor } from './gen-images.js';
 import { fetchAll } from './fetch-demo-images.js';
 import { seedAds } from './seedAds.js';
 import { seedVideos } from './seedVideos.js';
+import { requireLocalDatabase } from './lib/localOnly.js';
 
 /** Development-only credentials, printed at the end so they are never a secret
  *  hidden in a file, and never reused anywhere real. */
 const DEV_EMAIL = 'editor@example.invalid';
 const DEV_PASSWORD = 'seed-editor-password';
 
-const uri = process.env.MONGO_URI;
-if (!uri) {
-  console.error('MONGO_URI is not set. Copy .env.example to .env first.');
-  process.exit(1);
-}
+/* Empties articles, sources, staff and advertisers first: a local database only. */
+const uri = requireLocalDatabase('db:seed');
 
 /**
  * Image URLs are stored RELATIVE ("/media/..."), and the client resolves them

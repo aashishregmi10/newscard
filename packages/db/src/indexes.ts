@@ -1,5 +1,5 @@
 import type { Db, IndexDescription } from 'mongodb';
-import { READ_EVENT_TTL_DAYS, AD_EVENT_TTL_DAYS, CLIENT_ERROR_TTL_DAYS } from '@saar/shared';
+import { READ_EVENT_TTL_DAYS, AD_EVENT_TTL_DAYS, CLIENT_ERROR_TTL_DAYS, DEVICE_IDLE_DELETE_DAYS } from '@saar/shared';
 
 /**
  * Every index in the system.  Spec Ch. 3.15.
@@ -152,9 +152,14 @@ const DEVICES: IndexSpec[] = [
     serves: 'Token rotation and dedupe, ignoring devices with no token yet',
   },
   {
+    // An install not seen for 180 days is deleted, push token and all — the
+    // Privacy Policy says so. A TTL index rather than a job: nothing to run,
+    // nothing to forget to run. lastSeenAt is set by the server's clock on
+    // every registration (each app launch), never the phone's.
     key: { lastSeenAt: 1 },
     name: 'device_last_seen',
-    serves: 'prune-devices job — deletes devices idle for 180 days',
+    expireAfterSeconds: DEVICE_IDLE_DELETE_DAYS * 24 * 60 * 60,
+    serves: 'Automatic deletion of installs idle for 180 days',
   },
 ];
 
@@ -391,6 +396,8 @@ export interface SyncResult {
   collection: string;
   created: string[];
   existing: string[];
+  /** Could not be built — a duplicate under a unique index, most often. The rest went on. */
+  failed: Array<{ name: string; error: string }>;
 }
 
 /**
@@ -412,12 +419,40 @@ function sameDefinition(live: Record<string, unknown>, spec: Record<string, unkn
   return true;
 }
 
-/** Idempotent. Safe to run on every deploy. */
+/** The options of a live index, in the form createIndex takes, to put it back. */
+function asSpec(live: Record<string, unknown>): IndexDescription {
+  const spec: Record<string, unknown> = { key: live.key, name: live.name };
+  for (const o of ['unique', 'sparse', 'expireAfterSeconds', 'partialFilterExpression'] as const) {
+    if (live[o] !== undefined) spec[o] = live[o];
+  }
+  return spec as unknown as IndexDescription;
+}
+
+const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+
+/**
+ * Idempotent. Safe to run on every deploy.
+ *
+ * One index that cannot be built does not stop the others. It used to: on
+ * 7 Oct 2026 a duplicate URL in `leads` failed its unique index, the sync
+ * stopped there, and every collection after it went without its indexes —
+ * the votes' and ratings' "one per reader" included — for as long as nobody
+ * read the error. Now each failure is recorded, the sync carries on, and the
+ * caller reports them all.
+ *
+ * A changed definition has to replace the old index under the same name (and
+ * MongoDB keeps no two indexes on one key with different options), so the old
+ * one is dropped first — and if the new one then cannot be built, the old one
+ * is put back. A collection is never left without the index it had.
+ */
 export async function syncIndexes(db: Db): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
 
   for (const [collection, specs] of Object.entries(ALL_INDEXES)) {
     const coll = db.collection(collection);
+    const created: string[] = [];
+    const existing: string[] = [];
+    const failed: SyncResult['failed'] = [];
 
     // A collection with no documents and no validator does not exist yet, and
     // listing its indexes throws "ns does not exist" rather than returning [].
@@ -426,35 +461,42 @@ export async function syncIndexes(db: Db): Promise<SyncResult[]> {
     try {
       live = (await coll.indexes()) as Array<Record<string, unknown>>;
     } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (!/ns does not exist|NamespaceNotFound/i.test(msg)) throw e;
+      if (!/ns does not exist|NamespaceNotFound/i.test(message(e))) {
+        failed.push({ name: '(listing indexes)', error: message(e) });
+        results.push({ collection, created, existing, failed });
+        continue;
+      }
     }
     const byName = new Map(live.map((i) => [String(i.name), i]));
 
-    const created: string[] = [];
-    const existing: string[] = [];
-
     for (const { serves: _serves, ...spec } of specs) {
-      const name = spec.name;
-      const current = name ? byName.get(name) : undefined;
+      const name = spec.name ?? JSON.stringify(spec.key);
+      const current = spec.name ? byName.get(spec.name) : undefined;
 
-      if (current) {
+      if (current && sameDefinition(current, spec)) {
+        existing.push(name);
+        continue;
+      }
+
+      try {
         // An index whose OPTIONS changed must be dropped and rebuilt —
         // createIndex is a no-op when the name already exists, so without this
         // a corrected definition silently never takes effect and the old,
         // broken index keeps enforcing the old rule.
-        if (sameDefinition(current, spec)) {
-          existing.push(name!);
-          continue;
+        if (current) await coll.dropIndex(spec.name!);
+        try {
+          await coll.createIndex(spec.key, spec);
+        } catch (e) {
+          if (current) await coll.createIndex(current.key as IndexDescription['key'], asSpec(current));
+          throw e;
         }
-        await coll.dropIndex(name!);
+        created.push(name);
+      } catch (e) {
+        failed.push({ name, error: message(e) });
       }
-
-      await coll.createIndex(spec.key, spec);
-      created.push(name ?? JSON.stringify(spec.key));
     }
 
-    results.push({ collection, created, existing });
+    results.push({ collection, created, existing, failed });
   }
 
   return results;

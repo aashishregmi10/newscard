@@ -10,7 +10,7 @@ loadDotenv();
 
 export default defineConfig({
   test: {
-    include: ['{apps,packages}/**/__tests__/**/*.test.ts'],
+    include: ['{apps,packages,scripts}/**/__tests__/**/*.test.ts'],
     /**
      * apps/mobile runs its own suite — `npm run test:mobile`, and its own CI
      * job.

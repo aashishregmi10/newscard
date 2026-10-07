@@ -2,8 +2,14 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { collections, getDb } from '@saar/db';
 import { AppError } from '@saar/shared';
-import { equalisePasswordTiming, verifyPassword } from '../auth/password.js';
-import { createSession, destroySession, SESSION_COOKIE, SESSION_TTL_MS } from '../auth/session.js';
+import { equalisePasswordTiming, hashPassword, verifyPassword } from '../auth/password.js';
+import {
+  createSession,
+  destroyAllSessionsFor,
+  destroySession,
+  SESSION_COOKIE,
+  SESSION_TTL_MS,
+} from '../auth/session.js';
 import { asyncRoute } from '../middleware/index.js';
 import { clearLoginAttempts, loginLimit } from '../middleware/rateLimit.js';
 
@@ -43,8 +49,12 @@ authRoutes.post(
       throw reject();
     }
 
+    // Locked: the same answer, in the same time, as any other failure. Saying
+    // "temporarily locked" was only ever true of real accounts, so it told
+    // anyone which emails exist. Fifteen minutes later it opens again.
     if (staff.lockedUntil && staff.lockedUntil.getTime() > Date.now()) {
-      throw new AppError('FORBIDDEN', 'Account temporarily locked. Try again shortly.');
+      await equalisePasswordTiming(parsed.data.password);
+      throw reject();
     }
 
     const ok = await verifyPassword(staff.passwordHash, parsed.data.password);
@@ -98,6 +108,54 @@ authRoutes.post(
   asyncRoute(async (req, res) => {
     await destroySession(req.cookies?.[SESSION_COOKIE]);
     res.clearCookie(SESSION_COOKIE, { path: '/' });
+    res.json({ ok: true });
+  }),
+);
+
+const PasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(200),
+  newPassword: z.string().min(12, 'At least 12 characters.').max(200),
+});
+
+/**
+ * Change one's own password. The current one must be given — a session left
+ * open on a shared computer must not be enough to take the account. Every
+ * other session ends (a password change is what someone does when they think
+ * it was seen), and this one is replaced, so the person stays signed in here.
+ */
+authRoutes.post(
+  '/auth/password',
+  loginLimit,
+  asyncRoute(async (req, res) => {
+    if (!req.staff) throw new AppError('UNAUTHENTICATED');
+    const parsed = PasswordSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new AppError('BAD_REQUEST', parsed.error.issues[0]?.message ?? 'Give the current and the new password.');
+    }
+    if (parsed.data.newPassword === parsed.data.currentPassword) {
+      throw new AppError('BAD_REQUEST', 'The new password must differ from the current one.');
+    }
+
+    const c = collections(getDb());
+    const staff = await c.staff.findOne({ email: req.staff.email });
+    if (!staff || !staff.isActive) throw new AppError('UNAUTHENTICATED');
+    if (!(await verifyPassword(staff.passwordHash, parsed.data.currentPassword))) {
+      throw new AppError('UNAUTHENTICATED', 'The current password is not right.');
+    }
+
+    await c.staff.updateOne(
+      { _id: staff._id },
+      { $set: { passwordHash: await hashPassword(parsed.data.newPassword), updatedAt: new Date() } },
+    );
+    await destroyAllSessionsFor(staff._id.toString());
+    const token = await createSession({ _id: staff._id, email: staff.email });
+    res.cookie(SESSION_COOKIE, token, {
+      httpOnly: true,
+      sameSite: 'strict',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: SESSION_TTL_MS,
+      path: '/',
+    });
     res.json({ ok: true });
   }),
 );

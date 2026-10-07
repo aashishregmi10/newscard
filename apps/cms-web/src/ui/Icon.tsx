@@ -51,6 +51,7 @@ export type IconName =
   | 'inbox'
   | 'info'
   | 'layers'
+  | 'key'
   | 'logout'
   | 'megaphone'
   | 'newspaper'
@@ -204,6 +205,14 @@ const SHAPES: Record<IconName, ReactNode> = {
       <path d="m12 3.4 8.6 4.5-8.6 4.5-8.6-4.5z" />
       <path d="m3.4 12.4 8.6 4.5 8.6-4.5" />
       <path d="m3.4 16.6 8.6 4.5 8.6-4.5" />
+    </>
+  ),
+  key: (
+    <>
+      <circle cx="8" cy="15" r="4.2" />
+      <path d="m11 12 8.6-8.6" />
+      <path d="m16.4 6.6 2.4 2.4" />
+      <path d="m14.2 8.8 1.8 1.8" />
     </>
   ),
   logout: (

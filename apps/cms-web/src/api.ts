@@ -724,6 +724,11 @@ export const api = {
       body: JSON.stringify({ email, password }),
     }),
   logout: () => req<{ ok: true }>('/auth/logout', { method: 'POST' }),
+  changePassword: (currentPassword: string, newPassword: string) =>
+    req<{ ok: true }>('/auth/password', {
+      method: 'POST',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
 
   queue: (signal?: AbortSignal) =>
     req<{ limits: Limits; items: QueueItem[] }>('/cms/queue', { signal }),

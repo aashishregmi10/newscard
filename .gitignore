@@ -47,3 +47,6 @@ media/commons-cache.json
 media/v/
 media/video-cache.json
 media/.tmp/
+
+# Database backups (scripts/backup-db.ts) hold readers' data. Never in git.
+backups/

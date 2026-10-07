@@ -6,12 +6,13 @@ import { countGraphemes, countWords } from '@saar/shared';
 import { STORIES, SOURCES } from './seedStories.js';
 import { generateFor } from './gen-images.js';
 import { fetchAll } from './fetch-demo-images.js';
+import { requireLocalDatabase } from './lib/localOnly.js';
 
 const CDN_BASE = process.env.CDN_BASE_URL ?? '/media';
 const minsAgo = (m: number) => new Date(Date.now() - m * 60_000);
 
 async function main() {
-  await connect({ uri: process.env.MONGO_URI! });
+  await connect({ uri: requireLocalDatabase('seed-published') });
   const db = getDb();
   const c = collections(db);
 

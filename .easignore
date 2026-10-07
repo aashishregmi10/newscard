@@ -61,3 +61,6 @@ yarn-error.*
 # docs/, and local assistant settings. Neither belongs on a build server.
 docs/
 .claude/
+
+# Database backups — readers' data. Never uploaded.
+backups/

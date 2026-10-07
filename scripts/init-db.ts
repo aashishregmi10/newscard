@@ -47,6 +47,16 @@ async function main(): Promise<void> {
 
   const total = Object.values(ALL_INDEXES).reduce((n, list) => n + list.length, 0);
   console.log(`\n${created} index(es) created, ${total} declared in total.`);
+
+  /* Every failure, after everything else has been built — one bad collection
+     no longer hides the rest. Still a failed run: a missing unique index is a
+     rule the database is not enforcing. */
+  const failures = indexes.flatMap((r) => r.failed.map((f) => ({ ...f, collection: r.collection })));
+  if (failures.length > 0) {
+    console.error(`\n${failures.length} index(es) could not be built:`);
+    for (const f of failures) console.error(`  ${f.collection}.${f.name}: ${f.error}`);
+    process.exitCode = 1;
+  }
 }
 
 main()

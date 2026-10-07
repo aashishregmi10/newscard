@@ -1,8 +1,9 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Staff } from '../api';
 import { Routes, routeToHash, type Route, type Section } from '../nav';
 import { usePreventStrayFileDrop } from '../hooks/usePreventStrayFileDrop';
 import { Button, Icon, type IconName } from '../ui';
+import { ChangePassword } from './ChangePassword';
 
 /**
  * The frame: a persistent drawer, a toolbar beside it, and the screen beneath.
@@ -92,6 +93,7 @@ export function AppShell({
   children,
 }: AppShellProps) {
   usePreventStrayFileDrop();
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const mainRef = useRef<HTMLElement | null>(null);
   const settled = useRef(false);
@@ -193,6 +195,13 @@ export function AppShell({
 
           <Button
             variant="ghost"
+            icon="key"
+            onClick={() => setChangingPassword(true)}
+            aria-label="Change password"
+            title="Change password"
+          />
+          <Button
+            variant="ghost"
             icon="logout"
             busy={signingOut}
             onClick={onSignOut}
@@ -201,6 +210,8 @@ export function AppShell({
           />
         </div>
       </header>
+
+      <ChangePassword open={changingPassword} onClose={() => setChangingPassword(false)} />
 
       {/*
         * The scroll container, and the only one.
