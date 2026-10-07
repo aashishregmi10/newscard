@@ -140,5 +140,10 @@ jobs:
       - name: Install cms-web
         run: npm ci --prefix apps/cms-web
 
+      # Two of the site's tests check its copy of the rules against the server's
+      # (@saar/shared), whose type declarations exist only once it is built.
+      - name: Build the shared package the site's tests compare against
+        run: npx tsc -b packages/shared
+
       - name: Typecheck and build
         run: npm run build --prefix apps/cms-web

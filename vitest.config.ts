@@ -8,6 +8,18 @@ import { config as loadDotenv } from 'dotenv';
  */
 loadDotenv();
 
+/*
+ * The reader API validates its settings the first time a route asks for them,
+ * and two are required. A developer has them from .env; CI has no .env. The
+ * suites passed there only when app.test.ts — which loads test values into the
+ * settings cache — happened to run before the files that call those routes,
+ * and adding test files changed the order (CI, 7 Oct 2026). So the suites get
+ * test values here, before any worker starts, never overriding a real .env.
+ * Tests connect through MONGO_TEST_URI; this MONGO_URI is only validated.
+ */
+process.env.MONGO_URI ??= process.env.MONGO_TEST_URI ?? 'mongodb://localhost:27017/newscard_test';
+process.env.CURSOR_SECRET ??= 'test-only-cursor-secret-at-least-32-characters';
+
 export default defineConfig({
   test: {
     include: ['{apps,packages,scripts}/**/__tests__/**/*.test.ts'],
